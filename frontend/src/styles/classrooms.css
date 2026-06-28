@@ -6,13 +6,13 @@
   align-items: center;
   margin-bottom: 2rem;
   padding-bottom: 1.5rem;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .classrooms-header h1 {
   margin: 0;
   font-size: 2rem;
-  color: white;
+  color: var(--color-text);
 }
 
 /* ========== STATS ========== */
@@ -28,14 +28,14 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  background: rgba(85, 63, 51, 0.5);
-  border: 1px solid rgba(148, 163, 184, 0.15);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 12px;
   padding: 1.25rem 1.5rem;
 }
 
 .stat-label {
-  color: #cbd5e1;
+  color: var(--color-text-secondary);
   font-size: 0.9rem;
 }
 
@@ -43,7 +43,7 @@
   display: flex;
   align-items: baseline;
   gap: 0.35rem;
-  color: white;
+  color: var(--color-text);
 }
 
 .stat-number {
@@ -68,8 +68,8 @@
 
 .view-toggle {
   display: flex;
-  background: rgba(15, 23, 42, 0.8);
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 8px;
   padding: 4px;
 }
@@ -83,18 +83,18 @@
   background: transparent;
   border: none;
   border-radius: 6px;
-  color: #94a3b8;
+  color: var(--color-text-muted);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .view-toggle-btn:hover {
-  color: #e2e8f0;
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text);
+  background: var(--color-surface-hover);
 }
 
 .view-toggle-btn.active {
-  background: #3b82f6;
+  background: var(--color-accent);
   color: white;
 }
 
@@ -107,10 +107,10 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.6rem 1rem;
-  background: rgba(15, 23, 42, 0.8);
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 8px;
-  color: white;
+  color: var(--color-text);
   font-size: 0.95rem;
   font-weight: 500;
   cursor: pointer;
@@ -120,12 +120,12 @@
 }
 
 .dropdown-btn:hover {
-  border-color: rgba(148, 163, 184, 0.4);
-  background: rgba(15, 23, 42, 1);
+  border-color: var(--color-border);
+  background: var(--color-surface-hover);
 }
 
 .dropdown-btn.is-placeholder {
-  color: #64748b;
+  color: var(--color-text-secondary);
 }
 
 .dropdown-btn .chevron-open {
@@ -137,12 +137,12 @@
   top: calc(100% + 4px);
   left: 0;
   right: 0;
-  background: #1e293b;
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 8px;
   overflow: hidden;
   z-index: 100;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-lg);
 }
 
 .dropdown-option {
@@ -151,7 +151,7 @@
   padding: 0.65rem 1rem;
   background: transparent;
   border: none;
-  color: #cbd5e1;
+  color: var(--color-text-secondary);
   font-size: 0.95rem;
   text-align: left;
   cursor: pointer;
@@ -159,13 +159,13 @@
 }
 
 .dropdown-option:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: white;
+  background: var(--color-surface-hover);
+  color: var(--color-text);
 }
 
 .dropdown-option.active {
-  background: rgba(59, 130, 246, 0.15);
-  color: #93c5fd;
+  background: var(--color-accent-light);
+  color: var(--color-accent-text);
 }
 
 .dropdown--form .dropdown-btn {
@@ -237,16 +237,16 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  background: rgba(85, 63, 51, 0.5);
-  border: 1px solid rgba(148, 163, 184, 0.15);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 12px;
   padding: 1rem 1.5rem;
   transition: all 0.2s ease;
 }
 
 .classroom-row:hover {
-  background: rgba(51, 65, 85, 0.7);
-  border-color: rgba(148, 163, 184, 0.3);
+  background: var(--color-surface-hover);
+  border-color: var(--color-border);
 }
 
 .classroom-row-info {
@@ -264,38 +264,38 @@
 .classroom-row-main h3 {
   margin: 0;
   font-size: 1.1rem;
-  color: white;
+  color: var(--color-text);
 }
 
 .classroom-row-details {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem 1.5rem;
-  color: #94a3b8;
+  color: var(--color-text-muted);
   font-size: 0.9rem;
 }
 
 .classroom-row-details span:not(:last-child)::after {
   content: '·';
   margin-left: 1.5rem;
-  color: rgba(148, 163, 184, 0.4);
+  color: var(--color-text-muted);
 }
 
 /* ========== CARDS ========== */
 
 .classroom-card {
-  background: rgba(85, 63, 51, 0.5);
-  border: 1px solid rgba(148, 163, 184, 0.15);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 12px;
   padding: 1.5rem;
   transition: all 0.3s ease;
 }
 
 .classroom-card:hover {
-  background: rgba(51, 65, 85, 0.7);
-  border-color: rgba(148, 163, 184, 0.3);
+  background: var(--color-surface-hover);
+  border-color: var(--color-border);
   transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-md);
 }
 
 .card-header {
@@ -308,7 +308,7 @@
 .card-header h3 {
   margin: 0;
   font-size: 1.25rem;
-  color: white;
+  color: var(--color-text);
   flex: 1;
 }
 
@@ -325,12 +325,12 @@
 
 .card-body p {
   margin: 0;
-  color: #cbd5e1;
+  color: var(--color-text-secondary);
   font-size: 0.95rem;
 }
 
 .card-body strong {
-  color: #e2e8f0;
+  color: var(--color-text);
 }
 
 /* ========== EMPTY STATE ========== */
@@ -342,8 +342,8 @@
   align-items: center;
   justify-content: center;
   padding: 3rem;
-  background: rgba(51, 65, 85, 0.3);
-  border: 2px dashed rgba(148, 163, 184, 0.2);
+  background: var(--color-surface);
+  border: 2px dashed var(--color-border-subtle);
   border-radius: 12px;
   text-align: center;
   width: 100%;
@@ -351,7 +351,7 @@
 
 .empty-state p {
   margin: 0 0 1.5rem 0;
-  color: #cbd5e1;
+  color: var(--color-text-secondary);
   font-size: 1.1rem;
 }
 
@@ -363,7 +363,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -372,15 +372,15 @@
 }
 
 .modal-content {
-  background: #1e293b;
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 12px;
   padding: 2rem;
   width: 90%;
   max-width: 500px;
   max-height: 85vh;
   overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-lg);
   animation: slideUp 0.3s ease;
 }
 
@@ -405,7 +405,7 @@
 .modal-header h2 {
   margin: 0;
   font-size: 1.5rem;
-  color: white;
+  color: var(--color-text);
 }
 
 .btn-close {
@@ -416,15 +416,15 @@
   justify-content: center;
   background: transparent;
   border: none;
-  color: #94a3b8;
+  color: var(--color-text-muted);
   cursor: pointer;
   border-radius: 6px;
   transition: all 0.2s ease;
 }
 
 .btn-close:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: white;
+  background: var(--color-surface-hover);
+  color: var(--color-text);
 }
 
 /* ========== FORM ========== */
@@ -444,35 +444,35 @@ form {
 .form-group label {
   font-size: 0.9rem;
   font-weight: 500;
-  color: #e2e8f0;
+  color: var(--color-text);
 }
 
 .form-group input {
   padding: 0.75rem 1rem;
-  background: rgba(15, 23, 42, 0.8);
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 6px;
-  color: white;
+  color: var(--color-text);
   font-size: 1rem;
   transition: all 0.2s ease;
 }
 
 .form-group .dropdown-btn:focus {
   outline: none;
-  border-color: rgba(148, 163, 184, 0.5);
-  background: rgba(15, 23, 42, 1);
-  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.1);
+  border-color: var(--color-border);
+  background: var(--color-bg);
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.15);
 }
 
 .form-group input:focus {
   outline: none;
-  border-color: rgba(148, 163, 184, 0.5);
-  background: rgba(15, 23, 42, 1);
-  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.1);
+  border-color: var(--color-border);
+  background: var(--color-bg);
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.15);
 }
 
 .form-group input::placeholder {
-  color: #64748b;
+  color: var(--color-text-secondary);
 }
 
 .form-row {
@@ -501,7 +501,7 @@ form {
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1.5rem;
-  background: #3b82f6;
+  background: var(--color-accent);
   border: none;
   border-radius: 6px;
   color: white;
@@ -512,7 +512,7 @@ form {
 }
 
 .btn-primary:hover {
-  background: #2563eb;
+  background: var(--color-accent-hover);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
@@ -523,10 +523,10 @@ form {
 
 .btn-secondary {
   padding: 0.75rem 1.5rem;
-  background: rgba(100, 116, 139, 0.2);
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 6px;
-  color: #cbd5e1;
+  color: var(--color-text-secondary);
   font-size: 0.95rem;
   font-weight: 500;
   cursor: pointer;
@@ -534,8 +534,8 @@ form {
 }
 
 .btn-secondary:hover {
-  background: rgba(100, 116, 139, 0.3);
-  color: #e2e8f0;
+  background: var(--color-surface-hover);
+  color: var(--color-text);
 }
 
 .btn-icon {
@@ -546,15 +546,15 @@ form {
   justify-content: center;
   background: transparent;
   border: none;
-  color: #94a3b8;
+  color: var(--color-text-muted);
   cursor: pointer;
   border-radius: 6px;
   transition: all 0.2s ease;
 }
 
 .btn-icon:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: white;
+  background: var(--color-surface-hover);
+  color: var(--color-text);
 }
 
 .btn-icon.btn-danger {
