@@ -5,6 +5,8 @@ import { useTheme } from './hooks/useTheme';
 import Dashboard from './pages/Dashboard';
 import Teachers from './pages/Teachers';
 import Classrooms from './pages/Classrooms';
+import Courses from './pages/Courses';
+import Horarios from './pages/Horarios';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -21,10 +23,19 @@ function App() {
         return <Dashboard />;
       case 'teachers':
         return <Teachers />;
+      case 'courses':
+        return <Courses />;
       case 'classrooms':
         return <Classrooms />;
-      default:
+      default: {
+        if (currentPage.startsWith('cycle')) {
+          const cycle = Number.parseInt(currentPage.replace('cycle', ''), 10);
+          if (cycle >= 1 && cycle <= 10) {
+            return <Horarios cycle={cycle} />;
+          }
+        }
         return <Dashboard />;
+      }
     }
   };
 

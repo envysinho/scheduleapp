@@ -1,4 +1,5 @@
 import { Settings, Search, Bell, Menu, Sun, Moon } from 'lucide-react';
+import logo from "./assets/images/logofi.png";
 
 function Navbar({ toggleSidebar, isDark, onToggleTheme }) {
   return (
@@ -7,7 +8,8 @@ function Navbar({ toggleSidebar, isDark, onToggleTheme }) {
         <button type="button" className="hamburger-btn" onClick={toggleSidebar}>
           <Menu size={24} />
         </button>
-        <h2 className="navbar-title">Gestor de Horarios</h2>
+        <img src={logo} alt="LOGO FI" className="navbar-logo" />
+        <h2 className="navbar-title">admin</h2>
       </div>
 
       <div className="navbar-center">
@@ -15,7 +17,7 @@ function Navbar({ toggleSidebar, isDark, onToggleTheme }) {
           <Search size={18} />
           <input
             type="text"
-            placeholder="Buscar..."
+            placeholder="Buscar aulas, docentes..."
             className="search-input"
           />
         </div>

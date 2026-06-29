@@ -35,6 +35,8 @@
   top: 0;
   width: 250px;
   height: 100vh;
+  display: flex;
+  flex-direction: column;
   background: var(--color-surface);
   transition: left 0.3s ease;
   z-index: 999;
@@ -55,7 +57,8 @@
   margin: 0;
 }
 
-.sidebar nav a {
+.sidebar nav a,
+.sidebar-footer a {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -66,14 +69,24 @@
   border-left: 3px solid transparent;
 }
 
-.sidebar nav a:hover {
+.sidebar nav a:hover,
+.sidebar-footer a:hover {
   background: var(--color-surface-hover);
   border-left-color: var(--color-accent);
   padding-left: 1.75rem;
 }
 
-.sidebar nav a svg {
+.sidebar nav a svg,
+.sidebar-footer a svg {
   flex-shrink: 0;
+}
+
+.sidebar-footer a {
+  color: #ef4444;
+}
+
+.sidebar-footer a:hover {
+  border-left-color: #ef4444;
 }
 
 .overlay {
@@ -121,6 +134,71 @@
   font-weight: 700;
 }
 
+.sidebar-divider {
+  height: 1px;
+  background: var(--color-border-subtle);
+  margin: 0.5rem 1rem;
+}
+
+.sidebar nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin-top: 0.5rem;
+}
+
+.sidebar-dropdown {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  background: transparent;
+  border: none;
+  border-left: 3px solid transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.sidebar-dropdown-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sidebar-dropdown-label svg {
+  flex-shrink: 0;
+}
+
+.sidebar-dropdown:hover {
+  background: var(--color-surface-hover);
+  border-left-color: var(--color-accent);
+  padding-left: 1.75rem;
+}
+
+.sidebar-dropdown-chevron {
+  margin-left: auto;
+  flex-shrink: 0;
+  transition: transform 0.25s ease;
+}
+
+.sidebar-dropdown-chevron.rotate {
+  transform: rotate(180deg);
+}
+
+.sidebar-footer {
+  flex-shrink: 0;
+  margin-top: auto;
+  margin-bottom: 0.5rem;
+}
+
+.sidebar-footer ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
 
 @keyframes fadeIn {
   from {
