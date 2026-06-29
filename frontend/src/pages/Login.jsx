@@ -44,7 +44,7 @@ function Login() {
         <CardHeader>
           <CardTitle className="text-xl font-semibold text-center">Iniciar sesión</CardTitle>
           <CardDescription className="text-center text-sm text-muted-foreground">
-            Acceso sólo a personal autorizado.
+            Acceso sólo al personal autorizado.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -55,7 +55,7 @@ function Login() {
                 id="username"
                 type="text"
                 autoComplete="username"
-                placeholder="Tu usuario"
+                placeholder="Ingrese su usuario"
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
                 aria-invalid={hasError}
@@ -69,7 +69,7 @@ function Login() {
                 id="password"
                 type="password"
                 autoComplete="current-password"
-                placeholder="Tu contraseña"
+                placeholder="Ingrese su contraseña"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 aria-invalid={hasError}
