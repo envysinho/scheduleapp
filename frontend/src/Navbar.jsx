@@ -1,6 +1,6 @@
-import { Settings, Search, Bell, Menu } from 'lucide-react';
+import { Settings, Search, Bell, Menu, Sun, Moon } from 'lucide-react';
 
-function Navbar({ toggleSidebar }) {
+function Navbar({ toggleSidebar, isDark, onToggleTheme }) {
   return (
     <nav className="navbar">
       <div className="navbar-left">
@@ -25,6 +25,15 @@ function Navbar({ toggleSidebar }) {
         <button type="button" className="notification-btn">
           <Bell size={22} />
           <span className="notification-badge">3</span>
+        </button>
+        <button
+          type="button"
+          className="theme-btn"
+          onClick={onToggleTheme}
+          aria-label={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+          title={isDark ? 'Modo claro' : 'Modo oscuro'}
+        >
+          {isDark ? <Sun size={22} /> : <Moon size={22} />}
         </button>
         <button type="button" className="settings-btn">
           <Settings size={22} />

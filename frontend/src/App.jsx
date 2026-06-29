@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Sidebar from './Sidebar';
 import Navbar from './Navbar';
+import { useTheme } from './hooks/useTheme';
 import Dashboard from './pages/Dashboard';
 import Teachers from './pages/Teachers';
 import Classrooms from './pages/Classrooms';
@@ -8,6 +9,7 @@ import Classrooms from './pages/Classrooms';
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { isDark, toggleTheme } = useTheme();
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -28,7 +30,7 @@ function App() {
 
   return (
     <>
-      <Navbar toggleSidebar={toggleSidebar} />
+      <Navbar toggleSidebar={toggleSidebar} isDark={isDark} onToggleTheme={toggleTheme} />
       <Sidebar isOpen={sidebarOpen} toggleSidebar={toggleSidebar} onNavigate={setCurrentPage} />
       <main className="app">
         {renderPage()}
