@@ -1,9 +1,10 @@
+import PageCard from "@/components/PageCard";
+
 function Courses() {
   return (
-    <div className="view-container">
-      <h1>Cursos</h1>
+    <PageCard title="Cursos">
       <p>Contenido de cursos aquí</p>
-    </div>
+    </PageCard>
   );
 }
 

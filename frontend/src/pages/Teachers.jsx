@@ -1,9 +1,10 @@
+import PageCard from "@/components/PageCard";
+
 function Teachers() {
   return (
-    <div className="view-container">
-      <h1>Docentes</h1>
+    <PageCard title="Docentes">
       <p>Contenido de docentes aquí</p>
-    </div>
+    </PageCard>
   );
 }
 

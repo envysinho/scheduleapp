@@ -1,0 +1,134 @@
+import { useState } from "react";
+import logo from "@/assets/images/logofi.png";
+import {
+  LayoutDashboard,
+  GraduationCap,
+  BookOpen,
+  School,
+  CalendarDays,
+  LogOut,
+  ChevronDown,
+} from "lucide-react";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+  SidebarRail,
+  SidebarSeparator,
+  useSidebar,
+} from "@/components/ui/sidebar";
+import { CYCLES } from "@/pages/Horarios";
+
+const NAV_ITEMS = [
+  { id: "dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  { id: "teachers", icon: GraduationCap, label: "Docentes" },
+  { id: "courses", icon: BookOpen, label: "Cursos" },
+  { id: "classrooms", icon: School, label: "Aulas" },
+];
+
+function AppSidebar({ currentPage, onNavigate }) {
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const { isMobile, setOpenMobile } = useSidebar();
+
+  const handleNavigation = (page) => {
+    onNavigate(page);
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
+
+  return (
+    <Sidebar collapsible="icon">
+      <SidebarHeader className="border-b border-sidebar-border">
+        <div className="flex items-center gap-3 px-2 py-1">
+          <img src={logo} alt="Logo FI" className="size-10 object-contain" />
+          <div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
+            <span className="text-xs text-sidebar-foreground/70">Facultad de</span>
+            <strong className="text-sm font-semibold">Ingeniería</strong>
+          </div>
+        </div>
+      </SidebarHeader>
+
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {NAV_ITEMS.map(({ id, icon: Icon, label }) => (
+                <SidebarMenuItem key={id}>
+                  <SidebarMenuButton
+                    isActive={currentPage === id}
+                    tooltip={label}
+                    onClick={() => handleNavigation(id)}
+                  >
+                    <Icon />
+                    <span>{label}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarSeparator />
+
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="Horarios"
+                  onClick={() => setScheduleOpen((open) => !open)}
+                >
+                  <CalendarDays />
+                  <span>Horarios</span>
+                  <ChevronDown
+                    className={`ml-auto transition-transform${scheduleOpen ? " rotate-180" : ""}`}
+                  />
+                </SidebarMenuButton>
+                {scheduleOpen && (
+                  <SidebarMenuSub>
+                    {CYCLES.map(({ id, label }) => (
+                      <SidebarMenuSubItem key={id}>
+                        <SidebarMenuSubButton
+                          render={<button type="button" />}
+                          isActive={currentPage === `cycle${id}`}
+                          onClick={() => handleNavigation(`cycle${id}`)}
+                        >
+                          {label}
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    ))}
+                  </SidebarMenuSub>
+                )}
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton tooltip="Cerrar sesión">
+              <LogOut />
+              <span>Cerrar sesión</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+
+      <SidebarRail />
+    </Sidebar>
+  );
+}
+
+export default AppSidebar;

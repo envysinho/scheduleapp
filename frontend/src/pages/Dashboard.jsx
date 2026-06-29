@@ -1,9 +1,10 @@
+import PageCard from "@/components/PageCard";
+
 function Dashboard() {
   return (
-    <div className="view-container">
-      <h1>Dashboard</h1>
+    <PageCard title="Dashboard">
       <p>Contenido del dashboard aquí</p>
-    </div>
+    </PageCard>
   );
 }
 
