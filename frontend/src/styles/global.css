@@ -6,7 +6,7 @@
   --color-border-subtle: #ffffff29;
   --color-text: #ffffff;
   --color-text-secondary: #ffffff;
-  --color-text-muted: #ffffff;
+  --color-text-muted: #ffffff5e;
   --color-overlay: rgba(0, 0, 0, 0.6);
 }
 
@@ -33,6 +33,17 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
   min-height: 100vh;
+}
+
+html,
+body {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;
 }
 
 @media (max-width: 768px) {
