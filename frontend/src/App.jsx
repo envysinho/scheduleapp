@@ -3,16 +3,19 @@ import AppHeader from "@/components/AppHeader";
 import AppSidebar from "@/components/AppSidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/hooks/useTheme";
 import Dashboard from "@/pages/Dashboard";
 import Teachers from "@/pages/Teachers";
 import Classrooms from "@/pages/Classrooms";
 import Courses from "@/pages/Courses";
 import Horarios from "@/pages/Horarios";
+import Login from "@/pages/Login";
 
-function App() {
+function AppContent() {
   const [currentPage, setCurrentPage] = useState("dashboard");
   const { isDark, toggleTheme } = useTheme();
+  const { isAuthenticated, isLoading } = useAuth();
 
   const renderPage = () => {
     switch (currentPage) {
@@ -36,6 +39,18 @@ function App() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex min-h-svh items-center justify-center bg-background">
+        <p className="text-sm text-muted-foreground">Cargando...</p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Login />;
+  }
+
   return (
     <TooltipProvider>
       <SidebarProvider>
@@ -46,6 +61,14 @@ function App() {
         </SidebarInset>
       </SidebarProvider>
     </TooltipProvider>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

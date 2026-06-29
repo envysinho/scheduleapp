@@ -27,6 +27,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { CYCLES } from "@/pages/Horarios";
+import { useAuth } from "@/contexts/AuthContext";
 
 const NAV_ITEMS = [
   { id: "dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -38,6 +39,7 @@ const NAV_ITEMS = [
 function AppSidebar({ currentPage, onNavigate }) {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const { isMobile, setOpenMobile } = useSidebar();
+  const { logout } = useAuth();
 
   const handleNavigation = (page) => {
     onNavigate(page);
@@ -118,7 +120,7 @@ function AppSidebar({ currentPage, onNavigate }) {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Cerrar sesión">
+            <SidebarMenuButton tooltip="Cerrar sesión" onClick={logout}>
               <LogOut />
               <span>Cerrar sesión</span>
             </SidebarMenuButton>
