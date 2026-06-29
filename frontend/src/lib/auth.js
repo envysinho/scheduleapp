@@ -1,4 +1,5 @@
 const AUTH_STORAGE_KEY = "schedule.auth";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8081";
 
 export function getStoredSession() {
   try {
@@ -26,24 +27,26 @@ export async function login({ username, password }) {
     throw new Error("Usuario y contraseña son obligatorios");
   }
 
-  // TODO: conectar con POST /api/auth/login
-  // const res = await fetch("/api/auth/login", {
-  //   method: "POST",
-  //   headers: { "Content-Type": "application/json" },
-  //   body: JSON.stringify({ username: trimmedUsername, password: trimmedPassword }),
-  // });
-  // if (!res.ok) throw new Error("Credenciales inválidas");
-  // const data = await res.json();
-  // saveSession(data);
-  // return data;
+  const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username: trimmedUsername,
+      password: trimmedPassword,
+    }),
+  });
 
-  const session = {
-    user: { username: trimmedUsername },
-    token: "mock-token",
-  };
+  const payload = await res.json().catch(() => null);
+  if (!res.ok) {
+    const message =
+      payload && typeof payload.message === "string"
+        ? payload.message
+        : "Credenciales inválidas";
+    throw new Error(message);
+  }
 
-  saveSession(session);
-  return session;
+  saveSession(payload);
+  return payload;
 }
 
 export function logout() {
