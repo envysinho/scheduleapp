@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: schedule-postgres
+    environment:
+      POSTGRES_DB: schedule_db
+      POSTGRES_USER: schedule
+      POSTGRES_PASSWORD: schedule
+    ports:
+      - "5433:5432"
+    volumes:
+      - schedule_pg_data:/var/lib/postgresql/data
+
+volumes:
+  schedule_pg_data:

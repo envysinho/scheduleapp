@@ -8,6 +8,7 @@ import {
   CalendarDays,
   LogOut,
   ChevronDown,
+  Users,
 } from "lucide-react";
 import {
   Sidebar,
@@ -39,7 +40,8 @@ const NAV_ITEMS = [
 function AppSidebar({ currentPage, onNavigate }) {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const { isMobile, setOpenMobile } = useSidebar();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+  const isAdmin = user?.role === "ADMIN";
 
   const handleNavigation = (page) => {
     onNavigate(page);
@@ -54,8 +56,8 @@ function AppSidebar({ currentPage, onNavigate }) {
         <div className="flex items-center gap-3 px-2 py-1">
           <img src={logo} alt="Logo FI" className="size-10 object-contain" />
           <div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
-            <span className="text-xs text-sidebar-foreground/70 tracking-[0.5px]">Facultad de</span>
-            <strong className="text-sm font-semibold">Ingeniería</strong>
+            <span className="text-[10.3px] text-sidebar-foreground/70 tracking-normal">Universidad Nacional de Cañete</span>
+            <strong className="text-sm font-semibold">Facultad de Ingeniería</strong>
           </div>
         </div>
       </SidebarHeader>
@@ -76,6 +78,18 @@ function AppSidebar({ currentPage, onNavigate }) {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              {isAdmin && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={currentPage === "users"}
+                    tooltip="Usuarios"
+                    onClick={() => handleNavigation("users")}
+                  >
+                    <Users />
+                    <span>Usuarios</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

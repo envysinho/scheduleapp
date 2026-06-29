@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import AppSidebar from "@/components/AppSidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -11,11 +11,19 @@ import Classrooms from "@/pages/Classrooms";
 import Courses from "@/pages/Courses";
 import Horarios from "@/pages/Horarios";
 import Login from "@/pages/Login";
+import Users from "@/pages/Users";
 
 function AppContent() {
   const [currentPage, setCurrentPage] = useState("dashboard");
   const { isDark, toggleTheme } = useTheme();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const isAdmin = user?.role === "ADMIN";
+
+  useEffect(() => {
+    if (currentPage === "users" && !isAdmin) {
+      setCurrentPage("dashboard");
+    }
+  }, [currentPage, isAdmin]);
 
   const renderPage = () => {
     switch (currentPage) {
@@ -27,6 +35,8 @@ function AppContent() {
         return <Courses />;
       case "classrooms":
         return <Classrooms />;
+      case "users":
+        return isAdmin ? <Users /> : <Dashboard />;
       default: {
         if (currentPage.startsWith("cycle")) {
           const cycle = Number.parseInt(currentPage.replace("cycle", ""), 10);
@@ -38,14 +48,6 @@ function AppContent() {
       }
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="flex min-h-svh items-center justify-center bg-background">
-        <p className="text-sm text-muted-foreground">Cargando...</p>
-      </div>
-    );
-  }
 
   if (!isAuthenticated) {
     return <Login />;

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useState } from "react";
 import {
   getStoredSession,
   login as loginRequest,
@@ -8,15 +8,8 @@ import {
 const AuthContext = createContext(null);
 
 function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState(() => getStoredSession()?.user ?? null);
   const [error, setError] = useState(null);
-
-  useEffect(() => {
-    const session = getStoredSession();
-    setUser(session?.user ?? null);
-    setIsLoading(false);
-  }, []);
 
   const login = async (credentials) => {
     setError(null);
@@ -42,7 +35,6 @@ function AuthProvider({ children }) {
       value={{
         user,
         isAuthenticated: Boolean(user),
-        isLoading,
         login,
         logout,
         error,
