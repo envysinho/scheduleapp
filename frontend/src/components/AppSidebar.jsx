@@ -52,7 +52,7 @@ function AppSidebar({ currentPage, onNavigate }) {
         <div className="flex items-center gap-3 px-2 py-1">
           <img src={logo} alt="Logo FI" className="size-10 object-contain" />
           <div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
-            <span className="text-xs text-sidebar-foreground/70">Facultad de</span>
+            <span className="text-xs text-sidebar-foreground/70 tracking-[0.5px]">Facultad de</span>
             <strong className="text-sm font-semibold">Ingeniería</strong>
           </div>
         </div>
@@ -61,7 +61,7 @@ function AppSidebar({ currentPage, onNavigate }) {
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-y-0.5">
               {NAV_ITEMS.map(({ id, icon: Icon, label }) => (
                 <SidebarMenuItem key={id}>
                   <SidebarMenuButton

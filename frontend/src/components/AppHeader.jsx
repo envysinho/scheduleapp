@@ -9,8 +9,7 @@ function AppHeader({ isDark, onToggleTheme }) {
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
       <SidebarTrigger className="-ml-1" />
-      <img src={logo} alt="LOGO FI" className="size-8 object-contain shrink-0" />
-      <span className="font-semibold shrink-0">admin</span>
+      <span className="font-semibold shrink-0">Gestor de Horarios</span>
 
       <div className="flex flex-1 items-center justify-center px-2 md:px-4">
         <div className="relative w-full max-w-xl">
