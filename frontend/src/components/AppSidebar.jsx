@@ -27,6 +27,11 @@ import {
   SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { CYCLES } from "@/pages/Horarios";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -99,33 +104,34 @@ function AppSidebar({ currentPage, onNavigate }) {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  tooltip="Horarios"
-                  onClick={() => setScheduleOpen((open) => !open)}
-                >
-                  <CalendarDays />
-                  <span>Horarios</span>
-                  <ChevronDown
-                    className={`ml-auto transition-transform${scheduleOpen ? " rotate-180" : ""}`}
-                  />
-                </SidebarMenuButton>
-                {scheduleOpen && (
-                  <SidebarMenuSub>
-                    {CYCLES.map(({ id, label }) => (
-                      <SidebarMenuSubItem key={id}>
-                        <SidebarMenuSubButton
-                          render={<button type="button" />}
-                          isActive={currentPage === `cycle${id}`}
-                          onClick={() => handleNavigation(`cycle${id}`)}
-                        >
-                          {label}
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                    ))}
-                  </SidebarMenuSub>
-                )}
-              </SidebarMenuItem>
+              <Collapsible
+                open={scheduleOpen}
+                onOpenChange={setScheduleOpen}
+                className="group/collapsible"
+              >
+                <SidebarMenuItem>
+                  <CollapsibleTrigger render={<SidebarMenuButton tooltip="Horarios" />}>
+                    <CalendarDays />
+                    <span>Horarios</span>
+                    <ChevronDown className="ml-auto transition-transform duration-200 group-data-[open]/collapsible:rotate-180" />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {CYCLES.map(({ id, label }) => (
+                        <SidebarMenuSubItem key={id}>
+                          <SidebarMenuSubButton
+                            render={<button type="button" />}
+                            isActive={currentPage === `cycle${id}`}
+                            onClick={() => handleNavigation(`cycle${id}`)}
+                          >
+                            {label}
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
