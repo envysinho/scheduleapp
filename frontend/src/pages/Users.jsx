@@ -5,13 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+  useComboboxAnchor,
+} from "@/components/ui/combobox";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   createUser,
@@ -21,10 +22,7 @@ import {
   updateUser,
 } from "@/lib/api";
 
-const ROLE_OPTIONS = [
-  { value: "USER", label: "USER" },
-  { value: "ADMIN", label: "ADMIN" },
-];
+const ROLE_OPTIONS = ["USER", "ADMIN"];
 
 const EMPTY_FORM = {
   username: "",
@@ -42,6 +40,7 @@ function Users() {
   const [successMessage, setSuccessMessage] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const roleAnchor = useComboboxAnchor();
 
   const handleUnauthorized = useCallback(() => {
     logout();
@@ -288,27 +287,28 @@ function Users() {
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="user-role">Rol</Label>
-            <Select
-              items={ROLE_OPTIONS}
-              value={form.role}
-              onValueChange={(value) =>
-                setForm((current) => ({ ...current, role: value }))
-              }
-              disabled={isSubmitting}
-            >
-              <SelectTrigger id="user-role" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent alignItemWithTrigger>
-                <SelectGroup>
-                  {ROLE_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+            <div ref={roleAnchor} className="w-full">
+              <Combobox
+                items={ROLE_OPTIONS}
+                value={form.role}
+                onValueChange={(value) =>
+                  setForm((current) => ({ ...current, role: value }))
+                }
+                disabled={isSubmitting}
+              >
+                <ComboboxInput id="user-role" placeholder="Seleccionar rol" readOnly />
+                <ComboboxContent anchor={roleAnchor}>
+                  <ComboboxEmpty>Sin opciones.</ComboboxEmpty>
+                  <ComboboxList>
+                    {(item) => (
+                      <ComboboxItem key={item} value={item}>
+                        {item}
+                      </ComboboxItem>
+                    )}
+                  </ComboboxList>
+                </ComboboxContent>
+              </Combobox>
+            </div>
           </div>
 
           {editingId && (
