@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, globalShortcut } = require('electron');
 const path = require('path');
 
 if (process.platform === 'linux') {
@@ -21,9 +21,19 @@ function createWindow() {
 
   const startUrl = process.env.ELECTRON_START_URL || 'http://127.0.0.1:5173';
   mainWindow.loadURL(startUrl);
+  mainWindow.setMenuBarVisibility(false);
+}
+
+function registerMenuBarToggle() {
+  globalShortcut.register('Alt+M', () => {
+    const win = BrowserWindow.getFocusedWindow();
+    if (!win) return;
+    win.setMenuBarVisibility(!win.isMenuBarVisible());
+  });
 }
 
 app.whenReady().then(() => {
+  registerMenuBarToggle();
   createWindow();
 
   app.on('activate', () => {
@@ -37,4 +47,8 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
 });
