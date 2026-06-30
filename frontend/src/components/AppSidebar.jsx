@@ -6,10 +6,11 @@ import {
   BookOpen,
   School,
   CalendarDays,
-  LogOut,
   ChevronDown,
+  ScrollText,
   Users,
 } from "lucide-react";
+import NavUser from "@/components/NavUser";
 import {
   Sidebar,
   SidebarContent,
@@ -39,7 +40,7 @@ const NAV_ITEMS = [
   { id: "dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { id: "teachers", icon: GraduationCap, label: "Docentes" },
   { id: "courses", icon: BookOpen, label: "Cursos" },
-  { id: "classrooms", icon: School, label: "Aulas" },
+  { id: "spaces", icon: School, label: "Ambientes" },
 ];
 
 function AppSidebar({ currentPage, onNavigate }) {
@@ -50,6 +51,13 @@ function AppSidebar({ currentPage, onNavigate }) {
 
   const handleNavigation = (page) => {
     onNavigate(page);
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
+
+  const handleLogout = () => {
+    logout();
     if (isMobile) {
       setOpenMobile(false);
     }
@@ -134,6 +142,16 @@ function AppSidebar({ currentPage, onNavigate }) {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
+                  isActive={currentPage === "rules"}
+                  tooltip="Reglas"
+                  onClick={() => handleNavigation("rules")}
+                >
+                  <ScrollText />
+                  <span>Reglas</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
                   isActive={currentPage === "users"}
                   tooltip="Usuarios"
                   onClick={() => handleNavigation("users")}
@@ -146,18 +164,7 @@ function AppSidebar({ currentPage, onNavigate }) {
             <SidebarSeparator className="mx-0 !w-full" />
           </>
         )}
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              tooltip="Cerrar sesión"
-              className="text-red-400 hover:text-red-400 active:text-red-400"
-              onClick={logout}
-            >
-              <LogOut />
-              <span>Cerrar sesión</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <NavUser user={user} onLogout={handleLogout} />
       </SidebarFooter>
 
       <SidebarRail />

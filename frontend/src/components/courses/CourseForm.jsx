@@ -398,7 +398,7 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
 
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <Label>Espacios asignados</Label>
+            <Label>Ambientes asignados</Label>
             <Button
               type="button"
               variant="outline"
@@ -407,12 +407,12 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
               disabled={isSubmitting}
             >
               <Plus className="size-4" />
-              Añadir espacio
+              Añadir ambiente
             </Button>
           </div>
 
           {form.spaceAssignments.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin espacios asignados.</p>
+            <p className="text-sm text-muted-foreground">Sin ambientes asignados.</p>
           ) : (
             form.spaceAssignments.map((assignment, index) => (
               <SpaceAssignmentRow
@@ -464,21 +464,21 @@ function SpaceAssignmentRow({
   return (
     <div className="rounded-md border p-3">
       <div className="mb-3 flex items-center justify-between">
-        <span className="text-sm font-medium">Espacio {index + 1}</span>
+        <span className="text-sm font-medium">Ambiente {index + 1}</span>
         <Button
           type="button"
           variant="ghost"
           size="icon-sm"
           onClick={() => onRemove(index)}
           disabled={disabled}
-          aria-label={`Quitar espacio ${index + 1}`}
+          aria-label={`Quitar ambiente ${index + 1}`}
         >
           <Trash2 className="size-4" />
         </Button>
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor={`space-assignment-${index}`}>Espacio</Label>
+        <Label htmlFor={`space-assignment-${index}`}>Ambiente</Label>
         <div ref={spaceAnchor} className="w-full">
           <Combobox
             items={spaceLabels}
@@ -491,11 +491,11 @@ function SpaceAssignmentRow({
           >
             <ComboboxInput
               id={`space-assignment-${index}`}
-              placeholder="Seleccionar espacio"
+              placeholder="Seleccionar ambiente"
               readOnly
             />
             <ComboboxContent anchor={spaceAnchor}>
-              <ComboboxEmpty>Sin espacios.</ComboboxEmpty>
+              <ComboboxEmpty>Sin ambientes.</ComboboxEmpty>
               <ComboboxList>
                 {(label) => (
                   <ComboboxItem key={label} value={label}>

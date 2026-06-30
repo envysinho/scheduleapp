@@ -7,11 +7,12 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/hooks/useTheme";
 import Dashboard from "@/pages/Dashboard";
 import Teachers from "@/pages/Teachers";
-import Classrooms from "@/pages/Classrooms";
+import Spaces from "@/pages/Spaces";
 import Courses from "@/pages/Courses";
 import Horarios from "@/pages/Horarios";
 import Login from "@/pages/Login";
 import Users from "@/pages/Users";
+import Rules from "@/pages/Rules";
 
 function AppContent() {
   const [currentPage, setCurrentPage] = useState("dashboard");
@@ -20,7 +21,7 @@ function AppContent() {
   const isAdmin = user?.role === "ADMIN";
 
   useEffect(() => {
-    if (currentPage === "users" && !isAdmin) {
+    if ((currentPage === "users" || currentPage === "rules") && !isAdmin) {
       setCurrentPage("dashboard");
     }
   }, [currentPage, isAdmin]);
@@ -33,8 +34,10 @@ function AppContent() {
         return <Teachers />;
       case "courses":
         return <Courses />;
-      case "classrooms":
-        return <Classrooms />;
+      case "spaces":
+        return <Spaces />;
+      case "rules":
+        return isAdmin ? <Rules /> : <Dashboard />;
       case "users":
         return isAdmin ? <Users /> : <Dashboard />;
       default: {

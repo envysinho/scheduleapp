@@ -123,12 +123,12 @@ function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
         disabled={isSubmitting}
       >
         <ArrowLeft className="size-4" />
-        Volver a espacios
+        Volver a ambientes
       </Button>
 
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
-          <Label htmlFor="space-name">Nombre del espacio</Label>
+          <Label htmlFor="space-name">Nombre del ambiente</Label>
           <Input
             id="space-name"
             value={form.name}
@@ -142,7 +142,7 @@ function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="space-type">Tipo de espacio</Label>
+            <Label htmlFor="space-type">Tipo de ambiente</Label>
             <div ref={spaceTypeAnchor} className="w-full">
               <Combobox
                 items={SPACE_TYPES.map((item) => item.label)}

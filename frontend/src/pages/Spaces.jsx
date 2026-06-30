@@ -28,7 +28,7 @@ import {
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-function Classrooms() {
+function Spaces() {
   const { logout, user } = useAuth();
   const isAdmin = user?.role === "ADMIN";
 
@@ -61,7 +61,7 @@ function Classrooms() {
       );
       setSpaces(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al cargar espacios");
+      setError(err instanceof Error ? err.message : "Error al cargar ambientes");
     } finally {
       setIsLoading(false);
     }
@@ -102,7 +102,7 @@ function Classrooms() {
       }
       closeForm();
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Error al guardar espacio");
+      setFormError(err instanceof Error ? err.message : "Error al guardar ambiente");
     } finally {
       setIsSubmitting(false);
     }
@@ -124,7 +124,7 @@ function Classrooms() {
       }
       await loadSpaces();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al eliminar espacio");
+      setError(err instanceof Error ? err.message : "Error al eliminar ambiente");
     }
   };
 
@@ -148,13 +148,13 @@ function Classrooms() {
   const isFormView = pageView === "form";
   const pageTitle = isFormView
     ? editingSpace
-      ? "Editar espacio"
-      : "Añadir espacio"
-    : "Espacios";
+      ? "Editar ambiente"
+      : "Añadir ambiente"
+    : "Ambientes";
 
   const pageDescription = isFormView
-    ? "Complete los datos del espacio y sus cursos asignados."
-    : "Gestión y consulta de aulas y laboratorios por tipo, disponibilidad y ciclo.";
+    ? "Complete los datos del ambiente y sus cursos asignados."
+    : "Gestión y consulta de ambientes por tipo, disponibilidad y ciclo.";
 
   return (
     <PageCard title={pageTitle} description={pageDescription}>
@@ -170,7 +170,7 @@ function Classrooms() {
         <div className="flex flex-col gap-6">
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-2">
-              <Label>Tipo de espacio</Label>
+              <Label>Tipo de ambiente</Label>
               <div className="flex flex-wrap gap-1">
                 {SPACE_TYPE_FILTERS.map((item) => (
                   <Button
@@ -258,7 +258,7 @@ function Classrooms() {
               {isAdmin && (
                 <Button type="button" onClick={openCreateForm}>
                   <Building2 className="size-4" />
-                  Añadir espacio
+                  Añadir ambiente
                 </Button>
               )}
             </div>
@@ -271,10 +271,10 @@ function Classrooms() {
           )}
 
           {isLoading ? (
-            <p className="text-sm text-muted-foreground">Cargando espacios...</p>
+            <p className="text-sm text-muted-foreground">Cargando ambientes...</p>
           ) : spaces.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No hay espacios que coincidan con los filtros seleccionados.
+              No hay ambientes que coincidan con los filtros seleccionados.
             </p>
           ) : (
             <div
@@ -302,4 +302,4 @@ function Classrooms() {
   );
 }
 
-export default Classrooms;
+export default Spaces;

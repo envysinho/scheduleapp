@@ -151,7 +151,7 @@ function Courses() {
     : "Cursos";
 
   const pageDescription = isFormView
-    ? "Complete los datos del curso, docentes por turno y espacios asignados."
+    ? "Complete los datos del curso, docentes por turno y ambientes asignados."
     : "Gestión y consulta de cursos por tipo, disponibilidad, turno y ciclo.";
 
   return (
