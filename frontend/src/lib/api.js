@@ -121,3 +121,46 @@ export async function deleteTeacher(id, onUnauthorized) {
     onUnauthorized
   );
 }
+
+function buildSpacesQuery(filters = {}) {
+  const params = new URLSearchParams();
+  if (filters.spaceType) {
+    params.set("spaceType", filters.spaceType);
+  }
+  if (filters.availability) {
+    params.set("availability", filters.availability);
+  }
+  if (filters.cycle) {
+    params.set("cycle", String(filters.cycle));
+  }
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+export async function listSpaces(filters, onUnauthorized) {
+  return apiFetch(`/api/spaces${buildSpacesQuery(filters)}`, {}, onUnauthorized);
+}
+
+export async function createSpace(data, onUnauthorized) {
+  return apiFetch(
+    "/api/spaces",
+    { method: "POST", body: JSON.stringify(data) },
+    onUnauthorized
+  );
+}
+
+export async function updateSpace(id, data, onUnauthorized) {
+  return apiFetch(
+    `/api/spaces/${id}`,
+    { method: "PUT", body: JSON.stringify(data) },
+    onUnauthorized
+  );
+}
+
+export async function deleteSpace(id, onUnauthorized) {
+  return apiFetch(
+    `/api/spaces/${id}`,
+    { method: "DELETE" },
+    onUnauthorized
+  );
+}

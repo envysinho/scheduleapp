@@ -16,10 +16,9 @@ Este archivo define cómo un agente debe operar en el proyecto `Schedule` para r
 5. Cuando sea posible, usar instrucciones de patch o editar solo bloques específicos.
 
 ## Token savings
-- Evitar repetir contexto completo del proyecto.
-- No incluir código no solicitado.
-- Usar listas cortas y claras.
-- Si se sugiere ejecutar comandos, dar solo los comandos necesarios.
+Ver guía completa: [`docs/ECONOMIA-TOKENS.md`](docs/ECONOMIA-TOKENS.md).
+
+Resumen: no repetir contexto, grep antes de leer, patches pequeños, respuestas breves, sin builds/deps sin permiso.
 
 ## Flujo recomendado
 - Leer y entender el archivo actual antes de modificarlo.

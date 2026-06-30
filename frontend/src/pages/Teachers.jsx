@@ -174,7 +174,6 @@ function Teachers() {
                   <Button
                     key={item.label}
                     type="button"
-                    size="sm"
                     variant={employmentType === item.value ? "default" : "outline"}
                     onClick={() => handleEmploymentFilter(item.value)}
                   >

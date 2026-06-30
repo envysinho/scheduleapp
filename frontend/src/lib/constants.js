@@ -48,3 +48,32 @@ export function getCourseCategoryLabel(value) {
 export function getCycleLabel(cycleId) {
   return CYCLES.find((item) => item.id === cycleId)?.label ?? `Ciclo ${cycleId}`;
 }
+
+export const SPACE_TYPES = [
+  { value: "AULA", label: "Aula" },
+  { value: "LABORATORIO", label: "Laboratorio" },
+];
+
+export const SPACE_TYPE_FILTERS = [
+  { value: null, label: "Todos" },
+  ...SPACE_TYPES,
+];
+
+export const AVAILABILITY_STATUSES = [
+  { value: "DISPONIBLE", label: "Disponible" },
+  { value: "OCUPADO", label: "Ocupado" },
+  { value: "EN_MANTENIMIENTO", label: "En mantenimiento" },
+];
+
+export const AVAILABILITY_FILTERS = [
+  { value: null, label: "Todos" },
+  ...AVAILABILITY_STATUSES,
+];
+
+export function getSpaceTypeLabel(value) {
+  return SPACE_TYPES.find((item) => item.value === value)?.label ?? value;
+}
+
+export function getAvailabilityLabel(value) {
+  return AVAILABILITY_STATUSES.find((item) => item.value === value)?.label ?? value;
+}
