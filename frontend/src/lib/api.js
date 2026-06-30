@@ -78,3 +78,46 @@ export async function deleteUser(id, onUnauthorized) {
     onUnauthorized
   );
 }
+
+function buildTeachersQuery(filters = {}) {
+  const params = new URLSearchParams();
+  if (filters.employmentType) {
+    params.set("employmentType", filters.employmentType);
+  }
+  if (filters.courseCategory) {
+    params.set("courseCategory", filters.courseCategory);
+  }
+  if (filters.cycle) {
+    params.set("cycle", String(filters.cycle));
+  }
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+export async function listTeachers(filters, onUnauthorized) {
+  return apiFetch(`/api/teachers${buildTeachersQuery(filters)}`, {}, onUnauthorized);
+}
+
+export async function createTeacher(data, onUnauthorized) {
+  return apiFetch(
+    "/api/teachers",
+    { method: "POST", body: JSON.stringify(data) },
+    onUnauthorized
+  );
+}
+
+export async function updateTeacher(id, data, onUnauthorized) {
+  return apiFetch(
+    `/api/teachers/${id}`,
+    { method: "PUT", body: JSON.stringify(data) },
+    onUnauthorized
+  );
+}
+
+export async function deleteTeacher(id, onUnauthorized) {
+  return apiFetch(
+    `/api/teachers/${id}`,
+    { method: "DELETE" },
+    onUnauthorized
+  );
+}

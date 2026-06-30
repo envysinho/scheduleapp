@@ -32,7 +32,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { CYCLES } from "@/pages/Horarios";
+import { CYCLES } from "@/lib/constants";
 import { useAuth } from "@/contexts/AuthContext";
 
 const NAV_ITEMS = [
