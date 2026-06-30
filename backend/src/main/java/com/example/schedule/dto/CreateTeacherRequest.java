@@ -17,7 +17,7 @@ public record CreateTeacherRequest(
         @Size(max = 150) String email,
         @Size(max = 30) String phone,
         @NotNull EmploymentType employmentType,
-        @NotNull TeacherShift shift,
+        @NotEmpty List<TeacherShift> shifts,
         @NotEmpty @Valid List<TeacherAssignmentRequest> assignments
 ) {
 }

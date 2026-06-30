@@ -17,7 +17,7 @@ public interface TeacherRepository extends JpaRepository<Teacher, Long> {
             SELECT DISTINCT t FROM Teacher t
             LEFT JOIN t.assignments a
             WHERE (:employmentType IS NULL OR t.employmentType = :employmentType)
-              AND (:shift IS NULL OR t.shift = :shift)
+              AND (:shift IS NULL OR :shift MEMBER OF t.shifts)
               AND (:courseCategory IS NULL OR a.courseCategory = :courseCategory)
               AND (:cycle IS NULL OR a.cycle = :cycle)
             ORDER BY t.lastName ASC, t.firstName ASC

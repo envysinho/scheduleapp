@@ -2,7 +2,9 @@ package com.example.schedule.entity;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -11,13 +13,17 @@ import com.example.schedule.model.EmploymentType;
 import com.example.schedule.model.TeacherShift;
 
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
@@ -45,9 +51,11 @@ public class Teacher {
     @Column(name = "employment_type", nullable = false)
     private EmploymentType employmentType;
 
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "teacher_shifts", joinColumns = @JoinColumn(name = "teacher_id"))
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, columnDefinition = "varchar(255) not null default 'MANANA'")
-    private TeacherShift shift;
+    @Column(name = "shift")
+    private Set<TeacherShift> shifts = new LinkedHashSet<>();
 
     @OneToMany(mappedBy = "teacher", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<TeacherAssignment> assignments = new ArrayList<>();
@@ -108,12 +116,12 @@ public class Teacher {
         this.employmentType = employmentType;
     }
 
-    public TeacherShift getShift() {
-        return shift;
+    public Set<TeacherShift> getShifts() {
+        return shifts;
     }
 
-    public void setShift(TeacherShift shift) {
-        this.shift = shift;
+    public void setShifts(Set<TeacherShift> shifts) {
+        this.shifts = shifts;
     }
 
     public List<TeacherAssignment> getAssignments() {

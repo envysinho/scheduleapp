@@ -25,6 +25,7 @@ export const EMPLOYMENT_TYPE_FILTERS = [
 export const TEACHER_SHIFTS = [
   { value: "MANANA", label: "Mañana" },
   { value: "TARDE", label: "Tarde" },
+  { value: "NOCHE", label: "Noche" },
 ];
 
 export const TEACHER_SHIFT_FILTERS = [
@@ -90,4 +91,34 @@ export function getSpaceTypeLabel(value) {
 
 export function getAvailabilityLabel(value) {
   return AVAILABILITY_STATUSES.find((item) => item.value === value)?.label ?? value;
+}
+
+export const COURSE_TYPES = [
+  { value: "ESTUDIOS_GENERALES", label: "Estudios generales" },
+  { value: "DE_CARRERA", label: "De carrera" },
+  { value: "LECTIVOS", label: "Lectivos" },
+];
+
+export const COURSE_TYPE_FILTERS = [
+  { value: null, label: "Todos" },
+  ...COURSE_TYPES,
+];
+
+export const COURSE_AVAILABILITY = [
+  { value: "LIBRE", label: "Libre" },
+  { value: "INCOMPLETO", label: "Incompleto" },
+  { value: "LLENO", label: "Lleno" },
+];
+
+export const COURSE_AVAILABILITY_FILTERS = [
+  { value: null, label: "Todos" },
+  ...COURSE_AVAILABILITY,
+];
+
+export function getCourseTypeLabel(value) {
+  return COURSE_TYPES.find((item) => item.value === value)?.label ?? value;
+}
+
+export function getCourseAvailabilityLabel(value) {
+  return COURSE_AVAILABILITY.find((item) => item.value === value)?.label ?? value;
 }

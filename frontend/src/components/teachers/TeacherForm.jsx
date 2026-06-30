@@ -34,7 +34,7 @@ const EMPTY_FORM = {
   email: "",
   phone: "",
   employmentType: "NOMBRADO",
-  shift: "MANANA",
+  shifts: ["MANANA"],
   assignments: [{ ...EMPTY_ASSIGNMENT }],
 };
 
@@ -49,7 +49,12 @@ function teacherToForm(teacher) {
     email: teacher.email ?? "",
     phone: teacher.phone ?? "",
     employmentType: teacher.employmentType ?? "NOMBRADO",
-    shift: teacher.shift ?? "MANANA",
+    shifts:
+      teacher.shifts?.length > 0
+        ? [...teacher.shifts]
+        : teacher.shift
+          ? [teacher.shift]
+          : ["MANANA"],
     assignments:
       teacher.assignments?.length > 0
         ? teacher.assignments.map((assignment) => ({
@@ -92,15 +97,37 @@ function TeacherForm({ teacher, onSubmit, onCancel, isSubmitting, error }) {
     }));
   };
 
+  const toggleShift = (shift) => {
+    setForm((current) => {
+      const isSelected = current.shifts.includes(shift);
+      if (isSelected) {
+        if (current.shifts.length === 1) {
+          return current;
+        }
+        return {
+          ...current,
+          shifts: current.shifts.filter((item) => item !== shift),
+        };
+      }
+      return {
+        ...current,
+        shifts: [...current.shifts, shift],
+      };
+    });
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (form.shifts.length === 0) {
+      return;
+    }
     const payload = {
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),
       email: form.email.trim() || null,
       phone: form.phone.trim() || null,
       employmentType: form.employmentType,
-      shift: form.shift,
+      shifts: form.shifts,
       assignments: form.assignments
         .filter((assignment) => assignment.courseName.trim())
         .map((assignment) => ({
@@ -228,10 +255,8 @@ function TeacherForm({ teacher, onSubmit, onCancel, isSubmitting, error }) {
                 <Button
                   key={item.value}
                   type="button"
-                  variant={form.shift === item.value ? "default" : "outline"}
-                  onClick={() =>
-                    setForm((current) => ({ ...current, shift: item.value }))
-                  }
+                  variant={form.shifts.includes(item.value) ? "default" : "outline"}
+                  onClick={() => toggleShift(item.value)}
                   disabled={isSubmitting}
                 >
                   {item.label}

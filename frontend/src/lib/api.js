@@ -169,3 +169,49 @@ export async function deleteSpace(id, onUnauthorized) {
     onUnauthorized
   );
 }
+
+function buildCoursesQuery(filters = {}) {
+  const params = new URLSearchParams();
+  if (filters.type) {
+    params.set("type", filters.type);
+  }
+  if (filters.availability) {
+    params.set("availability", filters.availability);
+  }
+  if (filters.shift) {
+    params.set("shift", filters.shift);
+  }
+  if (filters.cycle) {
+    params.set("cycle", String(filters.cycle));
+  }
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+export async function listCourses(filters, onUnauthorized) {
+  return apiFetch(`/api/courses${buildCoursesQuery(filters)}`, {}, onUnauthorized);
+}
+
+export async function createCourse(data, onUnauthorized) {
+  return apiFetch(
+    "/api/courses",
+    { method: "POST", body: JSON.stringify(data) },
+    onUnauthorized
+  );
+}
+
+export async function updateCourse(id, data, onUnauthorized) {
+  return apiFetch(
+    `/api/courses/${id}`,
+    { method: "PUT", body: JSON.stringify(data) },
+    onUnauthorized
+  );
+}
+
+export async function deleteCourse(id, onUnauthorized) {
+  return apiFetch(
+    `/api/courses/${id}`,
+    { method: "DELETE" },
+    onUnauthorized
+  );
+}

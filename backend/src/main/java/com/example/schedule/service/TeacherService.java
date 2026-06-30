@@ -1,8 +1,10 @@
 package com.example.schedule.service;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -22,9 +24,11 @@ import com.example.schedule.repository.TeacherRepository;
 public class TeacherService {
 
     private final TeacherRepository teacherRepository;
+    private final JdbcTemplate jdbcTemplate;
 
-    public TeacherService(TeacherRepository teacherRepository) {
+    public TeacherService(TeacherRepository teacherRepository, JdbcTemplate jdbcTemplate) {
         this.teacherRepository = teacherRepository;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Transactional(readOnly = true)
@@ -47,7 +51,7 @@ public class TeacherService {
     public TeacherResponse create(CreateTeacherRequest request) {
         Teacher teacher = new Teacher();
         applyTeacherFields(teacher, request.firstName(), request.lastName(),
-                request.email(), request.phone(), request.employmentType(), request.shift());
+                request.email(), request.phone(), request.employmentType(), request.shifts());
         teacher.replaceAssignments(toAssignments(request.assignments()));
         return TeacherResponse.from(teacherRepository.save(teacher));
     }
@@ -56,7 +60,7 @@ public class TeacherService {
     public TeacherResponse update(Long id, UpdateTeacherRequest request) {
         Teacher teacher = getTeacherOrThrow(id);
         applyTeacherFields(teacher, request.firstName(), request.lastName(),
-                request.email(), request.phone(), request.employmentType(), request.shift());
+                request.email(), request.phone(), request.employmentType(), request.shifts());
         teacher.replaceAssignments(toAssignments(request.assignments()));
         return TeacherResponse.from(teacherRepository.save(teacher));
     }
@@ -79,7 +83,7 @@ public class TeacherService {
                 "maria.garcia@unc.edu.pe",
                 "987654321",
                 EmploymentType.NOMBRADO,
-                TeacherShift.MANANA,
+                List.of(TeacherShift.MANANA),
                 List.of(
                         new TeacherAssignmentRequest("Cálculo I", CourseCategory.CARRERA, 1),
                         new TeacherAssignmentRequest("Matemática General", CourseCategory.ESTUDIOS_GENERALES, 1)));
@@ -90,7 +94,7 @@ public class TeacherService {
                 "carlos.lopez@unc.edu.pe",
                 "912345678",
                 EmploymentType.CONTRATADO,
-                TeacherShift.TARDE,
+                List.of(TeacherShift.TARDE),
                 List.of(
                         new TeacherAssignmentRequest("Programación I", CourseCategory.CARRERA, 2),
                         new TeacherAssignmentRequest("Introducción a la Computación", CourseCategory.ESTUDIOS_GENERALES, 2)));
@@ -101,13 +105,30 @@ public class TeacherService {
                 "ana.torres@unc.edu.pe",
                 null,
                 EmploymentType.INVITADO,
-                TeacherShift.MANANA,
+                List.of(TeacherShift.MANANA),
                 List.of(
                         new TeacherAssignmentRequest("Física I", CourseCategory.CARRERA, 3)));
 
         create(teacher1);
         create(teacher2);
         create(teacher3);
+    }
+
+    @Transactional
+    public void migrateLegacyShiftsIfNeeded() {
+        try {
+            jdbcTemplate.execute("""
+                    INSERT INTO teacher_shifts (teacher_id, shift)
+                    SELECT t.id, t.shift
+                    FROM teachers t
+                    WHERE t.shift IS NOT NULL
+                      AND NOT EXISTS (
+                        SELECT 1 FROM teacher_shifts ts WHERE ts.teacher_id = t.id
+                      )
+                    """);
+        } catch (Exception ignored) {
+            // Legacy column may not exist on fresh databases.
+        }
     }
 
     private void applyTeacherFields(
@@ -117,13 +138,13 @@ public class TeacherService {
             String email,
             String phone,
             EmploymentType employmentType,
-            TeacherShift shift) {
+            List<TeacherShift> shifts) {
         teacher.setFirstName(firstName.trim());
         teacher.setLastName(lastName.trim());
         teacher.setEmail(blankToNull(email));
         teacher.setPhone(blankToNull(phone));
         teacher.setEmploymentType(employmentType);
-        teacher.setShift(shift);
+        teacher.setShifts(new LinkedHashSet<>(shifts));
     }
 
     private List<TeacherAssignment> toAssignments(List<TeacherAssignmentRequest> requests) {
