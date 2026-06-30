@@ -14,7 +14,6 @@ import {
   getCycleLabel,
   getEmploymentTypeLabel,
 } from "@/lib/constants";
-import { cn } from "@/lib/utils";
 
 function getInitials(firstName, lastName) {
   const first = firstName?.charAt(0) ?? "";
@@ -22,26 +21,97 @@ function getInitials(firstName, lastName) {
   return `${first}${last}`.toUpperCase() || "?";
 }
 
-function TeacherCard({ teacher, viewMode = "grid", isAdmin, onEdit, onDelete }) {
-  const isList = viewMode === "list";
+function formatAssignment(assignment) {
+  return `${assignment.courseName} · ${getCourseCategoryLabel(assignment.courseCategory)} · ${getCycleLabel(assignment.cycle)}`;
+}
+
+function TeacherActions({ teacher, onEdit, onDelete }) {
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        onClick={() => onEdit(teacher)}
+        aria-label={`Editar ${teacher.fullName}`}
+      >
+        <Pencil className="size-4" />
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        onClick={() => onDelete(teacher)}
+        aria-label={`Eliminar ${teacher.fullName}`}
+      >
+        <Trash2 className="size-4" />
+      </Button>
+    </>
+  );
+}
+
+function TeacherContact({ teacher, compact = false }) {
+  if (!teacher.email && !teacher.phone) {
+    return null;
+  }
 
   return (
-    <Card
-      className={cn(
-        "overflow-hidden",
-        isList && "flex flex-row items-stretch"
+    <div className={compact ? "flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1" : "shrink-0 space-y-1"}>
+      {teacher.email && (
+        <p className="flex min-w-0 items-center gap-2 text-muted-foreground">
+          <Mail className="size-3.5 shrink-0" />
+          <span className="truncate">{teacher.email}</span>
+        </p>
       )}
-    >
-      <CardHeader
-        className={cn(
-          "pb-2",
-          isList && "flex flex-row items-center gap-4 border-r pb-0"
-        )}
-      >
-        <Avatar size={isList ? "lg" : "default"}>
+      {teacher.phone && (
+        <p className="flex items-center gap-2 text-muted-foreground">
+          <Phone className="size-3.5 shrink-0" />
+          <span className={compact ? "truncate" : undefined}>{teacher.phone}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+function TeacherAssignments({ assignments, compact = false }) {
+  if (!assignments?.length) {
+    return null;
+  }
+
+  if (compact) {
+    return (
+      <p className="truncate text-xs text-muted-foreground">
+        {assignments.map(formatAssignment).join(" · ")}
+      </p>
+    );
+  }
+
+  return (
+    <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto">
+      {assignments.map((assignment) => (
+        <li
+          key={assignment.id ?? `${assignment.courseName}-${assignment.cycle}`}
+          className="rounded-md bg-muted/50 px-2 py-1 text-xs"
+        >
+          <span className="font-medium">{assignment.courseName}</span>
+          {" · "}
+          {getCourseCategoryLabel(assignment.courseCategory)}
+          {" · "}
+          {getCycleLabel(assignment.cycle)}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function TeacherCardGrid({ teacher, isAdmin, onEdit, onDelete }) {
+  return (
+    <Card className="flex h-72 flex-col overflow-hidden">
+      <CardHeader className="grid shrink-0 auto-rows-min grid-cols-[auto_1fr] items-center gap-3 pb-2">
+        <Avatar>
           <AvatarFallback>{getInitials(teacher.firstName, teacher.lastName)}</AvatarFallback>
         </Avatar>
-        <div className={cn("min-w-0", isList && "flex-1")}>
+        <div className="min-w-0">
           <CardTitle className="truncate">{teacher.fullName}</CardTitle>
           <Badge variant="secondary" className="mt-1">
             {getEmploymentTypeLabel(teacher.employmentType)}
@@ -49,70 +119,70 @@ function TeacherCard({ teacher, viewMode = "grid", isAdmin, onEdit, onDelete }) 
         </div>
       </CardHeader>
 
-      <CardContent
-        className={cn(
-          "flex flex-col gap-2 text-sm",
-          isList && "flex-1 justify-center py-4"
-        )}
-      >
-        {teacher.email && (
-          <p className="flex items-center gap-2 text-muted-foreground">
-            <Mail className="size-3.5 shrink-0" />
-            <span className="truncate">{teacher.email}</span>
-          </p>
-        )}
-        {teacher.phone && (
-          <p className="flex items-center gap-2 text-muted-foreground">
-            <Phone className="size-3.5 shrink-0" />
-            <span>{teacher.phone}</span>
-          </p>
-        )}
-        {teacher.assignments?.length > 0 && (
-          <ul className="mt-1 space-y-1">
-            {teacher.assignments.map((assignment) => (
-              <li
-                key={assignment.id ?? `${assignment.courseName}-${assignment.cycle}`}
-                className="rounded-md bg-muted/50 px-2 py-1 text-xs"
-              >
-                <span className="font-medium">{assignment.courseName}</span>
-                {" · "}
-                {getCourseCategoryLabel(assignment.courseCategory)}
-                {" · "}
-                {getCycleLabel(assignment.cycle)}
-              </li>
-            ))}
-          </ul>
-        )}
+      <CardContent className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden text-sm">
+        <TeacherContact teacher={teacher} />
+        <TeacherAssignments assignments={teacher.assignments} />
       </CardContent>
 
       {isAdmin && (
-        <CardFooter
-          className={cn(
-            "gap-2 border-t bg-muted/30",
-            isList && "flex-col justify-center border-t-0 border-l px-4"
-          )}
-        >
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={() => onEdit(teacher)}
-            aria-label={`Editar ${teacher.fullName}`}
-          >
-            <Pencil className="size-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={() => onDelete(teacher)}
-            aria-label={`Eliminar ${teacher.fullName}`}
-          >
-            <Trash2 className="size-4" />
-          </Button>
+        <CardFooter className="shrink-0 gap-2 border-t bg-muted/30">
+          <TeacherActions teacher={teacher} onEdit={onEdit} onDelete={onDelete} />
         </CardFooter>
       )}
     </Card>
+  );
+}
+
+function TeacherCardList({ teacher, isAdmin, onEdit, onDelete }) {
+  return (
+    <Card className="flex h-24 items-center overflow-hidden py-0">
+      <div className="grid h-full w-full grid-cols-[minmax(0,220px)_minmax(0,1fr)_auto] items-center gap-4 px-4 py-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <Avatar size="lg" className="shrink-0">
+            <AvatarFallback>{getInitials(teacher.firstName, teacher.lastName)}</AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <p className="truncate font-medium">{teacher.fullName}</p>
+            <Badge variant="secondary" className="mt-1">
+              {getEmploymentTypeLabel(teacher.employmentType)}
+            </Badge>
+          </div>
+        </div>
+
+        <div className="min-w-0 space-y-1 text-sm">
+          <TeacherContact teacher={teacher} compact />
+          <TeacherAssignments assignments={teacher.assignments} compact />
+        </div>
+
+        {isAdmin && (
+          <div className="flex shrink-0 items-center gap-2">
+            <TeacherActions teacher={teacher} onEdit={onEdit} onDelete={onDelete} />
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function TeacherCard({ teacher, viewMode = "grid", isAdmin, onEdit, onDelete }) {
+  if (viewMode === "list") {
+    return (
+      <TeacherCardList
+        teacher={teacher}
+        isAdmin={isAdmin}
+        onEdit={onEdit}
+        onDelete={onDelete}
+      />
+    );
+  }
+
+  return (
+    <TeacherCardGrid
+      teacher={teacher}
+      isAdmin={isAdmin}
+      onEdit={onEdit}
+      onDelete={onDelete}
+    />
   );
 }
 

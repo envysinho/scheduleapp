@@ -266,8 +266,8 @@ function Teachers() {
           <div
             className={cn(
               viewMode === "grid"
-                ? "grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
-                : "flex flex-col gap-3"
+                ? "grid gap-4 pb-6 sm:grid-cols-2 xl:grid-cols-3"
+                : "flex flex-col gap-3 pb-6"
             )}
           >
             {teachers.map((teacher) => (
