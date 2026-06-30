@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Mail, Pencil, Phone, Trash2 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -186,4 +187,4 @@ function TeacherCard({ teacher, viewMode = "grid", isAdmin, onEdit, onDelete }) 
   );
 }
 
-export default TeacherCard;
+export default memo(TeacherCard);

@@ -58,19 +58,21 @@ function AppSidebar({ currentPage, onNavigate }) {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="overflow-hidden border-b border-sidebar-border">
-        <div className="flex h-12 items-center gap-3 overflow-hidden px-2">
+        <div className="flex h-12 min-w-0 items-center gap-3 overflow-hidden px-2">
           <img src={logo} alt="Logo FI" className="size-10 shrink-0 object-contain" />
-          <div className="min-w-0 overflow-hidden transition-[max-width] duration-200 ease-linear max-w-xs group-data-[collapsible=icon]:max-w-0">
-            <div className="flex flex-col leading-tight transition-opacity duration-200 ease-linear opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:delay-0 group-data-[state=expanded]:delay-200">
-              <span className="whitespace-nowrap text-[10.3px] text-sidebar-foreground/70 tracking-normal">Universidad Nacional de Cañete</span>
-              <strong className="whitespace-nowrap text-sm font-semibold">Facultad de Ingeniería</strong>
+          <div className="min-w-0 flex-1 overflow-hidden transition-[opacity,max-width] duration-200 ease-linear group-data-[collapsible=icon]:max-w-0 group-data-[collapsible=icon]:opacity-0">
+            <div className="flex min-w-0 flex-col leading-tight">
+              <span className="truncate text-[10.3px] text-sidebar-foreground/70 tracking-normal">
+                Universidad Nacional de Cañete
+              </span>
+              <strong className="truncate text-sm font-semibold">Facultad de Ingeniería</strong>
             </div>
           </div>
         </div>
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
+        <SidebarGroup className="gap-2">
           <SidebarGroupContent>
             <SidebarMenu className="gap-y-0.5">
               {NAV_ITEMS.map(({ id, icon: Icon, label }) => (
@@ -87,11 +89,10 @@ function AppSidebar({ currentPage, onNavigate }) {
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
+          <SidebarSeparator className="mx-0 !w-full" />
         </SidebarGroup>
 
-        <SidebarSeparator />
-
-        <SidebarGroup>
+        <SidebarGroup className="pt-0">
           <SidebarGroupContent>
             <SidebarMenu>
               <Collapsible
@@ -142,7 +143,7 @@ function AppSidebar({ currentPage, onNavigate }) {
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
-            <SidebarSeparator />
+            <SidebarSeparator className="mx-0 !w-full" />
           </>
         )}
         <SidebarMenu>

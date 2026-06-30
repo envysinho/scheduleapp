@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { LayoutGrid, List, UserPlus } from "lucide-react";
 import PageCard from "@/components/PageCard";
 import TeacherCard from "@/components/teachers/TeacherCard";
-import TeacherSheet from "@/components/teachers/TeacherSheet";
+import TeacherForm from "@/components/teachers/TeacherForm";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -38,11 +38,11 @@ function Teachers() {
   const [courseCategory, setCourseCategory] = useState(null);
   const [cycle, setCycle] = useState(null);
 
+  const [pageView, setPageView] = useState("list");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState(null);
-  const [sheetError, setSheetError] = useState(null);
+  const [formError, setFormError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const categoryAnchor = useComboboxAnchor();
@@ -69,23 +69,31 @@ function Teachers() {
   }, [employmentType, courseCategory, cycle, handleUnauthorized]);
 
   useEffect(() => {
-    loadTeachers();
-  }, [loadTeachers]);
+    if (pageView === "list") {
+      loadTeachers();
+    }
+  }, [loadTeachers, pageView]);
 
-  const openCreateSheet = () => {
+  const closeForm = () => {
+    setPageView("list");
     setEditingTeacher(null);
-    setSheetError(null);
-    setSheetOpen(true);
+    setFormError(null);
   };
 
-  const openEditSheet = (teacher) => {
+  const openCreateForm = () => {
+    setEditingTeacher(null);
+    setFormError(null);
+    setPageView("form");
+  };
+
+  const openEditForm = (teacher) => {
     setEditingTeacher(teacher);
-    setSheetError(null);
-    setSheetOpen(true);
+    setFormError(null);
+    setPageView("form");
   };
 
-  const handleSheetSubmit = async (payload) => {
-    setSheetError(null);
+  const handleFormSubmit = async (payload) => {
+    setFormError(null);
     setIsSubmitting(true);
     try {
       if (editingTeacher?.id) {
@@ -93,11 +101,9 @@ function Teachers() {
       } else {
         await createTeacher(payload, handleUnauthorized);
       }
-      setSheetOpen(false);
-      setEditingTeacher(null);
-      await loadTeachers();
+      closeForm();
     } catch (err) {
-      setSheetError(err instanceof Error ? err.message : "Error al guardar docente");
+      setFormError(err instanceof Error ? err.message : "Error al guardar docente");
     } finally {
       setIsSubmitting(false);
     }
@@ -115,12 +121,18 @@ function Teachers() {
     try {
       await deleteTeacher(teacher.id, handleUnauthorized);
       if (editingTeacher?.id === teacher.id) {
-        setSheetOpen(false);
-        setEditingTeacher(null);
+        closeForm();
       }
       await loadTeachers();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al eliminar docente");
+    }
+  };
+
+  const handleEmploymentFilter = (value) => {
+    setEmploymentType(value);
+    if (pageView === "form") {
+      closeForm();
     }
   };
 
@@ -131,167 +143,176 @@ function Teachers() {
   const selectedCycle =
     CYCLE_FILTERS.find((item) => item.value === cycle) ?? CYCLE_FILTERS[0];
 
+  const isFormView = pageView === "form";
+  const pageTitle = isFormView
+    ? editingTeacher
+      ? "Editar docente"
+      : "Añadir docente"
+    : "Docentes";
+
+  const pageDescription = isFormView
+    ? "Complete los datos del docente y sus cursos asignados."
+    : "Gestión y consulta de docentes por tipo, categoría de curso y ciclo.";
+
   return (
-    <PageCard
-      title="Docentes"
-      description="Gestión y consulta de docentes por tipo, categoría de curso y ciclo."
-    >
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex flex-col gap-2">
-            <Label>Tipo de docente</Label>
-            <div className="flex flex-wrap gap-1">
-              {EMPLOYMENT_TYPE_FILTERS.map((item) => (
-                <Button
-                  key={item.label}
-                  type="button"
-                  size="sm"
-                  variant={employmentType === item.value ? "default" : "outline"}
-                  onClick={() => setEmploymentType(item.value)}
+    <PageCard title={pageTitle} description={pageDescription}>
+      {isFormView ? (
+        <TeacherForm
+          teacher={editingTeacher}
+          onSubmit={handleFormSubmit}
+          onCancel={closeForm}
+          isSubmitting={isSubmitting}
+          error={formError}
+        />
+      ) : (
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-2">
+              <Label>Tipo de docente</Label>
+              <div className="flex flex-wrap gap-1">
+                {EMPLOYMENT_TYPE_FILTERS.map((item) => (
+                  <Button
+                    key={item.label}
+                    type="button"
+                    size="sm"
+                    variant={employmentType === item.value ? "default" : "outline"}
+                    onClick={() => handleEmploymentFilter(item.value)}
+                  >
+                    {item.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex min-w-[180px] flex-col gap-2">
+              <Label htmlFor="filter-course-category">Categoría de curso</Label>
+              <div ref={categoryAnchor} className="w-full">
+                <Combobox
+                  items={COURSE_CATEGORY_FILTERS.map((item) => item.label)}
+                  value={selectedCategory.label}
+                  onValueChange={(label) => {
+                    const item = COURSE_CATEGORY_FILTERS.find(
+                      (option) => option.label === label
+                    );
+                    setCourseCategory(item?.value ?? null);
+                  }}
                 >
-                  {item.label}
+                  <ComboboxInput
+                    id="filter-course-category"
+                    placeholder="Todos"
+                    readOnly
+                  />
+                  <ComboboxContent anchor={categoryAnchor}>
+                    <ComboboxEmpty>Sin opciones.</ComboboxEmpty>
+                    <ComboboxList>
+                      {(label) => (
+                        <ComboboxItem key={label} value={label}>
+                          {label}
+                        </ComboboxItem>
+                      )}
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
+              </div>
+            </div>
+
+            <div className="flex min-w-[160px] flex-col gap-2">
+              <Label htmlFor="filter-cycle">Ciclo</Label>
+              <div ref={cycleAnchor} className="w-full">
+                <Combobox
+                  items={CYCLE_FILTERS.map((item) => item.label)}
+                  value={selectedCycle.label}
+                  onValueChange={(label) => {
+                    const item = CYCLE_FILTERS.find((option) => option.label === label);
+                    setCycle(item?.value ?? null);
+                  }}
+                >
+                  <ComboboxInput
+                    id="filter-cycle"
+                    placeholder="Todos"
+                    readOnly
+                  />
+                  <ComboboxContent anchor={cycleAnchor}>
+                    <ComboboxEmpty>Sin opciones.</ComboboxEmpty>
+                    <ComboboxList>
+                      {(label) => (
+                        <ComboboxItem key={label} value={label}>
+                          {label}
+                        </ComboboxItem>
+                      )}
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
+              </div>
+            </div>
+
+            <div className="ml-auto flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant={viewMode === "grid" ? "default" : "outline"}
+                  size="icon"
+                  onClick={() => setViewMode("grid")}
+                  aria-label="Vista en cuadrícula"
+                  title="Vista en cuadrícula"
+                >
+                  <LayoutGrid className="size-4" />
                 </Button>
+                <Button
+                  type="button"
+                  variant={viewMode === "list" ? "default" : "outline"}
+                  size="icon"
+                  onClick={() => setViewMode("list")}
+                  aria-label="Vista en lista"
+                  title="Vista en lista"
+                >
+                  <List className="size-4" />
+                </Button>
+              </div>
+
+              {isAdmin && (
+                <Button type="button" onClick={openCreateForm}>
+                  <UserPlus className="size-4" />
+                  Añadir docente
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {error && (
+            <p className="text-sm text-destructive" role="alert">
+              {error}
+            </p>
+          )}
+
+          {isLoading ? (
+            <p className="text-sm text-muted-foreground">Cargando docentes...</p>
+          ) : teachers.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No hay docentes que coincidan con los filtros seleccionados.
+            </p>
+          ) : (
+            <div
+              className={cn(
+                viewMode === "grid"
+                  ? "grid gap-4 pb-6 sm:grid-cols-2 xl:grid-cols-4"
+                  : "flex flex-col gap-3 pb-6"
+              )}
+            >
+              {teachers.map((teacher) => (
+                <TeacherCard
+                  key={teacher.id}
+                  teacher={teacher}
+                  viewMode={viewMode}
+                  isAdmin={isAdmin}
+                  onEdit={openEditForm}
+                  onDelete={handleDelete}
+                />
               ))}
             </div>
-          </div>
-
-          <div className="flex min-w-[180px] flex-col gap-2">
-            <Label htmlFor="filter-course-category">Categoría de curso</Label>
-            <div ref={categoryAnchor} className="w-full">
-              <Combobox
-                items={COURSE_CATEGORY_FILTERS.map((item) => item.label)}
-                value={selectedCategory.label}
-                onValueChange={(label) => {
-                  const item = COURSE_CATEGORY_FILTERS.find(
-                    (option) => option.label === label
-                  );
-                  setCourseCategory(item?.value ?? null);
-                }}
-              >
-                <ComboboxInput
-                  id="filter-course-category"
-                  placeholder="Todos"
-                  readOnly
-                />
-                <ComboboxContent anchor={categoryAnchor}>
-                  <ComboboxEmpty>Sin opciones.</ComboboxEmpty>
-                  <ComboboxList>
-                    {(label) => (
-                      <ComboboxItem key={label} value={label}>
-                        {label}
-                      </ComboboxItem>
-                    )}
-                  </ComboboxList>
-                </ComboboxContent>
-              </Combobox>
-            </div>
-          </div>
-
-          <div className="flex min-w-[160px] flex-col gap-2">
-            <Label htmlFor="filter-cycle">Ciclo</Label>
-            <div ref={cycleAnchor} className="w-full">
-              <Combobox
-                items={CYCLE_FILTERS.map((item) => item.label)}
-                value={selectedCycle.label}
-                onValueChange={(label) => {
-                  const item = CYCLE_FILTERS.find((option) => option.label === label);
-                  setCycle(item?.value ?? null);
-                }}
-              >
-                <ComboboxInput
-                  id="filter-cycle"
-                  placeholder="Todos"
-                  readOnly
-                />
-                <ComboboxContent anchor={cycleAnchor}>
-                  <ComboboxEmpty>Sin opciones.</ComboboxEmpty>
-                  <ComboboxList>
-                    {(label) => (
-                      <ComboboxItem key={label} value={label}>
-                        {label}
-                      </ComboboxItem>
-                    )}
-                  </ComboboxList>
-                </ComboboxContent>
-              </Combobox>
-            </div>
-          </div>
-
-          <div className="ml-auto flex items-center gap-2">
-            <div className="flex items-center gap-1">
-              <Button
-                type="button"
-                variant={viewMode === "grid" ? "default" : "outline"}
-                size="icon"
-                onClick={() => setViewMode("grid")}
-                aria-label="Vista en cuadrícula"
-                title="Vista en cuadrícula"
-              >
-                <LayoutGrid className="size-4" />
-              </Button>
-              <Button
-                type="button"
-                variant={viewMode === "list" ? "default" : "outline"}
-                size="icon"
-                onClick={() => setViewMode("list")}
-                aria-label="Vista en lista"
-                title="Vista en lista"
-              >
-                <List className="size-4" />
-              </Button>
-            </div>
-
-            {isAdmin && (
-              <Button type="button" onClick={openCreateSheet}>
-                <UserPlus className="size-4" />
-                Añadir docente
-              </Button>
-            )}
-          </div>
+          )}
         </div>
-
-        {error && (
-          <p className="text-sm text-destructive" role="alert">
-            {error}
-          </p>
-        )}
-
-        {isLoading ? (
-          <p className="text-sm text-muted-foreground">Cargando docentes...</p>
-        ) : teachers.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No hay docentes que coincidan con los filtros seleccionados.
-          </p>
-        ) : (
-          <div
-            className={cn(
-              viewMode === "grid"
-                ? "grid gap-4 pb-6 sm:grid-cols-2 xl:grid-cols-3"
-                : "flex flex-col gap-3 pb-6"
-            )}
-          >
-            {teachers.map((teacher) => (
-              <TeacherCard
-                key={teacher.id}
-                teacher={teacher}
-                viewMode={viewMode}
-                isAdmin={isAdmin}
-                onEdit={openEditSheet}
-                onDelete={handleDelete}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      <TeacherSheet
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
-        teacher={editingTeacher}
-        onSubmit={handleSheetSubmit}
-        isSubmitting={isSubmitting}
-        error={sheetError}
-      />
+      )}
     </PageCard>
   );
 }
