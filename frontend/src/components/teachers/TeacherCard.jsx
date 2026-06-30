@@ -11,8 +11,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  COURSE_CATEGORIES,
-  getCourseCategoryLabel,
   getCycleLabel,
   getEmploymentTypeLabel,
   getTeacherShiftLabel,
@@ -40,20 +38,6 @@ function formatAssignment(assignment, shifts) {
   return parts.join(" · ");
 }
 
-function getTeacherCourseCategories(assignments) {
-  if (!assignments?.length) {
-    return [];
-  }
-
-  const uniqueCategories = new Set(
-    assignments.map((assignment) => assignment.courseCategory).filter(Boolean)
-  );
-
-  return COURSE_CATEGORIES.filter((item) => uniqueCategories.has(item.value)).map(
-    (item) => item.value
-  );
-}
-
 function getTeacherShifts(teacher) {
   if (teacher.shifts?.length) {
     return teacher.shifts;
@@ -65,18 +49,11 @@ function getTeacherShifts(teacher) {
 }
 
 function TeacherBadges({ teacher }) {
-  const courseCategories = getTeacherCourseCategories(teacher.assignments);
-
   return (
     <div className="mt-1 flex flex-wrap gap-1">
       <Badge variant="secondary">
         {getEmploymentTypeLabel(teacher.employmentType)}
       </Badge>
-      {courseCategories.map((category) => (
-        <Badge key={category} variant="secondary">
-          {getCourseCategoryLabel(category)}
-        </Badge>
-      ))}
     </div>
   );
 }

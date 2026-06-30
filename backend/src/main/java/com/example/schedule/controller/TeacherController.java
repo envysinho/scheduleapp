@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.RestController;
 import com.example.schedule.dto.CreateTeacherRequest;
 import com.example.schedule.dto.TeacherResponse;
 import com.example.schedule.dto.UpdateTeacherRequest;
-import com.example.schedule.model.CourseCategory;
 import com.example.schedule.model.EmploymentType;
 import com.example.schedule.model.TeacherShift;
 import com.example.schedule.service.TeacherService;
@@ -38,9 +37,8 @@ public class TeacherController {
     public List<TeacherResponse> listTeachers(
             @RequestParam(required = false) EmploymentType employmentType,
             @RequestParam(required = false) TeacherShift shift,
-            @RequestParam(required = false) CourseCategory courseCategory,
             @RequestParam(required = false) Integer cycle) {
-        return teacherService.findAll(employmentType, shift, courseCategory, cycle);
+        return teacherService.findAll(employmentType, shift, cycle);
     }
 
     @GetMapping("/{id}")

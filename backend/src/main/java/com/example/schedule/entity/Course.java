@@ -38,6 +38,9 @@ public class Course {
     private CourseType type;
 
     @Column(nullable = false)
+    private boolean lectivo = false;
+
+    @Column(nullable = false)
     private Integer cycle;
 
     @ManyToOne
@@ -85,6 +88,14 @@ public class Course {
 
     public void setType(CourseType type) {
         this.type = type;
+    }
+
+    public boolean isLectivo() {
+        return lectivo;
+    }
+
+    public void setLectivo(boolean lectivo) {
+        this.lectivo = lectivo;
     }
 
     public Integer getCycle() {

@@ -14,7 +14,7 @@ export const CYCLES = [
 export const EMPLOYMENT_TYPES = [
   { value: "NOMBRADO", label: "Nombrado" },
   { value: "CONTRATADO", label: "Contratado" },
-  { value: "INVITADO", label: "Invitado" },
+  { value: "ESTUDIOS_GENERALES", label: "Estudios generales" },
 ];
 
 export const EMPLOYMENT_TYPE_FILTERS = [
@@ -50,6 +50,10 @@ export const CYCLE_FILTERS = [
 
 export function getEmploymentTypeLabel(value) {
   return EMPLOYMENT_TYPES.find((item) => item.value === value)?.label ?? value;
+}
+
+export function getCourseCategoryForEmploymentType(employmentType) {
+  return employmentType === "ESTUDIOS_GENERALES" ? "ESTUDIOS_GENERALES" : "CARRERA";
 }
 
 export function getTeacherShiftLabel(value) {
@@ -96,8 +100,9 @@ export function getAvailabilityLabel(value) {
 export const COURSE_TYPES = [
   { value: "ESTUDIOS_GENERALES", label: "Estudios generales" },
   { value: "DE_CARRERA", label: "De carrera" },
-  { value: "LECTIVOS", label: "Lectivos" },
 ];
+
+export const COURSE_LECTIVO_LABEL = "Lectivo";
 
 export const COURSE_TYPE_FILTERS = [
   { value: null, label: "Todos" },
@@ -117,6 +122,13 @@ export const COURSE_AVAILABILITY_FILTERS = [
 
 export function getCourseTypeLabel(value) {
   return COURSE_TYPES.find((item) => item.value === value)?.label ?? value;
+}
+
+export function isCourseLectivo(course) {
+  if (course?.lectivo) {
+    return true;
+  }
+  return course?.type === "LECTIVOS";
 }
 
 export function getCourseAvailabilityLabel(value) {

@@ -27,6 +27,7 @@ const EMPTY_SPACE_ASSIGNMENT = {
 const EMPTY_FORM = {
   name: "",
   type: "DE_CARRERA",
+  lectivo: false,
   cycle: 1,
   sameTeacher: true,
   morningTeacherId: null,
@@ -45,9 +46,12 @@ function courseToForm(course) {
     course.afternoonTeacher &&
     course.morningTeacher.id === course.afternoonTeacher.id;
 
+  const isLegacyLectivo = course.type === "LECTIVOS";
+
   return {
     name: course.name ?? "",
-    type: course.type ?? "DE_CARRERA",
+    type: isLegacyLectivo ? "DE_CARRERA" : (course.type ?? "DE_CARRERA"),
+    lectivo: course.lectivo ?? isLegacyLectivo,
     cycle: course.cycle ?? 1,
     sameTeacher: sameTeacher || (!course.afternoonTeacher && Boolean(course.morningTeacher)),
     morningTeacherId: course.morningTeacher?.id ?? null,
@@ -142,6 +146,7 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
     const payload = {
       name: form.name.trim(),
       type: form.type,
+      lectivo: form.lectivo,
       cycle: Number(form.cycle),
       morningTeacherId: morningTeacherId || null,
       afternoonTeacherId: afternoonTeacherId || null,
@@ -211,6 +216,19 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
                   </ComboboxList>
                 </ComboboxContent>
               </Combobox>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                id="course-lectivo"
+                type="checkbox"
+                checked={form.lectivo}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, lectivo: event.target.checked }))
+                }
+                disabled={isSubmitting}
+                className="size-4 rounded border"
+              />
+              <Label htmlFor="course-lectivo">Curso lectivo</Label>
             </div>
           </div>
 

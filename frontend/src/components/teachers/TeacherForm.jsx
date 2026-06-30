@@ -13,20 +13,21 @@ import {
   useComboboxAnchor,
 } from "@/components/ui/combobox";
 import {
-  COURSE_CATEGORIES,
   CYCLES,
   EMPLOYMENT_TYPES,
   TEACHER_SHIFTS,
-  getCourseCategoryLabel,
+  getCourseCategoryForEmploymentType,
   getCycleLabel,
   getEmploymentTypeLabel,
 } from "@/lib/constants";
 
-const EMPTY_ASSIGNMENT = {
-  courseName: "",
-  courseCategory: "CARRERA",
-  cycle: 1,
-};
+function createEmptyAssignment(employmentType) {
+  return {
+    courseName: "",
+    courseCategory: getCourseCategoryForEmploymentType(employmentType),
+    cycle: 1,
+  };
+}
 
 const EMPTY_FORM = {
   firstName: "",
@@ -35,20 +36,30 @@ const EMPTY_FORM = {
   phone: "",
   employmentType: "NOMBRADO",
   shifts: ["MANANA"],
-  assignments: [{ ...EMPTY_ASSIGNMENT }],
+  assignments: [createEmptyAssignment("NOMBRADO")],
 };
+
+function normalizeEmploymentType(value) {
+  if (value === "INVITADO") {
+    return "ESTUDIOS_GENERALES";
+  }
+  return value ?? "NOMBRADO";
+}
 
 function teacherToForm(teacher) {
   if (!teacher) {
     return EMPTY_FORM;
   }
 
+  const employmentType = normalizeEmploymentType(teacher.employmentType);
+  const courseCategory = getCourseCategoryForEmploymentType(employmentType);
+
   return {
     firstName: teacher.firstName ?? "",
     lastName: teacher.lastName ?? "",
     email: teacher.email ?? "",
     phone: teacher.phone ?? "",
-    employmentType: teacher.employmentType ?? "NOMBRADO",
+    employmentType,
     shifts:
       teacher.shifts?.length > 0
         ? [...teacher.shifts]
@@ -59,10 +70,10 @@ function teacherToForm(teacher) {
       teacher.assignments?.length > 0
         ? teacher.assignments.map((assignment) => ({
             courseName: assignment.courseName ?? "",
-            courseCategory: assignment.courseCategory ?? "CARRERA",
+            courseCategory,
             cycle: assignment.cycle ?? 1,
           }))
-        : [{ ...EMPTY_ASSIGNMENT }],
+        : [createEmptyAssignment(employmentType)],
   };
 }
 
@@ -73,6 +84,19 @@ function TeacherForm({ teacher, onSubmit, onCancel, isSubmitting, error }) {
   useEffect(() => {
     setForm(teacherToForm(teacher));
   }, [teacher]);
+
+  const handleEmploymentTypeChange = (value) => {
+    const employmentType = value ?? "NOMBRADO";
+    const courseCategory = getCourseCategoryForEmploymentType(employmentType);
+    setForm((current) => ({
+      ...current,
+      employmentType,
+      assignments: current.assignments.map((assignment) => ({
+        ...assignment,
+        courseCategory,
+      })),
+    }));
+  };
 
   const handleAssignmentChange = (index, field, value) => {
     setForm((current) => ({
@@ -86,7 +110,10 @@ function TeacherForm({ teacher, onSubmit, onCancel, isSubmitting, error }) {
   const addAssignment = () => {
     setForm((current) => ({
       ...current,
-      assignments: [...current.assignments, { ...EMPTY_ASSIGNMENT }],
+      assignments: [
+        ...current.assignments,
+        createEmptyAssignment(current.employmentType),
+      ],
     }));
   };
 
@@ -121,6 +148,7 @@ function TeacherForm({ teacher, onSubmit, onCancel, isSubmitting, error }) {
     if (form.shifts.length === 0) {
       return;
     }
+    const courseCategory = getCourseCategoryForEmploymentType(form.employmentType);
     const payload = {
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),
@@ -132,7 +160,7 @@ function TeacherForm({ teacher, onSubmit, onCancel, isSubmitting, error }) {
         .filter((assignment) => assignment.courseName.trim())
         .map((assignment) => ({
           courseName: assignment.courseName.trim(),
-          courseCategory: assignment.courseCategory,
+          courseCategory,
           cycle: Number(assignment.cycle),
         })),
     };
@@ -222,10 +250,7 @@ function TeacherForm({ teacher, onSubmit, onCancel, isSubmitting, error }) {
                 value={getEmploymentTypeLabel(form.employmentType)}
                 onValueChange={(label) => {
                   const item = EMPLOYMENT_TYPES.find((option) => option.label === label);
-                  setForm((current) => ({
-                    ...current,
-                    employmentType: item?.value ?? "NOMBRADO",
-                  }));
+                  handleEmploymentTypeChange(item?.value ?? "NOMBRADO");
                 }}
                 disabled={isSubmitting}
               >
@@ -321,7 +346,6 @@ function AssignmentRow({
   onChange,
   onRemove,
 }) {
-  const categoryAnchor = useComboboxAnchor();
   const cycleAnchor = useComboboxAnchor();
 
   return (
@@ -354,67 +378,34 @@ function AssignmentRow({
           />
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor={`assignment-category-${index}`}>Categoría</Label>
-            <div ref={categoryAnchor} className="w-full">
-              <Combobox
-                items={COURSE_CATEGORIES.map((item) => item.label)}
-                value={getCourseCategoryLabel(assignment.courseCategory)}
-                onValueChange={(label) => {
-                  const item = COURSE_CATEGORIES.find((option) => option.label === label);
-                  onChange(index, "courseCategory", item?.value ?? "CARRERA");
-                }}
-                disabled={disabled}
-              >
-                <ComboboxInput
-                  id={`assignment-category-${index}`}
-                  placeholder="Categoría"
-                  readOnly
-                />
-                <ComboboxContent anchor={categoryAnchor}>
-                  <ComboboxEmpty>Sin opciones.</ComboboxEmpty>
-                  <ComboboxList>
-                    {(label) => (
-                      <ComboboxItem key={label} value={label}>
-                        {label}
-                      </ComboboxItem>
-                    )}
-                  </ComboboxList>
-                </ComboboxContent>
-              </Combobox>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor={`assignment-cycle-${index}`}>Ciclo</Label>
-            <div ref={cycleAnchor} className="w-full">
-              <Combobox
-                items={CYCLES.map((item) => item.label)}
-                value={getCycleLabel(assignment.cycle)}
-                onValueChange={(label) => {
-                  const item = CYCLES.find((option) => option.label === label);
-                  onChange(index, "cycle", item?.id ?? 1);
-                }}
-                disabled={disabled}
-              >
-                <ComboboxInput
-                  id={`assignment-cycle-${index}`}
-                  placeholder="Ciclo"
-                  readOnly
-                />
-                <ComboboxContent anchor={cycleAnchor}>
-                  <ComboboxEmpty>Sin opciones.</ComboboxEmpty>
-                  <ComboboxList>
-                    {(label) => (
-                      <ComboboxItem key={label} value={label}>
-                        {label}
-                      </ComboboxItem>
-                    )}
-                  </ComboboxList>
-                </ComboboxContent>
-              </Combobox>
-            </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor={`assignment-cycle-${index}`}>Ciclo</Label>
+          <div ref={cycleAnchor} className="w-full">
+            <Combobox
+              items={CYCLES.map((item) => item.label)}
+              value={getCycleLabel(assignment.cycle)}
+              onValueChange={(label) => {
+                const item = CYCLES.find((option) => option.label === label);
+                onChange(index, "cycle", item?.id ?? 1);
+              }}
+              disabled={disabled}
+            >
+              <ComboboxInput
+                id={`assignment-cycle-${index}`}
+                placeholder="Ciclo"
+                readOnly
+              />
+              <ComboboxContent anchor={cycleAnchor}>
+                <ComboboxEmpty>Sin opciones.</ComboboxEmpty>
+                <ComboboxList>
+                  {(label) => (
+                    <ComboboxItem key={label} value={label}>
+                      {label}
+                    </ComboboxItem>
+                  )}
+                </ComboboxList>
+              </ComboboxContent>
+            </Combobox>
           </div>
         </div>
       </div>

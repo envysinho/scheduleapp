@@ -14,6 +14,7 @@ import jakarta.validation.constraints.Size;
 public record UpdateCourseRequest(
         @NotBlank @Size(max = 200) String name,
         @NotNull CourseType type,
+        @NotNull Boolean lectivo,
         @NotNull @Min(1) @Max(10) Integer cycle,
         Long morningTeacherId,
         Long afternoonTeacherId,

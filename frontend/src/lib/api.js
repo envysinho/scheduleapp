@@ -89,9 +89,6 @@ function buildTeachersQuery(filters = {}) {
   if (filters.shift) {
     params.set("shift", filters.shift);
   }
-  if (filters.courseCategory) {
-    params.set("courseCategory", filters.courseCategory);
-  }
   if (filters.cycle) {
     params.set("cycle", String(filters.cycle));
   }

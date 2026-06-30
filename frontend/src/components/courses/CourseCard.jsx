@@ -10,8 +10,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  COURSE_LECTIVO_LABEL,
   getCourseAvailabilityLabel,
   getCourseTypeLabel,
+  isCourseLectivo,
   getTeacherShiftLabel,
 } from "@/lib/constants";
 
@@ -76,9 +78,14 @@ function getTeacherEntries(course) {
 }
 
 function CourseBadges({ course }) {
+  const lectivo = isCourseLectivo(course);
+  const typeLabel =
+    course.type === "LECTIVOS" ? getCourseTypeLabel("DE_CARRERA") : getCourseTypeLabel(course.type);
+
   return (
     <div className="mt-1 flex flex-wrap gap-1">
-      <Badge variant="secondary">{getCourseTypeLabel(course.type)}</Badge>
+      <Badge variant="secondary">{typeLabel}</Badge>
+      {lectivo && <Badge variant="outline">{COURSE_LECTIVO_LABEL}</Badge>}
       <Badge className={getAvailabilityClassName(course.availability)}>
         {getCourseAvailabilityLabel(course.availability)}
       </Badge>

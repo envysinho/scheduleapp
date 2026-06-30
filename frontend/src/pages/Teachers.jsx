@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/combobox";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  COURSE_CATEGORY_FILTERS,
   CYCLE_FILTERS,
   EMPLOYMENT_TYPE_FILTERS,
   TEACHER_SHIFT_FILTERS,
@@ -37,7 +36,6 @@ function Teachers() {
   const [viewMode, setViewMode] = useState("grid");
   const [employmentType, setEmploymentType] = useState(null);
   const [shift, setShift] = useState(null);
-  const [courseCategory, setCourseCategory] = useState(null);
   const [cycle, setCycle] = useState(null);
 
   const [pageView, setPageView] = useState("list");
@@ -47,7 +45,7 @@ function Teachers() {
   const [formError, setFormError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const categoryAnchor = useComboboxAnchor();
+  const employmentAnchor = useComboboxAnchor();
   const cycleAnchor = useComboboxAnchor();
 
   const handleUnauthorized = useCallback(() => {
@@ -59,7 +57,7 @@ function Teachers() {
     setIsLoading(true);
     try {
       const data = await listTeachers(
-        { employmentType, shift, courseCategory, cycle },
+        { employmentType, shift, cycle },
         handleUnauthorized
       );
       setTeachers(data);
@@ -68,7 +66,7 @@ function Teachers() {
     } finally {
       setIsLoading(false);
     }
-  }, [employmentType, shift, courseCategory, cycle, handleUnauthorized]);
+  }, [employmentType, shift, cycle, handleUnauthorized]);
 
   useEffect(() => {
     if (pageView === "list") {
@@ -131,23 +129,25 @@ function Teachers() {
     }
   };
 
-  const handleEmploymentFilter = (value) => {
-    setEmploymentType(value);
+  const resetFormOnFilterChange = () => {
     if (pageView === "form") {
       closeForm();
     }
+  };
+
+  const handleEmploymentFilter = (value) => {
+    setEmploymentType(value);
+    resetFormOnFilterChange();
   };
 
   const handleShiftFilter = (value) => {
     setShift(value);
-    if (pageView === "form") {
-      closeForm();
-    }
+    resetFormOnFilterChange();
   };
 
-  const selectedCategory =
-    COURSE_CATEGORY_FILTERS.find((item) => item.value === courseCategory) ??
-    COURSE_CATEGORY_FILTERS[0];
+  const selectedEmploymentType =
+    EMPLOYMENT_TYPE_FILTERS.find((item) => item.value === employmentType) ??
+    EMPLOYMENT_TYPE_FILTERS[0];
 
   const selectedCycle =
     CYCLE_FILTERS.find((item) => item.value === cycle) ?? CYCLE_FILTERS[0];
@@ -161,7 +161,7 @@ function Teachers() {
 
   const pageDescription = isFormView
     ? "Complete los datos del docente y sus cursos asignados."
-    : "Gestión y consulta de docentes por tipo, categoría de curso y ciclo.";
+    : "Gestión y consulta de docentes por tipo, turno y ciclo.";
 
   return (
     <PageCard title={pageTitle} description={pageDescription}>
@@ -176,19 +176,35 @@ function Teachers() {
       ) : (
         <div className="flex flex-col gap-6">
           <div className="flex flex-wrap items-end gap-3">
-            <div className="flex flex-col gap-2">
-              <Label>Tipo de docente</Label>
-              <div className="flex flex-wrap gap-1">
-                {EMPLOYMENT_TYPE_FILTERS.map((item) => (
-                  <Button
-                    key={item.label}
-                    type="button"
-                    variant={employmentType === item.value ? "default" : "outline"}
-                    onClick={() => handleEmploymentFilter(item.value)}
-                  >
-                    {item.label}
-                  </Button>
-                ))}
+            <div className="flex min-w-[180px] flex-col gap-2">
+              <Label htmlFor="filter-employment-type">Tipo de docente</Label>
+              <div ref={employmentAnchor} className="w-full">
+                <Combobox
+                  items={EMPLOYMENT_TYPE_FILTERS.map((item) => item.label)}
+                  value={selectedEmploymentType.label}
+                  onValueChange={(label) => {
+                    const item = EMPLOYMENT_TYPE_FILTERS.find(
+                      (option) => option.label === label
+                    );
+                    handleEmploymentFilter(item?.value ?? null);
+                  }}
+                >
+                  <ComboboxInput
+                    id="filter-employment-type"
+                    placeholder="Todos"
+                    readOnly
+                  />
+                  <ComboboxContent anchor={employmentAnchor}>
+                    <ComboboxEmpty>Sin opciones.</ComboboxEmpty>
+                    <ComboboxList>
+                      {(label) => (
+                        <ComboboxItem key={label} value={label}>
+                          {label}
+                        </ComboboxItem>
+                      )}
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
               </div>
             </div>
 
@@ -208,38 +224,6 @@ function Teachers() {
               </div>
             </div>
 
-            <div className="flex min-w-[180px] flex-col gap-2">
-              <Label htmlFor="filter-course-category">Categoría de curso</Label>
-              <div ref={categoryAnchor} className="w-full">
-                <Combobox
-                  items={COURSE_CATEGORY_FILTERS.map((item) => item.label)}
-                  value={selectedCategory.label}
-                  onValueChange={(label) => {
-                    const item = COURSE_CATEGORY_FILTERS.find(
-                      (option) => option.label === label
-                    );
-                    setCourseCategory(item?.value ?? null);
-                  }}
-                >
-                  <ComboboxInput
-                    id="filter-course-category"
-                    placeholder="Todos"
-                    readOnly
-                  />
-                  <ComboboxContent anchor={categoryAnchor}>
-                    <ComboboxEmpty>Sin opciones.</ComboboxEmpty>
-                    <ComboboxList>
-                      {(label) => (
-                        <ComboboxItem key={label} value={label}>
-                          {label}
-                        </ComboboxItem>
-                      )}
-                    </ComboboxList>
-                  </ComboboxContent>
-                </Combobox>
-              </div>
-            </div>
-
             <div className="flex min-w-[160px] flex-col gap-2">
               <Label htmlFor="filter-cycle">Ciclo</Label>
               <div ref={cycleAnchor} className="w-full">
@@ -249,6 +233,7 @@ function Teachers() {
                   onValueChange={(label) => {
                     const item = CYCLE_FILTERS.find((option) => option.label === label);
                     setCycle(item?.value ?? null);
+                    resetFormOnFilterChange();
                   }}
                 >
                   <ComboboxInput

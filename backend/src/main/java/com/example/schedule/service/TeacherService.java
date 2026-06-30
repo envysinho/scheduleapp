@@ -35,11 +35,18 @@ public class TeacherService {
     public List<TeacherResponse> findAll(
             EmploymentType employmentType,
             TeacherShift shift,
-            CourseCategory courseCategory,
             Integer cycle) {
-        return teacherRepository.findByFilters(employmentType, shift, courseCategory, cycle).stream()
+        return teacherRepository.findByFilters(employmentType, cycle).stream()
+                .filter(teacher -> matchesShift(teacher, shift))
                 .map(TeacherResponse::from)
                 .toList();
+    }
+
+    private boolean matchesShift(Teacher teacher, TeacherShift shift) {
+        if (shift == null) {
+            return true;
+        }
+        return teacher.getShifts().contains(shift);
     }
 
     @Transactional(readOnly = true)
@@ -49,6 +56,7 @@ public class TeacherService {
 
     @Transactional
     public TeacherResponse create(CreateTeacherRequest request) {
+        validateAssignments(request.employmentType(), request.assignments());
         Teacher teacher = new Teacher();
         applyTeacherFields(teacher, request.firstName(), request.lastName(),
                 request.email(), request.phone(), request.employmentType(), request.shifts());
@@ -58,6 +66,7 @@ public class TeacherService {
 
     @Transactional
     public TeacherResponse update(Long id, UpdateTeacherRequest request) {
+        validateAssignments(request.employmentType(), request.assignments());
         Teacher teacher = getTeacherOrThrow(id);
         applyTeacherFields(teacher, request.firstName(), request.lastName(),
                 request.email(), request.phone(), request.employmentType(), request.shifts());
@@ -86,7 +95,7 @@ public class TeacherService {
                 List.of(TeacherShift.MANANA),
                 List.of(
                         new TeacherAssignmentRequest("Cálculo I", CourseCategory.CARRERA, 1),
-                        new TeacherAssignmentRequest("Matemática General", CourseCategory.ESTUDIOS_GENERALES, 1)));
+                        new TeacherAssignmentRequest("Álgebra Lineal", CourseCategory.CARRERA, 2)));
 
         CreateTeacherRequest teacher2 = new CreateTeacherRequest(
                 "Carlos",
@@ -97,21 +106,44 @@ public class TeacherService {
                 List.of(TeacherShift.TARDE),
                 List.of(
                         new TeacherAssignmentRequest("Programación I", CourseCategory.CARRERA, 2),
-                        new TeacherAssignmentRequest("Introducción a la Computación", CourseCategory.ESTUDIOS_GENERALES, 2)));
+                        new TeacherAssignmentRequest("Estructuras de Datos", CourseCategory.CARRERA, 3)));
 
         CreateTeacherRequest teacher3 = new CreateTeacherRequest(
                 "Ana",
                 "Torres",
                 "ana.torres@unc.edu.pe",
                 null,
-                EmploymentType.INVITADO,
+                EmploymentType.ESTUDIOS_GENERALES,
                 List.of(TeacherShift.MANANA),
                 List.of(
-                        new TeacherAssignmentRequest("Física I", CourseCategory.CARRERA, 3)));
+                        new TeacherAssignmentRequest("Matemática General", CourseCategory.ESTUDIOS_GENERALES, 1),
+                        new TeacherAssignmentRequest("Comunicación", CourseCategory.ESTUDIOS_GENERALES, 1)));
 
         create(teacher1);
         create(teacher2);
         create(teacher3);
+    }
+
+    @Transactional
+    public void migrateEmploymentTypesIfNeeded() {
+        try {
+            jdbcTemplate.execute("""
+                    ALTER TABLE teachers
+                    DROP CONSTRAINT IF EXISTS teachers_employment_type_check
+                    """);
+            jdbcTemplate.execute("""
+                    UPDATE teachers
+                    SET employment_type = 'ESTUDIOS_GENERALES'
+                    WHERE employment_type = 'INVITADO'
+                    """);
+            jdbcTemplate.execute("""
+                    ALTER TABLE teachers
+                    ADD CONSTRAINT teachers_employment_type_check
+                    CHECK (employment_type IN ('NOMBRADO', 'CONTRATADO', 'ESTUDIOS_GENERALES'))
+                    """);
+        } catch (Exception ignored) {
+            // Table may not exist yet on first bootstrap.
+        }
     }
 
     @Transactional
@@ -129,6 +161,24 @@ public class TeacherService {
         } catch (Exception ignored) {
             // Legacy column may not exist on fresh databases.
         }
+    }
+
+    private void validateAssignments(EmploymentType employmentType, List<TeacherAssignmentRequest> assignments) {
+        CourseCategory expectedCategory = expectedCourseCategory(employmentType);
+        boolean hasMismatch = assignments.stream()
+                .anyMatch(assignment -> assignment.courseCategory() != expectedCategory);
+        if (hasMismatch) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Las asignaciones no coinciden con el tipo de docente seleccionado");
+        }
+    }
+
+    private CourseCategory expectedCourseCategory(EmploymentType employmentType) {
+        if (employmentType == EmploymentType.ESTUDIOS_GENERALES) {
+            return CourseCategory.ESTUDIOS_GENERALES;
+        }
+        return CourseCategory.CARRERA;
     }
 
     private void applyTeacherFields(

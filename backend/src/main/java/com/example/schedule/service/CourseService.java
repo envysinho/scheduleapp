@@ -3,6 +3,7 @@ package com.example.schedule.service;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -28,14 +29,17 @@ public class CourseService {
     private final CourseRepository courseRepository;
     private final TeacherRepository teacherRepository;
     private final SpaceRepository spaceRepository;
+    private final JdbcTemplate jdbcTemplate;
 
     public CourseService(
             CourseRepository courseRepository,
             TeacherRepository teacherRepository,
-            SpaceRepository spaceRepository) {
+            SpaceRepository spaceRepository,
+            JdbcTemplate jdbcTemplate) {
         this.courseRepository = courseRepository;
         this.teacherRepository = teacherRepository;
         this.spaceRepository = spaceRepository;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Transactional(readOnly = true)
@@ -78,8 +82,15 @@ public class CourseService {
     @Transactional
     public CourseResponse create(CreateCourseRequest request) {
         Course course = new Course();
-        applyCourseFields(course, request.name(), request.type(), request.cycle(),
-                request.morningTeacherId(), request.afternoonTeacherId(), request.nightTeacherId());
+        applyCourseFields(
+                course,
+                request.name(),
+                request.type(),
+                request.lectivo(),
+                request.cycle(),
+                request.morningTeacherId(),
+                request.afternoonTeacherId(),
+                request.nightTeacherId());
         course.replaceSpaceAssignments(toSpaceAssignments(request.spaceAssignments()));
         return CourseResponse.from(courseRepository.save(course));
     }
@@ -87,8 +98,15 @@ public class CourseService {
     @Transactional
     public CourseResponse update(Long id, UpdateCourseRequest request) {
         Course course = getCourseOrThrow(id);
-        applyCourseFields(course, request.name(), request.type(), request.cycle(),
-                request.morningTeacherId(), request.afternoonTeacherId(), request.nightTeacherId());
+        applyCourseFields(
+                course,
+                request.name(),
+                request.type(),
+                request.lectivo(),
+                request.cycle(),
+                request.morningTeacherId(),
+                request.afternoonTeacherId(),
+                request.nightTeacherId());
         course.replaceSpaceAssignments(toSpaceAssignments(request.spaceAssignments()));
         return CourseResponse.from(courseRepository.save(course));
     }
@@ -109,6 +127,7 @@ public class CourseService {
             create(new CreateCourseRequest(
                     seed.name(),
                     seed.type(),
+                    seed.lectivo(),
                     seed.cycle(),
                     null,
                     null,
@@ -117,16 +136,57 @@ public class CourseService {
         }
     }
 
+    @Transactional
+    public void migrateLectivosIfNeeded() {
+        try {
+            jdbcTemplate.execute("""
+                    ALTER TABLE courses
+                    ADD COLUMN IF NOT EXISTS lectivo boolean DEFAULT false
+                    """);
+            jdbcTemplate.execute("""
+                    UPDATE courses
+                    SET lectivo = false
+                    WHERE lectivo IS NULL
+                    """);
+            jdbcTemplate.execute("""
+                    ALTER TABLE courses
+                    ALTER COLUMN lectivo SET NOT NULL
+                    """);
+            jdbcTemplate.execute("""
+                    ALTER TABLE courses
+                    ALTER COLUMN lectivo SET DEFAULT false
+                    """);
+            jdbcTemplate.execute("""
+                    ALTER TABLE courses
+                    DROP CONSTRAINT IF EXISTS courses_type_check
+                    """);
+            jdbcTemplate.execute("""
+                    ALTER TABLE courses
+                    ADD CONSTRAINT courses_type_check
+                    CHECK (type IN ('ESTUDIOS_GENERALES', 'DE_CARRERA'))
+                    """);
+            jdbcTemplate.execute("""
+                    UPDATE courses
+                    SET type = 'DE_CARRERA', lectivo = true
+                    WHERE type = 'LECTIVOS'
+                    """);
+        } catch (Exception ignored) {
+            // Table or column may not exist yet on first bootstrap.
+        }
+    }
+
     private void applyCourseFields(
             Course course,
             String name,
             CourseType type,
+            boolean lectivo,
             Integer cycle,
             Long morningTeacherId,
             Long afternoonTeacherId,
             Long nightTeacherId) {
         course.setName(name.trim());
         course.setType(type);
+        course.setLectivo(lectivo);
         course.setCycle(cycle);
         course.setMorningTeacher(resolveTeacher(morningTeacherId));
         course.setAfternoonTeacher(resolveTeacher(afternoonTeacherId));
@@ -163,80 +223,80 @@ public class CourseService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Curso no encontrado"));
     }
 
-    private record CourseSeed(String name, CourseType type, int cycle) {
+    private record CourseSeed(String name, CourseType type, boolean lectivo, int cycle) {
     }
 
     private static final List<CourseSeed> PLAN_COURSES = List.of(
             // Ciclo I
-            new CourseSeed("Comunicación", CourseType.ESTUDIOS_GENERALES, 1),
-            new CourseSeed("Matemática Básica I", CourseType.ESTUDIOS_GENERALES, 1),
-            new CourseSeed("Métodos de Estudios Universitarios", CourseType.ESTUDIOS_GENERALES, 1),
-            new CourseSeed("Derechos Fundamentales de la Persona y de la Sociedad", CourseType.ESTUDIOS_GENERALES, 1),
-            new CourseSeed("Teoría General de Sistemas", CourseType.DE_CARRERA, 1),
-            new CourseSeed("Algoritmo y Fundamentos de Programación", CourseType.DE_CARRERA, 1),
+            new CourseSeed("Comunicación", CourseType.ESTUDIOS_GENERALES, false, 1),
+            new CourseSeed("Matemática Básica I", CourseType.ESTUDIOS_GENERALES, false, 1),
+            new CourseSeed("Métodos de Estudios Universitarios", CourseType.ESTUDIOS_GENERALES, false, 1),
+            new CourseSeed("Derechos Fundamentales de la Persona y de la Sociedad", CourseType.ESTUDIOS_GENERALES, false, 1),
+            new CourseSeed("Teoría General de Sistemas", CourseType.DE_CARRERA, false, 1),
+            new CourseSeed("Algoritmo y Fundamentos de Programación", CourseType.DE_CARRERA, false, 1),
             // Ciclo II
-            new CourseSeed("Herramientas Digitales", CourseType.ESTUDIOS_GENERALES, 2),
-            new CourseSeed("Matemática Básica II", CourseType.ESTUDIOS_GENERALES, 2),
-            new CourseSeed("Desarrollo Personal", CourseType.ESTUDIOS_GENERALES, 2),
-            new CourseSeed("Física General", CourseType.DE_CARRERA, 2),
-            new CourseSeed("Estructura de Datos", CourseType.DE_CARRERA, 2),
-            new CourseSeed("Dibujo CAD", CourseType.DE_CARRERA, 2),
+            new CourseSeed("Herramientas Digitales", CourseType.ESTUDIOS_GENERALES, false, 2),
+            new CourseSeed("Matemática Básica II", CourseType.ESTUDIOS_GENERALES, false, 2),
+            new CourseSeed("Desarrollo Personal", CourseType.ESTUDIOS_GENERALES, false, 2),
+            new CourseSeed("Física General", CourseType.DE_CARRERA, false, 2),
+            new CourseSeed("Estructura de Datos", CourseType.DE_CARRERA, false, 2),
+            new CourseSeed("Dibujo CAD", CourseType.DE_CARRERA, false, 2),
             // Ciclo III
-            new CourseSeed("Filosofía y Ética", CourseType.ESTUDIOS_GENERALES, 3),
-            new CourseSeed("Realidad Nacional e Internacional", CourseType.ESTUDIOS_GENERALES, 3),
-            new CourseSeed("Emprendimiento e Innovación", CourseType.ESTUDIOS_GENERALES, 3),
-            new CourseSeed("Matemática Superior", CourseType.DE_CARRERA, 3),
-            new CourseSeed("Investigación Operativa I", CourseType.DE_CARRERA, 3),
-            new CourseSeed("Programación Orientada a Objetos", CourseType.DE_CARRERA, 3),
+            new CourseSeed("Filosofía y Ética", CourseType.ESTUDIOS_GENERALES, false, 3),
+            new CourseSeed("Realidad Nacional e Internacional", CourseType.ESTUDIOS_GENERALES, false, 3),
+            new CourseSeed("Emprendimiento e Innovación", CourseType.ESTUDIOS_GENERALES, false, 3),
+            new CourseSeed("Matemática Superior", CourseType.DE_CARRERA, false, 3),
+            new CourseSeed("Investigación Operativa I", CourseType.DE_CARRERA, false, 3),
+            new CourseSeed("Programación Orientada a Objetos", CourseType.DE_CARRERA, false, 3),
             // Ciclo IV
-            new CourseSeed("Cultura Ambiental y Responsabilidad Social", CourseType.ESTUDIOS_GENERALES, 4),
-            new CourseSeed("Derecho Empresarial", CourseType.ESTUDIOS_GENERALES, 4),
-            new CourseSeed("Estadística y Probabilidades", CourseType.DE_CARRERA, 4),
-            new CourseSeed("Investigación Operativa II", CourseType.DE_CARRERA, 4),
-            new CourseSeed("Sistemas Digitales", CourseType.DE_CARRERA, 4),
-            new CourseSeed("Fundamentos de Base de Datos", CourseType.DE_CARRERA, 4),
-            new CourseSeed("Desarrollo Web Full Stack", CourseType.DE_CARRERA, 4),
+            new CourseSeed("Cultura Ambiental y Responsabilidad Social", CourseType.ESTUDIOS_GENERALES, false, 4),
+            new CourseSeed("Derecho Empresarial", CourseType.ESTUDIOS_GENERALES, false, 4),
+            new CourseSeed("Estadística y Probabilidades", CourseType.DE_CARRERA, false, 4),
+            new CourseSeed("Investigación Operativa II", CourseType.DE_CARRERA, false, 4),
+            new CourseSeed("Sistemas Digitales", CourseType.DE_CARRERA, false, 4),
+            new CourseSeed("Fundamentos de Base de Datos", CourseType.DE_CARRERA, false, 4),
+            new CourseSeed("Desarrollo Web Full Stack", CourseType.DE_CARRERA, false, 4),
             // Ciclo V
-            new CourseSeed("Estadística Inferencial", CourseType.DE_CARRERA, 5),
-            new CourseSeed("Introducción al Networking", CourseType.DE_CARRERA, 5),
-            new CourseSeed("Arquitectura de Computadoras", CourseType.DE_CARRERA, 5),
-            new CourseSeed("Administración de Base de Datos", CourseType.DE_CARRERA, 5),
-            new CourseSeed("Desarrollo de Aplicaciones Móviles", CourseType.DE_CARRERA, 5),
-            new CourseSeed("Simulación de Sistemas", CourseType.DE_CARRERA, 5),
-            new CourseSeed("Ingeniería de Costos", CourseType.DE_CARRERA, 5),
+            new CourseSeed("Estadística Inferencial", CourseType.DE_CARRERA, false, 5),
+            new CourseSeed("Introducción al Networking", CourseType.DE_CARRERA, false, 5),
+            new CourseSeed("Arquitectura de Computadoras", CourseType.DE_CARRERA, false, 5),
+            new CourseSeed("Administración de Base de Datos", CourseType.DE_CARRERA, false, 5),
+            new CourseSeed("Desarrollo de Aplicaciones Móviles", CourseType.DE_CARRERA, false, 5),
+            new CourseSeed("Simulación de Sistemas", CourseType.DE_CARRERA, false, 5),
+            new CourseSeed("Ingeniería de Costos", CourseType.DE_CARRERA, false, 5),
             // Ciclo VI
-            new CourseSeed("Diseño de Redes de Comunicaciones", CourseType.DE_CARRERA, 6),
-            new CourseSeed("Configuración de Servidores", CourseType.DE_CARRERA, 6),
-            new CourseSeed("Data Warehouse", CourseType.DE_CARRERA, 6),
-            new CourseSeed("Arquitectura de Software", CourseType.DE_CARRERA, 6),
-            new CourseSeed("Inteligencia Artificial y Sistemas Expertos", CourseType.DE_CARRERA, 6),
-            new CourseSeed("Diseño de Procesos de Negocios", CourseType.DE_CARRERA, 6),
+            new CourseSeed("Diseño de Redes de Comunicaciones", CourseType.DE_CARRERA, false, 6),
+            new CourseSeed("Configuración de Servidores", CourseType.DE_CARRERA, false, 6),
+            new CourseSeed("Data Warehouse", CourseType.DE_CARRERA, false, 6),
+            new CourseSeed("Arquitectura de Software", CourseType.DE_CARRERA, false, 6),
+            new CourseSeed("Inteligencia Artificial y Sistemas Expertos", CourseType.DE_CARRERA, false, 6),
+            new CourseSeed("Diseño de Procesos de Negocios", CourseType.DE_CARRERA, false, 6),
             // Ciclo VII
-            new CourseSeed("Metodología de la Investigación Científica", CourseType.DE_CARRERA, 7),
-            new CourseSeed("Administración de Redes de Comunicaciones", CourseType.DE_CARRERA, 7),
-            new CourseSeed("Big Data", CourseType.DE_CARRERA, 7),
-            new CourseSeed("Desarrollo de Aplicaciones con DevOps", CourseType.DE_CARRERA, 7),
-            new CourseSeed("Machine Learning", CourseType.DE_CARRERA, 7),
-            new CourseSeed("Análisis de Sistemas", CourseType.DE_CARRERA, 7),
+            new CourseSeed("Metodología de la Investigación Científica", CourseType.DE_CARRERA, false, 7),
+            new CourseSeed("Administración de Redes de Comunicaciones", CourseType.DE_CARRERA, false, 7),
+            new CourseSeed("Big Data", CourseType.DE_CARRERA, false, 7),
+            new CourseSeed("Desarrollo de Aplicaciones con DevOps", CourseType.DE_CARRERA, false, 7),
+            new CourseSeed("Machine Learning", CourseType.DE_CARRERA, false, 7),
+            new CourseSeed("Análisis de Sistemas", CourseType.DE_CARRERA, false, 7),
             // Ciclo VIII
-            new CourseSeed("Proceso de la Investigación Científica", CourseType.DE_CARRERA, 8),
-            new CourseSeed("Seguridad y Criptografía", CourseType.DE_CARRERA, 8),
-            new CourseSeed("Internet de las Cosas", CourseType.DE_CARRERA, 8),
-            new CourseSeed("Testing y Aseguramiento de la Calidad en Desarrollo de Software", CourseType.DE_CARRERA, 8),
-            new CourseSeed("Deep Learning", CourseType.DE_CARRERA, 8),
-            new CourseSeed("Gestión de Proyectos", CourseType.DE_CARRERA, 8),
+            new CourseSeed("Proceso de la Investigación Científica", CourseType.DE_CARRERA, false, 8),
+            new CourseSeed("Seguridad y Criptografía", CourseType.DE_CARRERA, false, 8),
+            new CourseSeed("Internet de las Cosas", CourseType.DE_CARRERA, false, 8),
+            new CourseSeed("Testing y Aseguramiento de la Calidad en Desarrollo de Software", CourseType.DE_CARRERA, false, 8),
+            new CourseSeed("Deep Learning", CourseType.DE_CARRERA, false, 8),
+            new CourseSeed("Gestión de Proyectos", CourseType.DE_CARRERA, false, 8),
             // Ciclo IX
-            new CourseSeed("Seminario Tesis I", CourseType.DE_CARRERA, 9),
-            new CourseSeed("Práctica Preprofesional I", CourseType.DE_CARRERA, 9),
-            new CourseSeed("Ciberseguridad", CourseType.DE_CARRERA, 9),
-            new CourseSeed("Programación Funcional y Reactiva", CourseType.DE_CARRERA, 9),
-            new CourseSeed("Inteligencia de Negocios", CourseType.DE_CARRERA, 9),
-            new CourseSeed("Electivo I", CourseType.LECTIVOS, 9),
+            new CourseSeed("Seminario Tesis I", CourseType.DE_CARRERA, false, 9),
+            new CourseSeed("Práctica Preprofesional I", CourseType.DE_CARRERA, false, 9),
+            new CourseSeed("Ciberseguridad", CourseType.DE_CARRERA, false, 9),
+            new CourseSeed("Programación Funcional y Reactiva", CourseType.DE_CARRERA, false, 9),
+            new CourseSeed("Inteligencia de Negocios", CourseType.DE_CARRERA, false, 9),
+            new CourseSeed("Electivo I", CourseType.DE_CARRERA, true, 9),
             // Ciclo X
-            new CourseSeed("Seminario Tesis II", CourseType.DE_CARRERA, 10),
-            new CourseSeed("Práctica Preprofesional II", CourseType.DE_CARRERA, 10),
-            new CourseSeed("Cloud Computing", CourseType.DE_CARRERA, 10),
-            new CourseSeed("Auditoría y Legislación de TI", CourseType.DE_CARRERA, 10),
-            new CourseSeed("Gestión de Proyectos Sistémicos", CourseType.DE_CARRERA, 10),
-            new CourseSeed("Electivo II", CourseType.LECTIVOS, 10));
+            new CourseSeed("Seminario Tesis II", CourseType.DE_CARRERA, false, 10),
+            new CourseSeed("Práctica Preprofesional II", CourseType.DE_CARRERA, false, 10),
+            new CourseSeed("Cloud Computing", CourseType.DE_CARRERA, false, 10),
+            new CourseSeed("Auditoría y Legislación de TI", CourseType.DE_CARRERA, false, 10),
+            new CourseSeed("Gestión de Proyectos Sistémicos", CourseType.DE_CARRERA, false, 10),
+            new CourseSeed("Electivo II", CourseType.DE_CARRERA, true, 10));
 }

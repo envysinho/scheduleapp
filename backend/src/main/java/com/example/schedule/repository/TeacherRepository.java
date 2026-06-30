@@ -7,9 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.example.schedule.entity.Teacher;
-import com.example.schedule.model.CourseCategory;
 import com.example.schedule.model.EmploymentType;
-import com.example.schedule.model.TeacherShift;
 
 public interface TeacherRepository extends JpaRepository<Teacher, Long> {
 
@@ -17,14 +15,10 @@ public interface TeacherRepository extends JpaRepository<Teacher, Long> {
             SELECT DISTINCT t FROM Teacher t
             LEFT JOIN t.assignments a
             WHERE (:employmentType IS NULL OR t.employmentType = :employmentType)
-              AND (:shift IS NULL OR :shift MEMBER OF t.shifts)
-              AND (:courseCategory IS NULL OR a.courseCategory = :courseCategory)
               AND (:cycle IS NULL OR a.cycle = :cycle)
             ORDER BY t.lastName ASC, t.firstName ASC
             """)
     List<Teacher> findByFilters(
             @Param("employmentType") EmploymentType employmentType,
-            @Param("shift") TeacherShift shift,
-            @Param("courseCategory") CourseCategory courseCategory,
             @Param("cycle") Integer cycle);
 }

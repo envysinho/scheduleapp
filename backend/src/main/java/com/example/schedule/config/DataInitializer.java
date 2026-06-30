@@ -31,9 +31,11 @@ public class DataInitializer implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         userService.seedAdminIfMissing("admin", "admin123");
+        teacherService.migrateEmploymentTypesIfNeeded();
         teacherService.seedDemoIfEmpty();
         teacherService.migrateLegacyShiftsIfNeeded();
         spaceService.seedDemoIfEmpty();
+        courseService.migrateLectivosIfNeeded();
         courseService.seedFromPlanIfEmpty();
     }
 }
