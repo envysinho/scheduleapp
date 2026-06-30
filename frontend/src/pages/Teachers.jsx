@@ -19,6 +19,7 @@ import {
   COURSE_CATEGORY_FILTERS,
   CYCLE_FILTERS,
   EMPLOYMENT_TYPE_FILTERS,
+  TEACHER_SHIFT_FILTERS,
 } from "@/lib/constants";
 import {
   createTeacher,
@@ -35,6 +36,7 @@ function Teachers() {
   const [teachers, setTeachers] = useState([]);
   const [viewMode, setViewMode] = useState("grid");
   const [employmentType, setEmploymentType] = useState(null);
+  const [shift, setShift] = useState(null);
   const [courseCategory, setCourseCategory] = useState(null);
   const [cycle, setCycle] = useState(null);
 
@@ -57,7 +59,7 @@ function Teachers() {
     setIsLoading(true);
     try {
       const data = await listTeachers(
-        { employmentType, courseCategory, cycle },
+        { employmentType, shift, courseCategory, cycle },
         handleUnauthorized
       );
       setTeachers(data);
@@ -66,7 +68,7 @@ function Teachers() {
     } finally {
       setIsLoading(false);
     }
-  }, [employmentType, courseCategory, cycle, handleUnauthorized]);
+  }, [employmentType, shift, courseCategory, cycle, handleUnauthorized]);
 
   useEffect(() => {
     if (pageView === "list") {
@@ -136,6 +138,13 @@ function Teachers() {
     }
   };
 
+  const handleShiftFilter = (value) => {
+    setShift(value);
+    if (pageView === "form") {
+      closeForm();
+    }
+  };
+
   const selectedCategory =
     COURSE_CATEGORY_FILTERS.find((item) => item.value === courseCategory) ??
     COURSE_CATEGORY_FILTERS[0];
@@ -176,6 +185,22 @@ function Teachers() {
                     type="button"
                     variant={employmentType === item.value ? "default" : "outline"}
                     onClick={() => handleEmploymentFilter(item.value)}
+                  >
+                    {item.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label>Turno</Label>
+              <div className="flex flex-wrap gap-1">
+                {TEACHER_SHIFT_FILTERS.map((item) => (
+                  <Button
+                    key={item.label}
+                    type="button"
+                    variant={shift === item.value ? "default" : "outline"}
+                    onClick={() => handleShiftFilter(item.value)}
                   >
                     {item.label}
                   </Button>

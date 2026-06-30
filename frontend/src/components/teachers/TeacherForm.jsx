@@ -16,6 +16,7 @@ import {
   COURSE_CATEGORIES,
   CYCLES,
   EMPLOYMENT_TYPES,
+  TEACHER_SHIFTS,
   getCourseCategoryLabel,
   getCycleLabel,
   getEmploymentTypeLabel,
@@ -33,6 +34,7 @@ const EMPTY_FORM = {
   email: "",
   phone: "",
   employmentType: "NOMBRADO",
+  shift: "MANANA",
   assignments: [{ ...EMPTY_ASSIGNMENT }],
 };
 
@@ -47,6 +49,7 @@ function teacherToForm(teacher) {
     email: teacher.email ?? "",
     phone: teacher.phone ?? "",
     employmentType: teacher.employmentType ?? "NOMBRADO",
+    shift: teacher.shift ?? "MANANA",
     assignments:
       teacher.assignments?.length > 0
         ? teacher.assignments.map((assignment) => ({
@@ -97,6 +100,7 @@ function TeacherForm({ teacher, onSubmit, onCancel, isSubmitting, error }) {
       email: form.email.trim() || null,
       phone: form.phone.trim() || null,
       employmentType: form.employmentType,
+      shift: form.shift,
       assignments: form.assignments
         .filter((assignment) => assignment.courseName.trim())
         .map((assignment) => ({
@@ -182,37 +186,58 @@ function TeacherForm({ teacher, onSubmit, onCancel, isSubmitting, error }) {
           </div>
         </div>
 
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="teacher-employment-type">Tipo de docente</Label>
-          <div ref={employmentAnchor} className="w-full max-w-md">
-            <Combobox
-              items={EMPLOYMENT_TYPES.map((item) => item.label)}
-              value={getEmploymentTypeLabel(form.employmentType)}
-              onValueChange={(label) => {
-                const item = EMPLOYMENT_TYPES.find((option) => option.label === label);
-                setForm((current) => ({
-                  ...current,
-                  employmentType: item?.value ?? "NOMBRADO",
-                }));
-              }}
-              disabled={isSubmitting}
-            >
-              <ComboboxInput
-                id="teacher-employment-type"
-                placeholder="Seleccionar tipo"
-                readOnly
-              />
-              <ComboboxContent anchor={employmentAnchor}>
-                <ComboboxEmpty>Sin opciones.</ComboboxEmpty>
-                <ComboboxList>
-                  {(label) => (
-                    <ComboboxItem key={label} value={label}>
-                      {label}
-                    </ComboboxItem>
-                  )}
-                </ComboboxList>
-              </ComboboxContent>
-            </Combobox>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="teacher-employment-type">Tipo de docente</Label>
+            <div ref={employmentAnchor} className="w-full">
+              <Combobox
+                items={EMPLOYMENT_TYPES.map((item) => item.label)}
+                value={getEmploymentTypeLabel(form.employmentType)}
+                onValueChange={(label) => {
+                  const item = EMPLOYMENT_TYPES.find((option) => option.label === label);
+                  setForm((current) => ({
+                    ...current,
+                    employmentType: item?.value ?? "NOMBRADO",
+                  }));
+                }}
+                disabled={isSubmitting}
+              >
+                <ComboboxInput
+                  id="teacher-employment-type"
+                  placeholder="Seleccionar tipo"
+                  readOnly
+                />
+                <ComboboxContent anchor={employmentAnchor}>
+                  <ComboboxEmpty>Sin opciones.</ComboboxEmpty>
+                  <ComboboxList>
+                    {(label) => (
+                      <ComboboxItem key={label} value={label}>
+                        {label}
+                      </ComboboxItem>
+                    )}
+                  </ComboboxList>
+                </ComboboxContent>
+              </Combobox>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label>Turno</Label>
+            <div className="flex flex-wrap gap-1">
+              {TEACHER_SHIFTS.map((item) => (
+                <Button
+                  key={item.value}
+                  type="button"
+                  variant={form.shift === item.value ? "default" : "outline"}
+                  onClick={() =>
+                    setForm((current) => ({ ...current, shift: item.value }))
+                  }
+                  disabled={isSubmitting}
+                >
+                  {item.label}
+                </Button>
+              ))}
+            </div>
           </div>
         </div>
 

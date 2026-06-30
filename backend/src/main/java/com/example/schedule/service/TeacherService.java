@@ -15,6 +15,7 @@ import com.example.schedule.entity.Teacher;
 import com.example.schedule.entity.TeacherAssignment;
 import com.example.schedule.model.CourseCategory;
 import com.example.schedule.model.EmploymentType;
+import com.example.schedule.model.TeacherShift;
 import com.example.schedule.repository.TeacherRepository;
 
 @Service
@@ -29,9 +30,10 @@ public class TeacherService {
     @Transactional(readOnly = true)
     public List<TeacherResponse> findAll(
             EmploymentType employmentType,
+            TeacherShift shift,
             CourseCategory courseCategory,
             Integer cycle) {
-        return teacherRepository.findByFilters(employmentType, courseCategory, cycle).stream()
+        return teacherRepository.findByFilters(employmentType, shift, courseCategory, cycle).stream()
                 .map(TeacherResponse::from)
                 .toList();
     }
@@ -45,7 +47,7 @@ public class TeacherService {
     public TeacherResponse create(CreateTeacherRequest request) {
         Teacher teacher = new Teacher();
         applyTeacherFields(teacher, request.firstName(), request.lastName(),
-                request.email(), request.phone(), request.employmentType());
+                request.email(), request.phone(), request.employmentType(), request.shift());
         teacher.replaceAssignments(toAssignments(request.assignments()));
         return TeacherResponse.from(teacherRepository.save(teacher));
     }
@@ -54,7 +56,7 @@ public class TeacherService {
     public TeacherResponse update(Long id, UpdateTeacherRequest request) {
         Teacher teacher = getTeacherOrThrow(id);
         applyTeacherFields(teacher, request.firstName(), request.lastName(),
-                request.email(), request.phone(), request.employmentType());
+                request.email(), request.phone(), request.employmentType(), request.shift());
         teacher.replaceAssignments(toAssignments(request.assignments()));
         return TeacherResponse.from(teacherRepository.save(teacher));
     }
@@ -77,6 +79,7 @@ public class TeacherService {
                 "maria.garcia@unc.edu.pe",
                 "987654321",
                 EmploymentType.NOMBRADO,
+                TeacherShift.MANANA,
                 List.of(
                         new TeacherAssignmentRequest("Cálculo I", CourseCategory.CARRERA, 1),
                         new TeacherAssignmentRequest("Matemática General", CourseCategory.ESTUDIOS_GENERALES, 1)));
@@ -87,6 +90,7 @@ public class TeacherService {
                 "carlos.lopez@unc.edu.pe",
                 "912345678",
                 EmploymentType.CONTRATADO,
+                TeacherShift.TARDE,
                 List.of(
                         new TeacherAssignmentRequest("Programación I", CourseCategory.CARRERA, 2),
                         new TeacherAssignmentRequest("Introducción a la Computación", CourseCategory.ESTUDIOS_GENERALES, 2)));
@@ -97,6 +101,7 @@ public class TeacherService {
                 "ana.torres@unc.edu.pe",
                 null,
                 EmploymentType.INVITADO,
+                TeacherShift.MANANA,
                 List.of(
                         new TeacherAssignmentRequest("Física I", CourseCategory.CARRERA, 3)));
 
@@ -111,12 +116,14 @@ public class TeacherService {
             String lastName,
             String email,
             String phone,
-            EmploymentType employmentType) {
+            EmploymentType employmentType,
+            TeacherShift shift) {
         teacher.setFirstName(firstName.trim());
         teacher.setLastName(lastName.trim());
         teacher.setEmail(blankToNull(email));
         teacher.setPhone(blankToNull(phone));
         teacher.setEmploymentType(employmentType);
+        teacher.setShift(shift);
     }
 
     private List<TeacherAssignment> toAssignments(List<TeacherAssignmentRequest> requests) {

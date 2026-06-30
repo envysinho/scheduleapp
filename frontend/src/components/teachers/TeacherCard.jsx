@@ -15,6 +15,7 @@ import {
   getCourseCategoryLabel,
   getCycleLabel,
   getEmploymentTypeLabel,
+  getTeacherShiftLabel,
 } from "@/lib/constants";
 
 function getInitials(firstName, lastName) {
@@ -49,6 +50,11 @@ function TeacherBadges({ teacher }) {
       <Badge variant="secondary">
         {getEmploymentTypeLabel(teacher.employmentType)}
       </Badge>
+      {teacher.shift && (
+        <Badge variant="secondary">
+          {getTeacherShiftLabel(teacher.shift)}
+        </Badge>
+      )}
       {courseCategories.map((category) => (
         <Badge key={category} variant="secondary">
           {getCourseCategoryLabel(category)}

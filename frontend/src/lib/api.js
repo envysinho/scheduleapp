@@ -8,7 +8,9 @@ async function parseJsonResponse(res) {
     const message =
       payload && typeof payload.message === "string"
         ? payload.message
-        : "Error en la petición";
+        : payload && typeof payload.error === "string"
+          ? payload.error
+          : "Error en la petición";
     throw new Error(message);
   }
   return payload;
@@ -83,6 +85,9 @@ function buildTeachersQuery(filters = {}) {
   const params = new URLSearchParams();
   if (filters.employmentType) {
     params.set("employmentType", filters.employmentType);
+  }
+  if (filters.shift) {
+    params.set("shift", filters.shift);
   }
   if (filters.courseCategory) {
     params.set("courseCategory", filters.courseCategory);

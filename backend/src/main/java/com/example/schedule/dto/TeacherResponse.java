@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.example.schedule.entity.Teacher;
 import com.example.schedule.model.EmploymentType;
+import com.example.schedule.model.TeacherShift;
 
 public record TeacherResponse(
         Long id,
@@ -13,6 +14,7 @@ public record TeacherResponse(
         String email,
         String phone,
         EmploymentType employmentType,
+        TeacherShift shift,
         List<TeacherAssignmentResponse> assignments
 ) {
 
@@ -25,6 +27,7 @@ public record TeacherResponse(
                 teacher.getEmail(),
                 teacher.getPhone(),
                 teacher.getEmploymentType(),
+                teacher.getShift(),
                 teacher.getAssignments().stream()
                         .map(TeacherAssignmentResponse::from)
                         .toList());

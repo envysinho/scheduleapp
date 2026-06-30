@@ -22,6 +22,16 @@ export const EMPLOYMENT_TYPE_FILTERS = [
   ...EMPLOYMENT_TYPES,
 ];
 
+export const TEACHER_SHIFTS = [
+  { value: "MANANA", label: "Mañana" },
+  { value: "TARDE", label: "Tarde" },
+];
+
+export const TEACHER_SHIFT_FILTERS = [
+  { value: null, label: "Todos" },
+  ...TEACHER_SHIFTS,
+];
+
 export const COURSE_CATEGORIES = [
   { value: "CARRERA", label: "De carrera" },
   { value: "ESTUDIOS_GENERALES", label: "Estudios generales" },
@@ -39,6 +49,10 @@ export const CYCLE_FILTERS = [
 
 export function getEmploymentTypeLabel(value) {
   return EMPLOYMENT_TYPES.find((item) => item.value === value)?.label ?? value;
+}
+
+export function getTeacherShiftLabel(value) {
+  return TEACHER_SHIFTS.find((item) => item.value === value)?.label ?? value;
 }
 
 export function getCourseCategoryLabel(value) {

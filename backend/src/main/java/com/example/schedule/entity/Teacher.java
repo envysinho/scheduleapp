@@ -8,6 +8,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import com.example.schedule.model.EmploymentType;
+import com.example.schedule.model.TeacherShift;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -43,6 +44,10 @@ public class Teacher {
     @Enumerated(EnumType.STRING)
     @Column(name = "employment_type", nullable = false)
     private EmploymentType employmentType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, columnDefinition = "varchar(255) not null default 'MANANA'")
+    private TeacherShift shift;
 
     @OneToMany(mappedBy = "teacher", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<TeacherAssignment> assignments = new ArrayList<>();
@@ -101,6 +106,14 @@ public class Teacher {
 
     public void setEmploymentType(EmploymentType employmentType) {
         this.employmentType = employmentType;
+    }
+
+    public TeacherShift getShift() {
+        return shift;
+    }
+
+    public void setShift(TeacherShift shift) {
+        this.shift = shift;
     }
 
     public List<TeacherAssignment> getAssignments() {
