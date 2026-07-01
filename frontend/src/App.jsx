@@ -13,6 +13,7 @@ import Horarios from "@/pages/Horarios";
 import Login from "@/pages/Login";
 import Users from "@/pages/Users";
 import Rules from "@/pages/Rules";
+import Semesters from "@/pages/Semesters";
 
 const PAGE_BY_SEARCH_TYPE = {
   teacher: "teachers",
@@ -28,7 +29,12 @@ function AppContent() {
   const isAdmin = user?.role === "ADMIN";
 
   useEffect(() => {
-    if ((currentPage === "users" || currentPage === "rules") && !isAdmin) {
+    if (
+      (currentPage === "users" ||
+        currentPage === "rules" ||
+        currentPage === "semesters") &&
+      !isAdmin
+    ) {
       setCurrentPage("dashboard");
     }
   }, [currentPage, isAdmin]);
@@ -75,6 +81,8 @@ function AppContent() {
         );
       case "rules":
         return isAdmin ? <Rules /> : <Dashboard />;
+      case "semesters":
+        return isAdmin ? <Semesters /> : <Dashboard />;
       case "users":
         return isAdmin ? <Users /> : <Dashboard />;
       default: {

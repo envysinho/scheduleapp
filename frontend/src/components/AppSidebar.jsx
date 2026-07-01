@@ -8,6 +8,7 @@ import {
   CalendarDays,
   ChevronDown,
   ScrollText,
+  CalendarRange,
   Users,
 } from "lucide-react";
 import NavUser from "@/components/NavUser";
@@ -139,7 +140,7 @@ function AppSidebar({ currentPage, onNavigate }) {
       <SidebarFooter>
         {isAdmin && (
           <>
-            <SidebarMenu>
+            <SidebarMenu className="gap-y-0.5">
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={currentPage === "rules"}
@@ -148,6 +149,16 @@ function AppSidebar({ currentPage, onNavigate }) {
                 >
                   <ScrollText />
                   <span>Reglas</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={currentPage === "semesters"}
+                  tooltip="Semestres"
+                  onClick={() => handleNavigation("semesters")}
+                >
+                  <CalendarRange />
+                  <span>Semestres</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
