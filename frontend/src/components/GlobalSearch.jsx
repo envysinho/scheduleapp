@@ -215,24 +215,22 @@ function GlobalSearch({ onSelect }) {
             {emptyMessage}
           </ComboboxEmpty>
           <ComboboxList>
-            {() =>
-              groupedItems.map((group) => (
-                <ComboboxGroup key={group.label} items={group.items}>
-                  <ComboboxLabel>{group.label}</ComboboxLabel>
-                  <ComboboxCollection>
-                    {(item) => (
-                      <ComboboxItem
-                        key={item.value}
-                        value={item}
-                        className="text-muted-foreground data-highlighted:text-accent-foreground"
-                      >
-                        {item.label}
-                      </ComboboxItem>
-                    )}
-                  </ComboboxCollection>
-                </ComboboxGroup>
-              ))
-            }
+            {groupedItems.map((group) => (
+              <ComboboxGroup key={group.label} items={group.items}>
+                <ComboboxLabel>{group.label}</ComboboxLabel>
+                <ComboboxCollection>
+                  {(item) => (
+                    <ComboboxItem
+                      key={item.value}
+                      value={item}
+                      className="text-muted-foreground data-highlighted:text-accent-foreground"
+                    >
+                      {item.label}
+                    </ComboboxItem>
+                  )}
+                </ComboboxCollection>
+              </ComboboxGroup>
+            ))}
           </ComboboxList>
         </ComboboxContent>
       </Combobox>
