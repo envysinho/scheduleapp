@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { BookPlus, LayoutGrid, List } from "lucide-react";
 import PageCard from "@/components/PageCard";
+import SearchFilterBanner from "@/components/SearchFilterBanner";
 import CourseCard from "@/components/courses/CourseCard";
 import CourseForm from "@/components/courses/CourseForm";
 import { Button } from "@/components/ui/button";
@@ -24,12 +25,13 @@ import {
 import {
   createCourse,
   deleteCourse,
+  getCourse,
   listCourses,
   updateCourse,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-function Courses() {
+function Courses({ searchFilter, onClearSearchFilter }) {
   const { logout, user } = useAuth();
   const isAdmin = user?.role === "ADMIN";
 
@@ -54,10 +56,19 @@ function Courses() {
     logout();
   }, [logout]);
 
+  const isSearchActive =
+    searchFilter?.type === "course" && searchFilter.id != null;
+
   const loadCourses = useCallback(async () => {
     setError(null);
     setIsLoading(true);
     try {
+      if (isSearchActive) {
+        const data = await getCourse(searchFilter.id, handleUnauthorized);
+        setCourses([data]);
+        return;
+      }
+
       const data = await listCourses(
         { type, availability, shift, cycle },
         handleUnauthorized
@@ -65,16 +76,41 @@ function Courses() {
       setCourses(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar cursos");
+      if (isSearchActive) {
+        setCourses([]);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [type, availability, shift, cycle, handleUnauthorized]);
+  }, [
+    type,
+    availability,
+    shift,
+    cycle,
+    isSearchActive,
+    searchFilter?.id,
+    handleUnauthorized,
+  ]);
 
   useEffect(() => {
     if (pageView === "list") {
       loadCourses();
     }
   }, [loadCourses, pageView]);
+
+  useEffect(() => {
+    if (searchFilter?.type !== "course" || !searchFilter.id) {
+      return;
+    }
+
+    setPageView("list");
+    setEditingCourse(null);
+    setFormError(null);
+    setType(null);
+    setAvailability(null);
+    setShift(null);
+    setCycle(null);
+  }, [searchFilter]);
 
   const closeForm = () => {
     setPageView("list");
@@ -299,11 +335,20 @@ function Courses() {
             </p>
           )}
 
+          {isSearchActive && (
+            <SearchFilterBanner
+              label={searchFilter.label}
+              onClear={onClearSearchFilter}
+            />
+          )}
+
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Cargando cursos...</p>
           ) : courses.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No hay cursos que coincidan con los filtros seleccionados.
+              {isSearchActive
+                ? "No se encontró el curso seleccionado."
+                : "No hay cursos que coincidan con los filtros seleccionados."}
             </p>
           ) : (
             <div

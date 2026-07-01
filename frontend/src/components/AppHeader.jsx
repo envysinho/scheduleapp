@@ -1,28 +1,60 @@
-import { Bell, Moon, Search, Settings, Sun } from "lucide-react";
+import { useState } from "react";
+import { Bell, Moon, Settings, Sun } from "lucide-react";
+import GlobalSearch from "@/components/GlobalSearch";
 import logo from "@/assets/images/logofi.png";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+  useComboboxAnchor,
+} from "@/components/ui/combobox";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 
-function AppHeader({ isDark, onToggleTheme }) {
+const SEMESTER_OPTIONS = ["Semestre 26-I", "Semestre 26-II"];
+
+function AppHeader({ isDark, onToggleTheme, onSearchSelect }) {
+  const [semester, setSemester] = useState(SEMESTER_OPTIONS[0]);
+  const semesterAnchor = useComboboxAnchor();
+
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
       <SidebarTrigger className="-ml-1" />
       <span className="font-semibold shrink-0">Gestor de Horarios</span>
 
       <div className="flex flex-1 items-center justify-center px-2 md:px-4">
-        <div className="relative w-full max-w-xl">
-          <Search className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Buscar aulas, docentes..."
-            className="pl-8"
-          />
-        </div>
+        <GlobalSearch onSelect={onSearchSelect} />
       </div>
 
-      <div className="ml-auto flex items-center gap-1">
+      <div className="ml-auto flex items-center gap-2">
+        <div ref={semesterAnchor} className="w-[170px]">
+          <Combobox
+            items={SEMESTER_OPTIONS}
+            value={semester}
+            onValueChange={setSemester}
+          >
+            <ComboboxInput
+              id="header-semester"
+              placeholder="Semestre"
+              readOnly
+              aria-label="Semestre"
+            />
+            <ComboboxContent anchor={semesterAnchor}>
+              <ComboboxEmpty>Sin opciones.</ComboboxEmpty>
+              <ComboboxList>
+                {(label) => (
+                  <ComboboxItem key={label} value={label}>
+                    {label}
+                  </ComboboxItem>
+                )}
+              </ComboboxList>
+            </ComboboxContent>
+          </Combobox>
+        </div>
         <Button variant="ghost" size="icon" className="relative">
           <Bell />
           <Badge

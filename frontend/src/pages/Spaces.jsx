@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Building2, LayoutGrid, List } from "lucide-react";
 import PageCard from "@/components/PageCard";
+import SearchFilterBanner from "@/components/SearchFilterBanner";
 import SpaceCard from "@/components/spaces/SpaceCard";
 import SpaceForm from "@/components/spaces/SpaceForm";
 import { Button } from "@/components/ui/button";
@@ -23,12 +24,13 @@ import {
 import {
   createSpace,
   deleteSpace,
+  getSpace,
   listSpaces,
   updateSpace,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-function Spaces() {
+function Spaces({ searchFilter, onClearSearchFilter }) {
   const { logout, user } = useAuth();
   const isAdmin = user?.role === "ADMIN";
 
@@ -51,10 +53,19 @@ function Spaces() {
     logout();
   }, [logout]);
 
+  const isSearchActive =
+    searchFilter?.type === "space" && searchFilter.id != null;
+
   const loadSpaces = useCallback(async () => {
     setError(null);
     setIsLoading(true);
     try {
+      if (isSearchActive) {
+        const data = await getSpace(searchFilter.id, handleUnauthorized);
+        setSpaces([data]);
+        return;
+      }
+
       const data = await listSpaces(
         { spaceType, availability, cycle },
         handleUnauthorized
@@ -62,16 +73,39 @@ function Spaces() {
       setSpaces(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar ambientes");
+      if (isSearchActive) {
+        setSpaces([]);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [spaceType, availability, cycle, handleUnauthorized]);
+  }, [
+    spaceType,
+    availability,
+    cycle,
+    isSearchActive,
+    searchFilter?.id,
+    handleUnauthorized,
+  ]);
 
   useEffect(() => {
     if (pageView === "list") {
       loadSpaces();
     }
   }, [loadSpaces, pageView]);
+
+  useEffect(() => {
+    if (searchFilter?.type !== "space" || !searchFilter.id) {
+      return;
+    }
+
+    setPageView("list");
+    setEditingSpace(null);
+    setFormError(null);
+    setSpaceType(null);
+    setAvailability(null);
+    setCycle(null);
+  }, [searchFilter]);
 
   const closeForm = () => {
     setPageView("list");
@@ -270,11 +304,20 @@ function Spaces() {
             </p>
           )}
 
+          {isSearchActive && (
+            <SearchFilterBanner
+              label={searchFilter.label}
+              onClear={onClearSearchFilter}
+            />
+          )}
+
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Cargando ambientes...</p>
           ) : spaces.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No hay ambientes que coincidan con los filtros seleccionados.
+              {isSearchActive
+                ? "No se encontró el ambiente seleccionado."
+                : "No hay ambientes que coincidan con los filtros seleccionados."}
             </p>
           ) : (
             <div

@@ -14,8 +14,15 @@ import Login from "@/pages/Login";
 import Users from "@/pages/Users";
 import Rules from "@/pages/Rules";
 
+const PAGE_BY_SEARCH_TYPE = {
+  teacher: "teachers",
+  space: "spaces",
+  course: "courses",
+};
+
 function AppContent() {
   const [currentPage, setCurrentPage] = useState("dashboard");
+  const [searchFilter, setSearchFilter] = useState(null);
   const { isDark, toggleTheme } = useTheme();
   const { isAuthenticated, user } = useAuth();
   const isAdmin = user?.role === "ADMIN";
@@ -26,16 +33,46 @@ function AppContent() {
     }
   }, [currentPage, isAdmin]);
 
+  const handleNavigate = (page) => {
+    if (searchFilter) {
+      const expectedPage = PAGE_BY_SEARCH_TYPE[searchFilter.type];
+      if (page !== expectedPage) {
+        setSearchFilter(null);
+      }
+    }
+    setCurrentPage(page);
+  };
+
+  const handleSearchSelect = (filter) => {
+    setSearchFilter(filter);
+    setCurrentPage(PAGE_BY_SEARCH_TYPE[filter.type]);
+  };
+
   const renderPage = () => {
     switch (currentPage) {
       case "dashboard":
         return <Dashboard />;
       case "teachers":
-        return <Teachers />;
+        return (
+          <Teachers
+            searchFilter={searchFilter}
+            onClearSearchFilter={() => setSearchFilter(null)}
+          />
+        );
       case "courses":
-        return <Courses />;
+        return (
+          <Courses
+            searchFilter={searchFilter}
+            onClearSearchFilter={() => setSearchFilter(null)}
+          />
+        );
       case "spaces":
-        return <Spaces />;
+        return (
+          <Spaces
+            searchFilter={searchFilter}
+            onClearSearchFilter={() => setSearchFilter(null)}
+          />
+        );
       case "rules":
         return isAdmin ? <Rules /> : <Dashboard />;
       case "users":
@@ -59,9 +96,13 @@ function AppContent() {
   return (
     <TooltipProvider>
       <SidebarProvider>
-        <AppSidebar currentPage={currentPage} onNavigate={setCurrentPage} />
+        <AppSidebar currentPage={currentPage} onNavigate={handleNavigate} />
         <SidebarInset>
-          <AppHeader isDark={isDark} onToggleTheme={toggleTheme} />
+          <AppHeader
+            isDark={isDark}
+            onToggleTheme={toggleTheme}
+            onSearchSelect={handleSearchSelect}
+          />
           <div className="flex flex-1 flex-col gap-4 p-4">{renderPage()}</div>
         </SidebarInset>
       </SidebarProvider>

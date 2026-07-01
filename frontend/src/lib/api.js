@@ -100,6 +100,10 @@ export async function listTeachers(filters, onUnauthorized) {
   return apiFetch(`/api/teachers${buildTeachersQuery(filters)}`, {}, onUnauthorized);
 }
 
+export async function getTeacher(id, onUnauthorized) {
+  return apiFetch(`/api/teachers/${id}`, {}, onUnauthorized);
+}
+
 export async function createTeacher(data, onUnauthorized) {
   return apiFetch(
     "/api/teachers",
@@ -141,6 +145,10 @@ function buildSpacesQuery(filters = {}) {
 
 export async function listSpaces(filters, onUnauthorized) {
   return apiFetch(`/api/spaces${buildSpacesQuery(filters)}`, {}, onUnauthorized);
+}
+
+export async function getSpace(id, onUnauthorized) {
+  return apiFetch(`/api/spaces/${id}`, {}, onUnauthorized);
 }
 
 export async function createSpace(data, onUnauthorized) {
@@ -187,6 +195,10 @@ function buildCoursesQuery(filters = {}) {
 
 export async function listCourses(filters, onUnauthorized) {
   return apiFetch(`/api/courses${buildCoursesQuery(filters)}`, {}, onUnauthorized);
+}
+
+export async function getCourse(id, onUnauthorized) {
+  return apiFetch(`/api/courses/${id}`, {}, onUnauthorized);
 }
 
 export async function createCourse(data, onUnauthorized) {

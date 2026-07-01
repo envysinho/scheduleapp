@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { LayoutGrid, List, UserPlus } from "lucide-react";
 import PageCard from "@/components/PageCard";
+import SearchFilterBanner from "@/components/SearchFilterBanner";
 import TeacherCard from "@/components/teachers/TeacherCard";
 import TeacherForm from "@/components/teachers/TeacherForm";
 import { Button } from "@/components/ui/button";
@@ -23,12 +24,13 @@ import {
 import {
   createTeacher,
   deleteTeacher,
+  getTeacher,
   listTeachers,
   updateTeacher,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-function Teachers() {
+function Teachers({ searchFilter, onClearSearchFilter }) {
   const { logout, user } = useAuth();
   const isAdmin = user?.role === "ADMIN";
 
@@ -52,10 +54,19 @@ function Teachers() {
     logout();
   }, [logout]);
 
+  const isSearchActive =
+    searchFilter?.type === "teacher" && searchFilter.id != null;
+
   const loadTeachers = useCallback(async () => {
     setError(null);
     setIsLoading(true);
     try {
+      if (isSearchActive) {
+        const data = await getTeacher(searchFilter.id, handleUnauthorized);
+        setTeachers([data]);
+        return;
+      }
+
       const data = await listTeachers(
         { employmentType, shift, cycle },
         handleUnauthorized
@@ -63,16 +74,39 @@ function Teachers() {
       setTeachers(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar docentes");
+      if (isSearchActive) {
+        setTeachers([]);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [employmentType, shift, cycle, handleUnauthorized]);
+  }, [
+    employmentType,
+    shift,
+    cycle,
+    isSearchActive,
+    searchFilter?.id,
+    handleUnauthorized,
+  ]);
 
   useEffect(() => {
     if (pageView === "list") {
       loadTeachers();
     }
   }, [loadTeachers, pageView]);
+
+  useEffect(() => {
+    if (searchFilter?.type !== "teacher" || !searchFilter.id) {
+      return;
+    }
+
+    setPageView("list");
+    setEditingTeacher(null);
+    setFormError(null);
+    setEmploymentType(null);
+    setShift(null);
+    setCycle(null);
+  }, [searchFilter]);
 
   const closeForm = () => {
     setPageView("list");
@@ -294,11 +328,20 @@ function Teachers() {
             </p>
           )}
 
+          {isSearchActive && (
+            <SearchFilterBanner
+              label={searchFilter.label}
+              onClear={onClearSearchFilter}
+            />
+          )}
+
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Cargando docentes...</p>
           ) : teachers.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No hay docentes que coincidan con los filtros seleccionados.
+              {isSearchActive
+                ? "No se encontró el docente seleccionado."
+                : "No hay docentes que coincidan con los filtros seleccionados."}
             </p>
           ) : (
             <div
