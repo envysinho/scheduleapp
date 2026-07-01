@@ -13,9 +13,12 @@ import {
   COURSE_LECTIVO_LABEL,
   getCourseAvailabilityLabel,
   getCourseTypeLabel,
-  isCourseLectivo,
+  getCycleLabel,
   getTeacherShiftLabel,
+  isCourseLectivo,
+  isNightOnlyCycle,
 } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 
 function getAvailabilityClassName(availability) {
   switch (availability) {
@@ -42,8 +45,19 @@ function hasSameTeacher(course) {
 function getTeacherEntries(course) {
   const morning = course.morningTeacher;
   const afternoon = course.afternoonTeacher;
+  const night = course.nightTeacher;
+
+  if (isNightOnlyCycle(course.cycle)) {
+    if (!night) {
+      return [];
+    }
+    return [{ label: null, teacher: night, shiftLabel: getTeacherShiftLabel("NOCHE") }];
+  }
 
   if (!morning && !afternoon) {
+    if (night) {
+      return [{ label: null, teacher: night, shiftLabel: getTeacherShiftLabel("NOCHE") }];
+    }
     return [];
   }
 
@@ -66,7 +80,6 @@ function getTeacherEntries(course) {
       shiftLabel: getTeacherShiftLabel("TARDE"),
     });
   }
-  const night = course.nightTeacher;
   if (night) {
     entries.push({
       label: null,
@@ -77,13 +90,21 @@ function getTeacherEntries(course) {
   return entries;
 }
 
-function CourseBadges({ course }) {
+function CourseBadges({ course, compact = false }) {
   const lectivo = isCourseLectivo(course);
   const typeLabel =
     course.type === "LECTIVOS" ? getCourseTypeLabel("DE_CARRERA") : getCourseTypeLabel(course.type);
 
   return (
-    <div className="mt-1 flex flex-wrap gap-1">
+    <div
+      className={cn(
+        "mt-1 flex gap-1",
+        compact ? "w-max flex-nowrap" : "flex-wrap"
+      )}
+    >
+      {course.cycle != null && (
+        <Badge variant="outline">{getCycleLabel(course.cycle)}</Badge>
+      )}
       <Badge variant="secondary">{typeLabel}</Badge>
       {lectivo && <Badge variant="outline">{COURSE_LECTIVO_LABEL}</Badge>}
       <Badge className={getAvailabilityClassName(course.availability)}>
@@ -224,14 +245,14 @@ function CourseCardGrid({ course, isAdmin, onEdit, onDelete }) {
 function CourseCardList({ course, isAdmin, onEdit, onDelete }) {
   return (
     <Card className="flex h-24 items-center overflow-hidden py-0">
-      <div className="grid h-full w-full grid-cols-[minmax(0,220px)_minmax(0,1fr)_auto] items-center gap-4 px-4 py-3">
-        <div className="flex min-w-0 items-center gap-3">
+      <div className="grid h-full w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 px-4 py-3">
+        <div className="flex items-center gap-3">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted">
             <BookOpen className="size-5 text-muted-foreground" />
           </div>
-          <div className="min-w-0">
-            <p className="truncate font-medium">{course.name}</p>
-            <CourseBadges course={course} />
+          <div>
+            <p className="max-w-[14rem] truncate font-medium">{course.name}</p>
+            <CourseBadges course={course} compact />
           </div>
         </div>
 

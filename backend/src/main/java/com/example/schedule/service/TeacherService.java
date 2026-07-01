@@ -2,6 +2,7 @@ package com.example.schedule.service;
 
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -13,21 +14,28 @@ import com.example.schedule.dto.CreateTeacherRequest;
 import com.example.schedule.dto.TeacherAssignmentRequest;
 import com.example.schedule.dto.TeacherResponse;
 import com.example.schedule.dto.UpdateTeacherRequest;
+import com.example.schedule.entity.Course;
 import com.example.schedule.entity.Teacher;
 import com.example.schedule.entity.TeacherAssignment;
 import com.example.schedule.model.CourseCategory;
 import com.example.schedule.model.EmploymentType;
 import com.example.schedule.model.TeacherShift;
+import com.example.schedule.repository.CourseRepository;
 import com.example.schedule.repository.TeacherRepository;
 
 @Service
 public class TeacherService {
 
     private final TeacherRepository teacherRepository;
+    private final CourseRepository courseRepository;
     private final JdbcTemplate jdbcTemplate;
 
-    public TeacherService(TeacherRepository teacherRepository, JdbcTemplate jdbcTemplate) {
+    public TeacherService(
+            TeacherRepository teacherRepository,
+            CourseRepository courseRepository,
+            JdbcTemplate jdbcTemplate) {
         this.teacherRepository = teacherRepository;
+        this.courseRepository = courseRepository;
         this.jdbcTemplate = jdbcTemplate;
     }
 
@@ -77,6 +85,16 @@ public class TeacherService {
     @Transactional
     public void delete(Long id) {
         Teacher teacher = getTeacherOrThrow(id);
+        List<Course> linkedCourses = courseRepository.findByTeacherId(id);
+        if (!linkedCourses.isEmpty()) {
+            String courseNames = linkedCourses.stream()
+                    .map(Course::getName)
+                    .distinct()
+                    .collect(Collectors.joining(", "));
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "No se puede eliminar el docente porque está asignado a: " + courseNames);
+        }
         teacherRepository.delete(teacher);
     }
 

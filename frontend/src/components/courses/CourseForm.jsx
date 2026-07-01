@@ -17,6 +17,7 @@ import {
   CYCLES,
   getCourseTypeLabel,
   getCycleLabel,
+  isNightOnlyCycle,
 } from "@/lib/constants";
 import { listSpaces, listTeachers } from "@/lib/api";
 
@@ -36,6 +37,26 @@ const EMPTY_FORM = {
   spaceAssignments: [],
 };
 
+const UNASSIGNED_LABEL = "Sin asignar";
+
+function withUnassignedOption(labels) {
+  return [UNASSIGNED_LABEL, ...labels];
+}
+
+function resolveTeacherSelection(label, teachers) {
+  if (label === UNASSIGNED_LABEL) {
+    return null;
+  }
+  return teachers.find((teacher) => teacher.fullName === label)?.id ?? null;
+}
+
+function resolveSpaceSelection(label, spaces) {
+  if (label === UNASSIGNED_LABEL) {
+    return null;
+  }
+  return spaces.find((space) => space.name === label)?.id ?? null;
+}
+
 function courseToForm(course) {
   if (!course) {
     return EMPTY_FORM;
@@ -47,15 +68,19 @@ function courseToForm(course) {
     course.morningTeacher.id === course.afternoonTeacher.id;
 
   const isLegacyLectivo = course.type === "LECTIVOS";
+  const cycle = course.cycle ?? 1;
+  const nightOnly = isNightOnlyCycle(cycle);
 
   return {
     name: course.name ?? "",
     type: isLegacyLectivo ? "DE_CARRERA" : (course.type ?? "DE_CARRERA"),
     lectivo: course.lectivo ?? isLegacyLectivo,
-    cycle: course.cycle ?? 1,
-    sameTeacher: sameTeacher || (!course.afternoonTeacher && Boolean(course.morningTeacher)),
-    morningTeacherId: course.morningTeacher?.id ?? null,
-    afternoonTeacherId: course.afternoonTeacher?.id ?? null,
+    cycle,
+    sameTeacher: nightOnly
+      ? true
+      : sameTeacher || (!course.afternoonTeacher && Boolean(course.morningTeacher)),
+    morningTeacherId: nightOnly ? null : (course.morningTeacher?.id ?? null),
+    afternoonTeacherId: nightOnly ? null : (course.afternoonTeacher?.id ?? null),
     nightTeacherId: course.nightTeacher?.id ?? null,
     spaceAssignments:
       course.spaceAssignments?.length > 0
@@ -105,12 +130,14 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
   const afternoonTeacherLabels = afternoonTeachers.map((teacher) => teacher.fullName);
   const nightTeacherLabels = nightTeachers.map((teacher) => teacher.fullName);
   const spaceLabels = spaces.map((space) => space.name);
+  const nightOnly = isNightOnlyCycle(form.cycle);
 
-  const getTeacherLabel = (teacherId) =>
-    teachers.find((teacher) => teacher.id === teacherId)?.fullName ?? "";
-
-  const getSpaceLabel = (spaceId) =>
-    spaces.find((space) => space.id === spaceId)?.name ?? "";
+  const getTeacherLabel = (teacherId) => {
+    if (teacherId == null) {
+      return UNASSIGNED_LABEL;
+    }
+    return teachers.find((teacher) => teacher.id === teacherId)?.fullName ?? "";
+  };
 
   const handleSpaceAssignmentChange = (index, spaceId) => {
     setForm((current) => ({
@@ -138,10 +165,12 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    const morningTeacherId = form.morningTeacherId;
-    const afternoonTeacherId = form.sameTeacher
-      ? form.morningTeacherId
-      : form.afternoonTeacherId;
+    const morningTeacherId = nightOnly ? null : form.morningTeacherId;
+    const afternoonTeacherId = nightOnly
+      ? null
+      : form.sameTeacher
+        ? form.morningTeacherId
+        : form.afternoonTeacherId;
 
     const payload = {
       name: form.name.trim(),
@@ -240,9 +269,17 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
                 value={getCycleLabel(form.cycle)}
                 onValueChange={(label) => {
                   const item = CYCLES.find((option) => option.label === label);
+                  const cycle = item?.id ?? 1;
                   setForm((current) => ({
                     ...current,
-                    cycle: item?.id ?? 1,
+                    cycle,
+                    ...(isNightOnlyCycle(cycle)
+                      ? {
+                          morningTeacherId: null,
+                          afternoonTeacherId: null,
+                          sameTeacher: true,
+                        }
+                      : {}),
                   }));
                 }}
                 disabled={isSubmitting}
@@ -264,6 +301,11 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
         </div>
 
         <div className="flex flex-col gap-3">
+          {nightOnly && (
+            <p className="text-sm text-muted-foreground">
+              Los cursos de Ciclo IX y X son solo turno noche.
+            </p>
+          )}
           <div className="flex items-center gap-2">
             <input
               id="same-teacher"
@@ -278,7 +320,7 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
                     : current.afternoonTeacherId,
                 }))
               }
-              disabled={isSubmitting}
+              disabled={isSubmitting || nightOnly}
               className="size-4 rounded border"
             />
             <Label htmlFor="same-teacher">Mismo docente en ambos turnos</Label>
@@ -291,19 +333,19 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
               </Label>
               <div ref={morningTeacherAnchor} className="w-full">
                 <Combobox
-                  items={morningTeacherLabels}
+                  items={withUnassignedOption(morningTeacherLabels)}
                   value={getTeacherLabel(form.morningTeacherId)}
                   onValueChange={(label) => {
-                    const teacher = morningTeachers.find((item) => item.fullName === label);
+                    const teacherId = resolveTeacherSelection(label, morningTeachers);
                     setForm((current) => ({
                       ...current,
-                      morningTeacherId: teacher?.id ?? null,
+                      morningTeacherId: teacherId,
                       afternoonTeacherId: current.sameTeacher
-                        ? teacher?.id ?? null
+                        ? teacherId
                         : current.afternoonTeacherId,
                     }));
                   }}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || nightOnly}
                 >
                   <ComboboxInput
                     id="morning-teacher"
@@ -329,16 +371,16 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
                 <Label htmlFor="afternoon-teacher">Docente 2 (Tarde)</Label>
                 <div ref={afternoonTeacherAnchor} className="w-full">
                   <Combobox
-                    items={afternoonTeacherLabels}
+                    items={withUnassignedOption(afternoonTeacherLabels)}
                     value={getTeacherLabel(form.afternoonTeacherId)}
                     onValueChange={(label) => {
-                      const teacher = afternoonTeachers.find((item) => item.fullName === label);
+                      const teacherId = resolveTeacherSelection(label, afternoonTeachers);
                       setForm((current) => ({
                         ...current,
-                        afternoonTeacherId: teacher?.id ?? null,
+                        afternoonTeacherId: teacherId,
                       }));
                     }}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || nightOnly}
                   >
                     <ComboboxInput
                       id="afternoon-teacher"
@@ -365,13 +407,13 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
             <Label htmlFor="night-teacher">Docente (Noche)</Label>
             <div ref={nightTeacherAnchor} className="w-full">
               <Combobox
-                items={nightTeacherLabels}
+                items={withUnassignedOption(nightTeacherLabels)}
                 value={getTeacherLabel(form.nightTeacherId)}
                 onValueChange={(label) => {
-                  const teacher = nightTeachers.find((item) => item.fullName === label);
+                  const teacherId = resolveTeacherSelection(label, nightTeachers);
                   setForm((current) => ({
                     ...current,
-                    nightTeacherId: teacher?.id ?? null,
+                    nightTeacherId: teacherId,
                   }));
                 }}
                 disabled={isSubmitting}
@@ -459,7 +501,9 @@ function SpaceAssignmentRow({
 }) {
   const spaceAnchor = useComboboxAnchor();
   const selectedLabel =
-    spaces.find((space) => space.id === assignment.spaceId)?.name ?? "";
+    assignment.spaceId == null
+      ? UNASSIGNED_LABEL
+      : (spaces.find((space) => space.id === assignment.spaceId)?.name ?? "");
 
   return (
     <div className="rounded-md border p-3">
@@ -481,17 +525,16 @@ function SpaceAssignmentRow({
         <Label htmlFor={`space-assignment-${index}`}>Ambiente</Label>
         <div ref={spaceAnchor} className="w-full">
           <Combobox
-            items={spaceLabels}
+            items={withUnassignedOption(spaceLabels)}
             value={selectedLabel}
             onValueChange={(label) => {
-              const space = spaces.find((item) => item.name === label);
-              onChange(index, space?.id ?? null);
+              onChange(index, resolveSpaceSelection(label, spaces));
             }}
             disabled={disabled}
           >
             <ComboboxInput
               id={`space-assignment-${index}`}
-              placeholder="Seleccionar ambiente"
+              placeholder="Sin asignar"
               readOnly
             />
             <ComboboxContent anchor={spaceAnchor}>

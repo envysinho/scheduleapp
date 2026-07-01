@@ -17,6 +17,7 @@ import com.example.schedule.entity.CourseSpaceAssignment;
 import com.example.schedule.entity.Space;
 import com.example.schedule.entity.Teacher;
 import com.example.schedule.model.CourseAvailability;
+import com.example.schedule.model.CourseCycleRules;
 import com.example.schedule.model.CourseType;
 import com.example.schedule.model.TeacherShift;
 import com.example.schedule.repository.CourseRepository;
@@ -188,6 +189,10 @@ public class CourseService {
         course.setType(type);
         course.setLectivo(lectivo);
         course.setCycle(cycle);
+        if (CourseCycleRules.isNightOnlyCycle(cycle)) {
+            morningTeacherId = null;
+            afternoonTeacherId = null;
+        }
         course.setMorningTeacher(resolveTeacher(morningTeacherId));
         course.setAfternoonTeacher(resolveTeacher(afternoonTeacherId));
         course.setNightTeacher(resolveTeacher(nightTeacherId));

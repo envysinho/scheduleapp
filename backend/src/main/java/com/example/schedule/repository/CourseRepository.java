@@ -25,4 +25,12 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     List<Course> findByFilters(
             @Param("type") CourseType type,
             @Param("cycle") Integer cycle);
+
+    @Query("""
+            SELECT c FROM Course c
+            WHERE c.morningTeacher.id = :teacherId
+               OR c.afternoonTeacher.id = :teacherId
+               OR c.nightTeacher.id = :teacherId
+            """)
+    List<Course> findByTeacherId(@Param("teacherId") Long teacherId);
 }

@@ -11,6 +11,12 @@ export const CYCLES = [
   { id: 10, label: "Ciclo X" },
 ];
 
+export const NIGHT_ONLY_CYCLES = [9, 10];
+
+export function isNightOnlyCycle(cycleId) {
+  return NIGHT_ONLY_CYCLES.includes(cycleId);
+}
+
 export const EMPLOYMENT_TYPES = [
   { value: "NOMBRADO", label: "Nombrado" },
   { value: "CONTRATADO", label: "Contratado" },

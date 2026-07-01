@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.example.schedule.entity.Course;
 import com.example.schedule.model.CourseAvailability;
+import com.example.schedule.model.CourseCycleRules;
 import com.example.schedule.model.CourseType;
 import com.example.schedule.model.TeacherShift;
 
@@ -38,6 +39,12 @@ public record CourseResponse(
     }
 
     public static CourseAvailability computeAvailability(Course course) {
+        if (CourseCycleRules.isNightOnlyCycle(course.getCycle())) {
+            return course.getNightTeacher() != null
+                    ? CourseAvailability.LLENO
+                    : CourseAvailability.LIBRE;
+        }
+
         boolean hasMorning = course.getMorningTeacher() != null;
         boolean hasAfternoon = course.getAfternoonTeacher() != null;
         if (!hasMorning && !hasAfternoon) {

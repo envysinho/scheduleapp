@@ -58,7 +58,6 @@ function GlobalSearch({ onSelect }) {
   const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [open, setOpen] = useState(false);
-  const [resetKey, setResetKey] = useState(0);
 
   const handleUnauthorized = useCallback(() => {
     logout();
@@ -156,7 +155,6 @@ function GlobalSearch({ onSelect }) {
     });
     setQuery("");
     setOpen(false);
-    setResetKey((current) => current + 1);
   };
 
   const handleValueChange = (item) => {
@@ -191,9 +189,9 @@ function GlobalSearch({ onSelect }) {
     <div ref={anchor} className="relative w-full max-w-xl">
       <Search className="pointer-events-none absolute top-1/2 left-2.5 z-10 size-4 -translate-y-1/2 text-muted-foreground" />
       <Combobox
-        key={resetKey}
         items={filteredItems}
         value={null}
+        inputValue={query}
         open={open && showSuggestions}
         onOpenChange={setOpen}
         onValueChange={handleValueChange}
