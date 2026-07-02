@@ -2,7 +2,7 @@
 
 Reglas de negocio para la asignación de cursos y turnos de docentes **nombrados** en la Escuela Profesional de Ingeniería de Sistemas (EPIS), junto con el **flujo general de asignación** de docentes en la escuela.
 
-En el sistema Schedule, los docentes se clasifican como `NOMBRADO`, `CONTRATADO` o `ESTUDIOS_GENERALES`, y los turnos disponibles son **Mañana** (`MANANA`), **Tarde** (`TARDE`) y **Noche** (`NOCHE`), definidos en `frontend/src/lib/constants.js`.
+En el sistema Schedule, los docentes se clasifican como `NOMBRADO`, `CONTRATADO` o `ESTUDIOS_GENERALES`, y los turnos disponibles son **Mañana** (`MANANA`), **Tarde** (`TARDE`) y **Noche** (`NOCHE`), definidos en `frontend/src/lib/constants.js`. Ver horarios en [`TURNOS-HORARIOS.md`](TURNOS-HORARIOS.md).
 
 ---
 

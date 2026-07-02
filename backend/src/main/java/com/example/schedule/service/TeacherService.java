@@ -10,6 +10,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.example.schedule.config.NombradosSeedData;
+import com.example.schedule.config.NombradosSeedData.DayChoicePattern;
+import com.example.schedule.config.NombradosSeedData.TeacherSeed;
 import com.example.schedule.dto.CreateTeacherRequest;
 import com.example.schedule.dto.TeacherAssignmentRequest;
 import com.example.schedule.dto.TeacherResponse;
@@ -99,47 +102,99 @@ public class TeacherService {
     }
 
     @Transactional
-    public void seedDemoIfEmpty() {
-        if (teacherRepository.count() > 0) {
+    public void seedNombradosIfNeeded() {
+        if (hasNombradosSeedFlag()) {
             return;
         }
 
-        CreateTeacherRequest teacher1 = new CreateTeacherRequest(
-                "María",
-                "García",
-                "maria.garcia@unc.edu.pe",
-                "987654321",
-                EmploymentType.NOMBRADO,
-                List.of(TeacherShift.MANANA),
-                List.of(
-                        new TeacherAssignmentRequest("Cálculo I", CourseCategory.CARRERA, 1),
-                        new TeacherAssignmentRequest("Álgebra Lineal", CourseCategory.CARRERA, 2)));
+        ensureSeedFlagsTable();
+        clearCourseTeacherReferences();
+        teacherRepository.deleteAll();
 
-        CreateTeacherRequest teacher2 = new CreateTeacherRequest(
-                "Carlos",
-                "López",
-                "carlos.lopez@unc.edu.pe",
-                "912345678",
-                EmploymentType.CONTRATADO,
-                List.of(TeacherShift.TARDE),
-                List.of(
-                        new TeacherAssignmentRequest("Programación I", CourseCategory.CARRERA, 2),
-                        new TeacherAssignmentRequest("Estructuras de Datos", CourseCategory.CARRERA, 3)));
+        for (TeacherSeed seed : NombradosSeedData.TEACHERS) {
+            List<TeacherAssignmentRequest> assignments = toSeedAssignmentRequests(seed);
 
-        CreateTeacherRequest teacher3 = new CreateTeacherRequest(
-                "Ana",
-                "Torres",
-                "ana.torres@unc.edu.pe",
-                null,
-                EmploymentType.ESTUDIOS_GENERALES,
-                List.of(TeacherShift.MANANA),
-                List.of(
-                        new TeacherAssignmentRequest("Matemática General", CourseCategory.ESTUDIOS_GENERALES, 1),
-                        new TeacherAssignmentRequest("Comunicación", CourseCategory.ESTUDIOS_GENERALES, 1)));
+            create(new CreateTeacherRequest(
+                    seed.firstName(),
+                    seed.lastName(),
+                    seed.email(),
+                    null,
+                    EmploymentType.NOMBRADO,
+                    seed.shifts(),
+                    assignments));
+        }
+    }
 
-        create(teacher1);
-        create(teacher2);
-        create(teacher3);
+    private List<TeacherAssignmentRequest> toSeedAssignmentRequests(TeacherSeed seed) {
+        List<TeacherAssignmentRequest> assignments = NombradosSeedData.preferenceCourses(seed).stream()
+                .map(course -> new TeacherAssignmentRequest(
+                        course.courseName(),
+                        CourseCategory.CARRERA,
+                        course.cycle()))
+                .toList();
+
+        if (seed.dayPattern() == DayChoicePattern.OPTION_A) {
+            if (assignments.size() != 1) {
+                throw new IllegalStateException(
+                        "Opción A requiere 1 preferencia de curso: " + seed.email());
+            }
+            return assignments;
+        }
+
+        long dayCourses = NombradosSeedData.preferenceCourses(seed).stream()
+                .filter(course -> course.modality() != NombradosSeedData.ShiftModality.NIGHT)
+                .count();
+        if (dayCourses != 2) {
+            throw new IllegalStateException(
+                    "Opción B requiere 2 cursos de día: " + seed.email());
+        }
+        return assignments;
+    }
+
+    private void clearCourseTeacherReferences() {
+        try {
+            jdbcTemplate.update("""
+                    UPDATE courses
+                    SET morning_teacher_id = NULL,
+                        afternoon_teacher_id = NULL,
+                        night_teacher_id = NULL
+                    """);
+        } catch (Exception ignored) {
+            // Table may not exist yet on first bootstrap.
+        }
+    }
+
+    private void ensureSeedFlagsTable() {
+        try {
+            jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS app_seed_flags (
+                        flag_key VARCHAR(100) PRIMARY KEY,
+                        applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """);
+        } catch (Exception ignored) {
+            // Database may not be ready yet.
+        }
+    }
+
+    boolean hasNombradosSeedFlag() {
+        ensureSeedFlagsTable();
+        try {
+            Integer count = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM app_seed_flags WHERE flag_key = ?",
+                    Integer.class,
+                    NombradosSeedData.SEED_FLAG);
+            return count != null && count > 0;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    void markNombradosSeedFlag() {
+        ensureSeedFlagsTable();
+        jdbcTemplate.update(
+                "INSERT INTO app_seed_flags (flag_key) VALUES (?) ON CONFLICT (flag_key) DO NOTHING",
+                NombradosSeedData.SEED_FLAG);
     }
 
     @Transactional

@@ -33,6 +33,9 @@ public class Course {
     @Column(nullable = false)
     private String name;
 
+    @Column(nullable = false, unique = true, length = 50)
+    private String code;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private CourseType type;
@@ -80,6 +83,14 @@ public class Course {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getCode() {
+        return code;
+    }
+
+    public void setCode(String code) {
+        this.code = code;
     }
 
     public CourseType getType() {

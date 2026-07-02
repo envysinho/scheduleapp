@@ -27,6 +27,7 @@ const EMPTY_SPACE_ASSIGNMENT = {
 
 const EMPTY_FORM = {
   name: "",
+  code: "",
   type: "DE_CARRERA",
   lectivo: false,
   cycle: 1,
@@ -73,6 +74,7 @@ function courseToForm(course) {
 
   return {
     name: course.name ?? "",
+    code: course.code ?? "",
     type: isLegacyLectivo ? "DE_CARRERA" : (course.type ?? "DE_CARRERA"),
     lectivo: course.lectivo ?? isLegacyLectivo,
     cycle,
@@ -174,6 +176,7 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
 
     const payload = {
       name: form.name.trim(),
+      code: form.code.trim(),
       type: form.type,
       lectivo: form.lectivo,
       cycle: Number(form.cycle),
@@ -204,17 +207,33 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
       </Button>
 
       <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="course-name">Nombre del curso</Label>
-          <Input
-            id="course-name"
-            value={form.name}
-            onChange={(event) =>
-              setForm((current) => ({ ...current, name: event.target.value }))
-            }
-            required
-            disabled={isSubmitting}
-          />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="course-name">Nombre del curso</Label>
+            <Input
+              id="course-name"
+              value={form.name}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, name: event.target.value }))
+              }
+              required
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="course-code">Código del curso</Label>
+            <Input
+              id="course-code"
+              value={form.code}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, code: event.target.value }))
+              }
+              required
+              maxLength={50}
+              disabled={isSubmitting}
+            />
+          </div>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">

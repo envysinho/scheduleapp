@@ -11,6 +11,7 @@ import com.example.schedule.model.TeacherShift;
 public record CourseResponse(
         Long id,
         String name,
+        String code,
         CourseType type,
         boolean lectivo,
         Integer cycle,
@@ -26,6 +27,7 @@ public record CourseResponse(
         return new CourseResponse(
                 course.getId(),
                 course.getName(),
+                course.getCode(),
                 course.getType(),
                 course.isLectivo(),
                 course.getCycle(),

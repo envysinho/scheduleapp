@@ -1,6 +1,7 @@
 package com.example.schedule.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -33,4 +34,10 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
                OR c.nightTeacher.id = :teacherId
             """)
     List<Course> findByTeacherId(@Param("teacherId") Long teacherId);
+
+    Optional<Course> findByCode(String code);
+
+    boolean existsByCode(String code);
+
+    boolean existsByCodeAndIdNot(String code, Long id);
 }

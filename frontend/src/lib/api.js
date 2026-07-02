@@ -224,3 +224,15 @@ export async function deleteCourse(id, onUnauthorized) {
     onUnauthorized
   );
 }
+
+export async function getScheduleSettings(onUnauthorized) {
+  return apiFetch("/api/schedule-settings", {}, onUnauthorized);
+}
+
+export async function updateScheduleSettings(data, onUnauthorized) {
+  return apiFetch(
+    "/api/schedule-settings",
+    { method: "PUT", body: JSON.stringify(data) },
+    onUnauthorized
+  );
+}

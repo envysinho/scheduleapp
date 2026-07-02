@@ -234,8 +234,11 @@ function CourseCardGrid({ course, isAdmin, onEdit, onDelete }) {
       </CardContent>
 
       {isAdmin && (
-        <CardFooter className="shrink-0 gap-2 border-t bg-muted/30">
-          <CourseActions course={course} onEdit={onEdit} onDelete={onDelete} />
+        <CardFooter className="flex shrink-0 items-center justify-between gap-2 border-t bg-muted/30">
+          <div className="flex gap-2">
+            <CourseActions course={course} onEdit={onEdit} onDelete={onDelete} />
+          </div>
+          <span className="text-sm font-normal text-muted-foreground">{course.code}</span>
         </CardFooter>
       )}
     </Card>
@@ -251,7 +254,12 @@ function CourseCardList({ course, isAdmin, onEdit, onDelete }) {
             <BookOpen className="size-5 text-muted-foreground" />
           </div>
           <div>
-            <p className="max-w-[14rem] truncate font-medium">{course.name}</p>
+            <p className="max-w-[14rem] truncate font-medium">
+              <span className="mr-2 text-sm font-normal text-muted-foreground">
+                {course.code}
+              </span>
+              {course.name}
+            </p>
             <CourseBadges course={course} compact />
           </div>
         </div>
