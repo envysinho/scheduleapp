@@ -25,7 +25,7 @@ Estas franjas aplican **de lunes a viernes**. No hay clases ni bloques lectivos 
 
 | Orden | Bloque | Código API | Inicio | Fin |
 |-------|--------|------------|--------|-----|
-| 1 | Desayuno | `DESAYUNO` | 06:00 | 08:00 |
+| 1 | Desayuno | `DESAYUNO` | 06:30 | 08:00 |
 | 2 | Turno mañana | `MANANA` | 08:00 | 12:30 |
 | 3 | Almuerzo | `ALMUERZO` | 12:30 | 14:00 |
 | 4 | Turno tarde | `TARDE` | 14:00 | 17:00 |
@@ -58,7 +58,7 @@ Ruta en la app: sidebar **Reglas** → sección **Horarios del día** (solo rol 
 ### Timeline visual
 
 - Grid con **5 columnas:** Lun, Mar, Mié, Jue, Vie.
-- Eje vertical con horas desde el inicio del desayuno hasta el fin del turno noche.
+- Eje vertical con marcas cada **30 minutos** desde el inicio del desayuno hasta el fin del turno noche (p. ej. 06:30, 07:00, 07:30, …, 22:30).
 - **6 bandas coloreadas** repetidas en cada día; solo etiquetas de bloque, **sin cursos**.
 - **Handles** arrastrables en los bordes internos entre bloques (snap cada 5 min).
 
@@ -83,7 +83,7 @@ Autenticado (cualquier rol).
 ```json
 {
   "blocks": [
-    { "id": "DESAYUNO", "label": "Desayuno", "start": "06:00", "end": "08:00" },
+    { "id": "DESAYUNO", "label": "Desayuno", "start": "06:30", "end": "08:00" },
     { "id": "MANANA", "label": "Turno mañana", "start": "08:00", "end": "12:30" },
     { "id": "ALMUERZO", "label": "Almuerzo", "start": "12:30", "end": "14:00" },
     { "id": "TARDE", "label": "Turno tarde", "start": "14:00", "end": "17:00" },

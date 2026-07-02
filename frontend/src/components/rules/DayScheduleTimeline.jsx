@@ -13,6 +13,9 @@ import {
   updateBoundary,
 } from "@/lib/scheduleTime";
 
+const TIMELINE_TRACK_CLASS =
+  "relative box-border min-h-[548px] overflow-visible py-1.5";
+
 function TimelineColumn({ blocks, dayStart, dayEnd, onBoundaryChange }) {
   const columnRef = useRef(null);
 
@@ -54,7 +57,7 @@ function TimelineColumn({ blocks, dayStart, dayEnd, onBoundaryChange }) {
     <div className="flex min-w-0 flex-1 flex-col gap-2">
       <div
         ref={columnRef}
-        className="relative min-h-[520px] rounded-lg border border-border bg-muted/20"
+        className={cn(TIMELINE_TRACK_CLASS, "rounded-lg border border-border bg-muted/20")}
       >
         {blocks.map((block) => {
           const position = getBlockPosition(block, dayStart, dayEnd);
@@ -115,14 +118,20 @@ function DayScheduleTimeline({ blocks, onChange }) {
         </span>
       </div>
 
-      <div className="overflow-x-auto">
-        <div className="flex min-w-[720px] gap-3">
-          <div className="relative w-12 shrink-0">
-            <div className="relative min-h-[520px]">
+      <div className="overflow-x-auto overflow-y-hidden">
+        <div className="flex min-w-[720px] gap-3 pb-2">
+          <div className="flex w-11 shrink-0 flex-col gap-2">
+            <div
+              aria-hidden
+              className="text-center text-xs font-medium text-muted-foreground opacity-0 select-none"
+            >
+              Hora
+            </div>
+            <div className={TIMELINE_TRACK_CLASS}>
               {hourMarks.map((mark) => (
                 <span
-                  key={mark.label}
-                  className="absolute right-0 -translate-y-1/2 text-[10px] text-muted-foreground"
+                  key={`${mark.label}-${mark.top}`}
+                  className="absolute right-0 w-full -translate-y-1/2 text-right font-mono text-[10px] tabular-nums leading-none text-muted-foreground"
                   style={{ top: `${mark.top}%` }}
                 >
                   {mark.label}

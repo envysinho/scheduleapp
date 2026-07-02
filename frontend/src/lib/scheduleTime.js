@@ -121,18 +121,16 @@ export function updateBlockTime(blocks, blockIndex, field, value) {
   return next;
 }
 
-export function buildHourMarks(dayStart, dayEnd) {
+export function buildHourMarks(dayStart, dayEnd, step = 30) {
   const marks = [];
-  const firstHour = Math.floor(dayStart / 60);
-  const lastHour = Math.ceil(dayEnd / 60);
-  for (let hour = firstHour; hour <= lastHour; hour += 1) {
-    const minutes = hour * 60;
-    if (minutes >= dayStart && minutes <= dayEnd) {
-      marks.push({
-        label: formatMinutesToTime(minutes),
-        top: ((minutes - dayStart) / Math.max(dayEnd - dayStart, 1)) * 100,
-      });
-    }
+  const span = Math.max(dayEnd - dayStart, 1);
+
+  for (let minutes = dayStart; minutes <= dayEnd; minutes += step) {
+    marks.push({
+      label: formatMinutesToTime(minutes),
+      top: ((minutes - dayStart) / span) * 100,
+    });
   }
+
   return marks;
 }

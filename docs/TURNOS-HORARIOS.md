@@ -18,7 +18,7 @@ Los turnos académicos no incluyen las siguientes franjas reservadas para las co
 
 | Comida | Inicio | Fin | Duración |
 |--------|--------|-----|----------|
-| Desayuno | 06:00 | 08:00 | 2 h |
+| Desayuno | 06:30 | 08:00 | 1 h 30 min |
 | Almuerzo | 12:30 | 14:00 | 1 h 30 min |
 | Cena | 17:00 | 18:30 | 1 h 30 min |
 
@@ -38,7 +38,7 @@ gantt
   dateFormat HH:mm
   axisFormat %H:%M
   section Comidas
-  Desayuno  :06:00, 120min
+  Desayuno  :06:30, 90min
   Almuerzo  :12:30, 90min
   Cena      :17:00, 90min
   section Turnos

@@ -87,7 +87,7 @@ public class ScheduleSettingsService {
         }
 
         List<DefaultBlock> defaults = List.of(
-                new DefaultBlock(ScheduleBlockId.DESAYUNO, "06:00", "08:00"),
+                new DefaultBlock(ScheduleBlockId.DESAYUNO, "06:30", "08:00"),
                 new DefaultBlock(ScheduleBlockId.MANANA, "08:00", "12:30"),
                 new DefaultBlock(ScheduleBlockId.ALMUERZO, "12:30", "14:00"),
                 new DefaultBlock(ScheduleBlockId.TARDE, "14:00", "17:00"),
