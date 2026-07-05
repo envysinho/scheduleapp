@@ -17,7 +17,7 @@ function getInitials(username) {
 }
 
 function NavUser({ user, onLogout }) {
-  const { state } = useSidebar();
+  const { state, isMobile } = useSidebar();
 
   if (!user) return null;
 
