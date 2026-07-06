@@ -5,6 +5,8 @@ public enum SubShift {
     A2,
     B1,
     B2,
+    NA,
+    NB,
     NA1,
     NA2,
     NB1,

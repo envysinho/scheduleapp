@@ -32,20 +32,29 @@ public final class CourseCycleRules {
         return cycle != null && (cycle == 8 || cycle == 9 || cycle == 10);
     }
 
-    public static List<SubShift> allowedSubShiftsForLabCycle(Integer cycle, TeacherShift shift) {
-        if (cycle == null || shift == null) {
+    public static List<SubShift> allowedSubShiftsForCycle(Integer cycle, TeacherShift shift, SpaceType requiredSpaceType) {
+        if (cycle == null || shift == null || requiredSpaceType == null) {
             return List.of();
         }
-        if (isNightOnlyCycle(cycle) && shift == TeacherShift.NOCHE) {
-            return List.of(SubShift.NA1, SubShift.NA2, SubShift.NB1, SubShift.NB2);
+        if (requiredSpaceType == SpaceType.LABORATORIO) {
+            if (isDayOnlyCycle(cycle)) {
+                if (shift == TeacherShift.MANANA) {
+                    return List.of(SubShift.A1, SubShift.A2);
+                }
+                if (shift == TeacherShift.TARDE) {
+                    return List.of(SubShift.B1, SubShift.B2);
+                }
+            }
+            if (isNightOnlyCycle(cycle) && shift == TeacherShift.NOCHE) {
+                return List.of(SubShift.NA1, SubShift.NA2, SubShift.NB1, SubShift.NB2);
+            }
+            return List.of();
         }
-        if (isDayOnlyCycle(cycle)) {
-            if (shift == TeacherShift.MANANA) {
-                return List.of(SubShift.A1, SubShift.A2);
+        if (requiredSpaceType == SpaceType.AULA) {
+            if (isNightOnlyCycle(cycle) && shift == TeacherShift.NOCHE) {
+                return List.of(SubShift.NA, SubShift.NB);
             }
-            if (shift == TeacherShift.TARDE) {
-                return List.of(SubShift.B1, SubShift.B2);
-            }
+            return List.of();
         }
         return List.of();
     }

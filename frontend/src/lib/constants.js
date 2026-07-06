@@ -23,26 +23,35 @@ export function isLabSubShiftCycle(cycleId) {
   return LAB_SUB_SHIFT_CYCLES.includes(Number(cycleId));
 }
 
-export function allowedSubShiftsForLabCycle(cycleId, shift) {
+export function allowedSubShiftsForCycle(cycleId, shift, requiredSpaceType) {
   const cycle = Number(cycleId);
-  if (!cycle || !shift) {
+  if (!cycle || !shift || !requiredSpaceType) {
     return [];
   }
-  if (NIGHT_ONLY_CYCLES.includes(cycle) && shift === "NOCHE") {
-    return ["NA1", "NA2", "NB1", "NB2"];
+  if (requiredSpaceType === "LABORATORIO") {
+    if (isDayOnlyCycle(cycle)) {
+      if (shift === "MANANA") return ["A1", "A2"];
+      if (shift === "TARDE") return ["B1", "B2"];
+    }
+    if (NIGHT_ONLY_CYCLES.includes(cycle) && shift === "NOCHE") {
+      return ["NA1", "NA2", "NB1", "NB2"];
+    }
+    return [];
   }
-  if (isDayOnlyCycle(cycle)) {
-    if (shift === "MANANA") return ["A1", "A2"];
-    if (shift === "TARDE") return ["B1", "B2"];
+  if (requiredSpaceType === "AULA") {
+    if (NIGHT_ONLY_CYCLES.includes(cycle) && shift === "NOCHE") {
+      return ["NA", "NB"];
+    }
+    return [];
   }
   return [];
 }
 
 export function requiresSubShift(course, shift) {
-  if (!course || course.requiredSpaceType !== "LABORATORIO") {
+  if (!course) {
     return false;
   }
-  return allowedSubShiftsForLabCycle(course.cycle, shift).length > 0;
+  return allowedSubShiftsForCycle(course.cycle, shift, course.requiredSpaceType).length > 0;
 }
 
 export const SUB_SHIFT_LABELS = {
@@ -50,6 +59,8 @@ export const SUB_SHIFT_LABELS = {
   A2: "A2",
   B1: "B1",
   B2: "B2",
+  NA: "NA",
+  NB: "NB",
   NA1: "NA1",
   NA2: "NA2",
   NB1: "NB1",

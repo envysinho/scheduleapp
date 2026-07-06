@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/combobox";
 import {
   allowedShiftsForCycle,
-  allowedSubShiftsForLabCycle,
+  allowedSubShiftsForCycle,
   EMPLOYMENT_TYPES,
   requiresSubShift,
   TEACHER_SHIFTS,
@@ -141,7 +141,7 @@ function TeacherForm({ teacher, onSubmit, onCancel, isSubmitting, error, onUnaut
   };
 
   function resolveSubShiftFor(course, shift, currentSubShift) {
-    const allowed = allowedSubShiftsForLabCycle(course?.cycle, shift);
+    const allowed = allowedSubShiftsForCycle(course?.cycle, shift, course?.requiredSpaceType);
     if (allowed.length === 0) {
       return null;
     }
@@ -366,10 +366,9 @@ function AssignmentRow({
 }) {
   const selectedCourse = courses.find((c) => c.id === assignment.courseId) ?? null;
   const allowedSubShifts = selectedCourse
-    ? allowedSubShiftsForLabCycle(selectedCourse.cycle, assignment.shift)
+    ? allowedSubShiftsForCycle(selectedCourse.cycle, assignment.shift, selectedCourse.requiredSpaceType)
     : [];
   const showSubShifts = Boolean(selectedCourse)
-    && selectedCourse.requiredSpaceType === "LABORATORIO"
     && allowedSubShifts.length > 0;
   const subShiftMissing = showSubShifts && !assignment.subShift;
 
@@ -432,7 +431,7 @@ function AssignmentRow({
 
         {showSubShifts && (
           <div className="flex flex-col gap-2">
-            <Label>Sub-turno (laboratorio)</Label>
+            <Label>Sub-turno</Label>
             <div className="flex flex-wrap gap-1">
               {allowedSubShifts.map((value) => (
                 <Button

@@ -180,10 +180,11 @@ public class TeacherService {
     }
 
     private SubShift seedSubShift(Course course, TeacherShift shift) {
-        if (course == null || course.getRequiredSpaceType() != SpaceType.LABORATORIO) {
+        if (course == null) {
             return null;
         }
-        List<SubShift> allowed = CourseCycleRules.allowedSubShiftsForLabCycle(course.getCycle(), shift);
+        List<SubShift> allowed = CourseCycleRules.allowedSubShiftsForCycle(
+                course.getCycle(), shift, course.getRequiredSpaceType());
         return allowed.isEmpty() ? null : allowed.get(0);
     }
 
@@ -292,6 +293,27 @@ public class TeacherService {
                     """);
         } catch (Exception ignored) {
         }
+        migrateSubShiftCheckConstraint("course_teacher_assignments");
+        migrateSubShiftCheckConstraint("space_assignments");
+    }
+
+    private void migrateSubShiftCheckConstraint(String table) {
+        try {
+            jdbcTemplate.execute("ALTER TABLE " + table + " DROP CONSTRAINT IF EXISTS " + table + "_sub_shift_check");
+        } catch (Exception ignored) {
+        }
+        try {
+            jdbcTemplate.execute("""
+                    ALTER TABLE %s
+                    ADD CONSTRAINT %s_sub_shift_check
+                    CHECK (sub_shift::text = ANY (ARRAY[
+                        'A1', 'A2', 'B1', 'B2',
+                        'NA', 'NB',
+                        'NA1', 'NA2', 'NB1', 'NB2'
+                    ]::text[]))
+                    """.formatted(table, table));
+        } catch (Exception ignored) {
+        }
     }
 
     private void validateAssignments(EmploymentType employmentType,
@@ -393,10 +415,9 @@ public class TeacherService {
     }
 
     private void validateSubShift(Course course, CourseTeacherAssignmentRequest req) {
-        boolean isLab = course.getRequiredSpaceType() == SpaceType.LABORATORIO;
-        List<SubShift> allowed = CourseCycleRules.allowedSubShiftsForLabCycle(
-                course.getCycle(), req.shift());
-        if (!isLab || allowed.isEmpty()) {
+        List<SubShift> allowed = CourseCycleRules.allowedSubShiftsForCycle(
+                course.getCycle(), req.shift(), course.getRequiredSpaceType());
+        if (allowed.isEmpty()) {
             if (req.subShift() != null) {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_REQUEST,
@@ -408,7 +429,7 @@ public class TeacherService {
         if (req.subShift() == null) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "El curso de laboratorio " + course.getCode()
+                    "El curso " + course.getCode()
                             + " requiere un sub-turno (" + allowed + ")");
         }
         if (!allowed.contains(req.subShift())) {
@@ -420,10 +441,9 @@ public class TeacherService {
     }
 
     private SubShift resolveSubShift(Course course, CourseTeacherAssignmentRequest req) {
-        boolean isLab = course.getRequiredSpaceType() == SpaceType.LABORATORIO;
-        List<SubShift> allowed = CourseCycleRules.allowedSubShiftsForLabCycle(
-                course.getCycle(), req.shift());
-        if (!isLab || allowed.isEmpty()) {
+        List<SubShift> allowed = CourseCycleRules.allowedSubShiftsForCycle(
+                course.getCycle(), req.shift(), course.getRequiredSpaceType());
+        if (allowed.isEmpty()) {
             return null;
         }
         if (req.subShift() != null && allowed.contains(req.subShift())) {

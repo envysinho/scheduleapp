@@ -16,7 +16,7 @@ import {
   COURSE_TYPES,
   CYCLES,
   SPACE_TYPES,
-  allowedSubShiftsForLabCycle,
+  allowedSubShiftsForCycle,
   getCourseTypeLabel,
   getCycleLabel,
   getSpaceTypeLabel,
@@ -141,12 +141,9 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
   const requiredSpaceType = form.requiredSpaceType;
 
   const labSubShifts = (() => {
-    if (requiredSpaceType !== "LABORATORIO") {
-      return [];
-    }
     const shifts = nightOnly ? ["NOCHE"] : ["MANANA", "TARDE"];
     return shifts.flatMap((shift) =>
-      allowedSubShiftsForLabCycle(form.cycle, shift).map((subShift) => ({
+      allowedSubShiftsForCycle(form.cycle, shift, requiredSpaceType).map((subShift) => ({
         shift,
         subShift,
         teacher:
@@ -538,7 +535,7 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
         {hasLabSubShifts && (
           <div className="flex flex-col gap-2 rounded-md border p-3">
             <div>
-              <Label>Sub-turnos de laboratorio</Label>
+              <Label>Sub-turnos</Label>
               <p className="text-xs text-muted-foreground">
                 Docentes asignados por sub-turno (se asignan desde la pestaña Docentes).
               </p>

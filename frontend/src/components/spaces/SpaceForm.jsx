@@ -18,7 +18,7 @@ import { listCourses } from "@/lib/api";
 import { normalizeSearchText } from "@/lib/search";
 import {
   allowedShiftsForCycle,
-  allowedSubShiftsForLabCycle,
+  allowedSubShiftsForCycle,
   AVAILABILITY_STATUSES,
   CYCLES,
   getAvailabilityLabel,
@@ -364,15 +364,14 @@ function AssignmentRow({ assignment, index, canRemove, disabled, courses, onChan
   const cycleAnchor = useComboboxAnchor();
   const selectedCourse = courses.find((course) => course.name === assignment.courseName) ?? null;
   const allowedSubShifts = selectedCourse
-    ? allowedSubShiftsForLabCycle(selectedCourse.cycle, assignment.shift)
+    ? allowedSubShiftsForCycle(selectedCourse.cycle, assignment.shift, selectedCourse.requiredSpaceType)
     : [];
   const showSubShifts = Boolean(selectedCourse)
-    && selectedCourse.requiredSpaceType === "LABORATORIO"
     && allowedSubShifts.length > 0;
   const subShiftMissing = showSubShifts && !assignment.subShift;
 
   function resolveSubShift(course, shift, currentSubShift) {
-    const allowed = allowedSubShiftsForLabCycle(course?.cycle, shift);
+    const allowed = allowedSubShiftsForCycle(course?.cycle, shift, course?.requiredSpaceType);
     if (allowed.length === 0) {
       return null;
     }
@@ -499,7 +498,7 @@ function AssignmentRow({ assignment, index, canRemove, disabled, courses, onChan
 
       {showSubShifts && (
         <div className="mt-3 flex flex-col gap-2">
-          <Label>Sub-turno (laboratorio)</Label>
+          <Label>Sub-turno</Label>
           <div className="flex flex-wrap gap-1">
             {allowedSubShifts.map((value) => (
               <Button

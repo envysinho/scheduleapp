@@ -220,11 +220,10 @@ public class SpaceService {
             return;
         }
         var course = courseRepository.findByName(request.courseName().trim()).orElse(null);
-        boolean isLab = course != null
-                && course.getRequiredSpaceType() == SpaceType.LABORATORIO;
-        List<SubShift> allowed = CourseCycleRules.allowedSubShiftsForLabCycle(
-                request.cycle(), request.shift());
-        if (!isLab || allowed.isEmpty()) {
+        var requiredSpaceType = course != null ? course.getRequiredSpaceType() : null;
+        List<SubShift> allowed = CourseCycleRules.allowedSubShiftsForCycle(
+                request.cycle(), request.shift(), requiredSpaceType);
+        if (allowed.isEmpty()) {
             if (request.subShift() != null) {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_REQUEST,
@@ -236,7 +235,7 @@ public class SpaceService {
         if (request.subShift() == null) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "El curso de laboratorio \"" + request.courseName()
+                    "El curso \"" + request.courseName()
                             + "\" requiere un sub-turno (" + allowed + ")");
         }
         if (!allowed.contains(request.subShift())) {
