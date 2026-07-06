@@ -13,10 +13,11 @@ import com.example.schedule.model.EmploymentType;
 public interface TeacherRepository extends JpaRepository<Teacher, Long> {
 
     @Query("""
-            SELECT DISTINCT t FROM Teacher t
-            LEFT JOIN t.courseAssignments a
+            SELECT t FROM Teacher t
             WHERE (:employmentType IS NULL OR t.employmentType = :employmentType)
-              AND (:cycle IS NULL OR a.course.cycle = :cycle)
+              AND (:cycle IS NULL OR EXISTS (
+                  SELECT 1 FROM t.courseAssignments a WHERE a.course.cycle = :cycle
+              ))
             ORDER BY t.lastName ASC, t.firstName ASC
             """)
     List<Teacher> findByFilters(

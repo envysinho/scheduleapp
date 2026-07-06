@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import CourseSearchInput from "@/components/spaces/CourseSearchInput";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,16 +14,19 @@ import {
   useComboboxAnchor,
 } from "@/components/ui/combobox";
 import {
+  allowedShiftsForCycle,
   EMPLOYMENT_TYPES,
   TEACHER_SHIFTS,
   getCycleLabel,
   getEmploymentTypeLabel,
   getTeacherShiftLabel,
-  isNightOnlyCycle,
 } from "@/lib/constants";
 import { listCourses } from "@/lib/api";
 
-const UNASSIGNED_LABEL = "Sin asignar";
+function getFirstAllowedShift(cycle) {
+  const [first] = allowedShiftsForCycle(cycle);
+  return first ?? "MANANA";
+}
 
 const EMPTY_FORM = {
   firstName: "",
@@ -30,21 +34,8 @@ const EMPTY_FORM = {
   email: "",
   phone: "",
   employmentType: "NOMBRADO",
-  courseAssignments: [
-    { courseId: null, shift: "MANANA" },
-  ],
+  courseAssignments: [],
 };
-
-function withUnassignedOption(labels) {
-  return [UNASSIGNED_LABEL, ...labels];
-}
-
-function resolveCourseSelection(label, courses) {
-  if (label === UNASSIGNED_LABEL || !label) {
-    return null;
-  }
-  return courses.find((course) => `${course.code} · ${course.name}` === label)?.id ?? null;
-}
 
 function teacherToForm(teacher) {
   if (!teacher) {
@@ -61,9 +52,9 @@ function teacherToForm(teacher) {
       teacher.courseAssignments?.length > 0
         ? teacher.courseAssignments.map((assignment) => ({
             courseId: assignment.courseId,
-            shift: assignment.shift ?? "MANANA",
+            shift: assignment.shift ?? getFirstAllowedShift(assignment.cycle),
           }))
-        : [{ courseId: null, shift: "MANANA" }],
+        : [],
   };
 }
 
@@ -114,6 +105,24 @@ function TeacherForm({ teacher, onSubmit, onCancel, isSubmitting, error, onUnaut
     }));
   };
 
+  const handleCourseSelect = (index, course) => {
+    const nextCourseId = course?.id ?? null;
+    const nextCycle = course?.cycle ?? null;
+    const nextAllowedShifts = allowedShiftsForCycle(nextCycle);
+    const currentShift = form.courseAssignments[index]?.shift;
+    const nextShift = currentShift && nextAllowedShifts.includes(currentShift)
+      ? currentShift
+      : getFirstAllowedShift(nextCycle);
+    setForm((current) => ({
+      ...current,
+      courseAssignments: current.courseAssignments.map((assignment, itemIndex) =>
+        itemIndex === index
+          ? { ...assignment, courseId: nextCourseId, shift: nextShift }
+          : assignment
+      ),
+    }));
+  };
+
   const removeAssignment = (index) => {
     setForm((current) => ({
       ...current,
@@ -131,10 +140,6 @@ function TeacherForm({ teacher, onSubmit, onCancel, isSubmitting, error, onUnaut
         shift: assignment.shift,
       }));
 
-    if (courseAssignments.length === 0) {
-      return;
-    }
-
     const payload = {
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),
@@ -148,10 +153,6 @@ function TeacherForm({ teacher, onSubmit, onCancel, isSubmitting, error, onUnaut
   };
 
   const isEditing = Boolean(teacher?.id);
-
-  const courseLabels = courses
-    .map((course) => `${course.code} · ${course.name}`)
-    .sort();
 
   return (
     <form className="flex flex-col gap-6 pb-6" onSubmit={handleSubmit}>
@@ -273,19 +274,23 @@ function TeacherForm({ teacher, onSubmit, onCancel, isSubmitting, error, onUnaut
             </Button>
           </div>
 
-          {form.courseAssignments.map((assignment, index) => (
-            <AssignmentRow
-              key={`assignment-${index}`}
-              assignment={assignment}
-              index={index}
-              canRemove={form.courseAssignments.length > 1}
-              disabled={isSubmitting}
-              courses={courses}
-              courseLabels={courseLabels}
-              onChange={handleAssignmentChange}
-              onRemove={removeAssignment}
-            />
-          ))}
+          {form.courseAssignments.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Sin cursos asignados.</p>
+          ) : (
+            form.courseAssignments.map((assignment, index) => (
+              <AssignmentRow
+                key={`assignment-${index}`}
+                assignment={assignment}
+                index={index}
+                canRemove={true}
+                disabled={isSubmitting}
+                courses={courses}
+                onChange={handleAssignmentChange}
+                onCourseSelect={handleCourseSelect}
+                onRemove={removeAssignment}
+              />
+            ))
+          )}
         </div>
 
         {error && (
@@ -313,16 +318,11 @@ function AssignmentRow({
   canRemove,
   disabled,
   courses,
-  courseLabels,
   onChange,
+  onCourseSelect,
   onRemove,
 }) {
-  const courseAnchor = useComboboxAnchor();
-  const selectedCourse = courses.find((c) => c.id === assignment.courseId);
-  const cycleNightOnly = selectedCourse ? isNightOnlyCycle(selectedCourse.cycle) : false;
-  const selectedCourseLabel = selectedCourse
-    ? `${selectedCourse.code} · ${selectedCourse.name}`
-    : UNASSIGNED_LABEL;
+  const selectedCourse = courses.find((c) => c.id === assignment.courseId) ?? null;
 
   return (
     <div className="rounded-md border p-3">
@@ -345,37 +345,19 @@ function AssignmentRow({
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-2">
           <Label htmlFor={`assignment-course-${index}`}>Curso</Label>
-          <div ref={courseAnchor} className="w-full">
-            <Combobox
-              items={withUnassignedOption(courseLabels)}
-              value={selectedCourseLabel}
-              onValueChange={(label) => {
-                const courseId = resolveCourseSelection(label, courses);
-                onChange(index, "courseId", courseId);
-              }}
-              disabled={disabled}
-            >
-              <ComboboxInput
-                id={`assignment-course-${index}`}
-                placeholder="Seleccionar curso"
-                readOnly
-              />
-              <ComboboxContent anchor={courseAnchor}>
-                <ComboboxEmpty>Sin cursos.</ComboboxEmpty>
-                <ComboboxList>
-                  {(label) => (
-                    <ComboboxItem key={label} value={label}>
-                      {label}
-                    </ComboboxItem>
-                  )}
-                </ComboboxList>
-              </ComboboxContent>
-            </Combobox>
-          </div>
+          <CourseSearchInput
+            inputId={`assignment-course-${index}`}
+            value={selectedCourse}
+            onSelect={(course) => onCourseSelect(index, course)}
+            disabled={disabled}
+            courses={courses}
+            placeholder="Buscar curso…"
+            getLabel={(course) => `${course.code} · ${course.name}`}
+            getSecondary={(course) => getCycleLabel(course.cycle)}
+          />
           {selectedCourse && (
             <p className="text-xs text-muted-foreground">
               {getCycleLabel(selectedCourse.cycle)}
-              {cycleNightOnly ? " · Solo turno noche" : ""}
             </p>
           )}
         </div>
@@ -383,12 +365,9 @@ function AssignmentRow({
         <div className="flex flex-col gap-2">
           <Label>Turno</Label>
           <div className="flex flex-wrap gap-1">
-            {TEACHER_SHIFTS.filter((item) => {
-              if (cycleNightOnly) {
-                return item.value === "NOCHE";
-              }
-              return true;
-            }).map((item) => (
+            {TEACHER_SHIFTS.filter((item) =>
+              allowedShiftsForCycle(selectedCourse?.cycle).includes(item.value)
+            ).map((item) => (
               <Button
                 key={item.value}
                 type="button"

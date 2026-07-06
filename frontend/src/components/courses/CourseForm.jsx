@@ -179,7 +179,7 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
       cycle: Number(form.cycle),
       morningTeacherId: morningTeacherId || null,
       afternoonTeacherId: afternoonTeacherId || null,
-      nightTeacherId: form.nightTeacherId || null,
+      nightTeacherId: nightOnly ? (form.nightTeacherId || null) : null,
       spaceAssignments: form.spaceAssignments
         .filter((assignment) => assignment.spaceId)
         .map((assignment) => ({ spaceId: assignment.spaceId })),
@@ -419,39 +419,41 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
             )}
           </div>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="night-teacher">Docente (Noche)</Label>
-            <div ref={nightTeacherAnchor} className="w-full">
-              <Combobox
-                items={withUnassignedOption(nightTeacherLabels)}
-                value={getTeacherLabel(form.nightTeacherId)}
-                onValueChange={(label) => {
-                  const teacherId = resolveTeacherSelection(label, nightTeachers);
-                  setForm((current) => ({
-                    ...current,
-                    nightTeacherId: teacherId,
-                  }));
-                }}
-                disabled={isSubmitting}
-              >
-                <ComboboxInput
-                  id="night-teacher"
-                  placeholder="Sin asignar"
-                  readOnly
-                />
-                <ComboboxContent anchor={nightTeacherAnchor}>
-                  <ComboboxEmpty>Sin docentes de noche.</ComboboxEmpty>
-                  <ComboboxList>
-                    {(label) => (
-                      <ComboboxItem key={label} value={label}>
-                        {label}
-                      </ComboboxItem>
-                    )}
-                  </ComboboxList>
-                </ComboboxContent>
-              </Combobox>
+          {nightOnly && (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="night-teacher">Docente (Noche)</Label>
+              <div ref={nightTeacherAnchor} className="w-full">
+                <Combobox
+                  items={withUnassignedOption(nightTeacherLabels)}
+                  value={getTeacherLabel(form.nightTeacherId)}
+                  onValueChange={(label) => {
+                    const teacherId = resolveTeacherSelection(label, nightTeachers);
+                    setForm((current) => ({
+                      ...current,
+                      nightTeacherId: teacherId,
+                    }));
+                  }}
+                  disabled={isSubmitting}
+                >
+                  <ComboboxInput
+                    id="night-teacher"
+                    placeholder="Sin asignar"
+                    readOnly
+                  />
+                  <ComboboxContent anchor={nightTeacherAnchor}>
+                    <ComboboxEmpty>Sin docentes de noche.</ComboboxEmpty>
+                    <ComboboxList>
+                      {(label) => (
+                        <ComboboxItem key={label} value={label}>
+                          {label}
+                        </ComboboxItem>
+                      )}
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-3">

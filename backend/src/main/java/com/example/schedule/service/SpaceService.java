@@ -13,8 +13,10 @@ import com.example.schedule.dto.SpaceResponse;
 import com.example.schedule.dto.UpdateSpaceRequest;
 import com.example.schedule.entity.Space;
 import com.example.schedule.entity.SpaceAssignment;
+import com.example.schedule.model.CourseCycleRules;
 import com.example.schedule.model.SpaceAvailability;
 import com.example.schedule.model.SpaceType;
+import com.example.schedule.model.TeacherShift;
 import com.example.schedule.repository.SpaceRepository;
 
 @Service
@@ -43,6 +45,7 @@ public class SpaceService {
 
     @Transactional
     public SpaceResponse create(CreateSpaceRequest request) {
+        validateAssignments(request.assignments());
         Space space = new Space();
         applySpaceFields(space, request.name(), request.spaceType(), request.availability(),
                 request.managerName(), request.managerPhone());
@@ -52,6 +55,7 @@ public class SpaceService {
 
     @Transactional
     public SpaceResponse update(Long id, UpdateSpaceRequest request) {
+        validateAssignments(request.assignments());
         Space space = getSpaceOrThrow(id);
         applySpaceFields(space, request.name(), request.spaceType(), request.availability(),
                 request.managerName(), request.managerPhone());
@@ -103,8 +107,8 @@ public class SpaceService {
                     encargados[i - 1],
                     phones[i - 1],
                     List.of(
-                            new SpaceAssignmentRequest("Cálculo I", i),
-                            new SpaceAssignmentRequest("Matemática General", i))));
+                            new SpaceAssignmentRequest("Cálculo I", i, null),
+                            new SpaceAssignmentRequest("Matemática General", i, null))));
         }
 
         SpaceAvailability[] labAvailabilities = {
@@ -148,8 +152,8 @@ public class SpaceService {
                     labEncargados[i - 1],
                     labPhones[i - 1],
                     List.of(
-                            new SpaceAssignmentRequest("Programación I", ((i - 1) % 10) + 1),
-                            new SpaceAssignmentRequest("Química Orgánica", ((i + 1) % 10) + 1))));
+                            new SpaceAssignmentRequest("Programación I", ((i - 1) % 10) + 1, null),
+                            new SpaceAssignmentRequest("Química Orgánica", ((i + 1) % 10) + 1, null))));
         }
     }
 
@@ -177,7 +181,28 @@ public class SpaceService {
         SpaceAssignment assignment = new SpaceAssignment();
         assignment.setCourseName(request.courseName().trim());
         assignment.setCycle(request.cycle());
+        assignment.setShift(request.shift());
         return assignment;
+    }
+
+    private void validateAssignments(List<SpaceAssignmentRequest> requests) {
+        for (SpaceAssignmentRequest request : requests) {
+            Integer cycle = request.cycle();
+            TeacherShift shift = request.shift();
+            if (cycle == null || shift == null) {
+                continue;
+            }
+            if (CourseCycleRules.isNightOnlyCycle(cycle) && shift != TeacherShift.NOCHE) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "El curso asignado es de ciclo nocturno (IX–X), solo turno NOCHE");
+            }
+            if (CourseCycleRules.isDayOnlyCycle(cycle) && shift == TeacherShift.NOCHE) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "El curso asignado es de ciclo diurno (I–VIII), solo turnos MAÑANA o TARDE");
+            }
+        }
     }
 
     private String blankToNull(String value) {

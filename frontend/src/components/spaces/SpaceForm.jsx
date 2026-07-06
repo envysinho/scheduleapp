@@ -15,19 +15,29 @@ import {
 } from "@/components/ui/combobox";
 import { useAuth } from "@/contexts/AuthContext";
 import { listCourses } from "@/lib/api";
+import { normalizeSearchText } from "@/lib/search";
 import {
+  allowedShiftsForCycle,
   AVAILABILITY_STATUSES,
   CYCLES,
-  SPACE_TYPES,
   getAvailabilityLabel,
   getCycleLabel,
   getSpaceTypeLabel,
+  getTeacherShiftLabel,
+  SPACE_TYPES,
+  TEACHER_SHIFTS,
 } from "@/lib/constants";
 
 const EMPTY_ASSIGNMENT = {
   courseName: "",
-  cycle: 1,
+  cycle: null,
+  shift: null,
 };
+
+const CYCLE_OPTIONS = [
+  { id: null, label: "Sin asignar" },
+  ...CYCLES,
+];
 
 const EMPTY_FORM = {
   name: "",
@@ -53,7 +63,8 @@ function spaceToForm(space) {
       space.assignments?.length > 0
         ? space.assignments.map((assignment) => ({
             courseName: assignment.courseName ?? "",
-            cycle: assignment.cycle ?? 1,
+            cycle: assignment.cycle ?? null,
+            shift: assignment.shift ?? null,
           }))
         : [{ ...EMPTY_ASSIGNMENT }],
   };
@@ -95,6 +106,14 @@ function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
     setForm(spaceToForm(space));
   }, [space]);
 
+  const hasInvalidCourses = form.assignments.some((assignment) => {
+    const normalized = normalizeSearchText(assignment.courseName);
+    if (!normalized) {
+      return false;
+    }
+    return !courses.some((course) => normalizeSearchText(course.name) === normalized);
+  });
+
   const handleAssignmentChange = (index, field, value) => {
     setForm((current) => ({
       ...current,
@@ -130,13 +149,10 @@ function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
         .filter((assignment) => assignment.courseName.trim())
         .map((assignment) => ({
           courseName: assignment.courseName.trim(),
-          cycle: Number(assignment.cycle),
+          cycle: assignment.cycle == null ? null : Number(assignment.cycle),
+          shift: assignment.shift ?? null,
         })),
     };
-
-    if (payload.assignments.length === 0) {
-      return;
-    }
 
     await onSubmit(payload);
   };
@@ -281,18 +297,22 @@ function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
             </Button>
           </div>
 
-          {form.assignments.map((assignment, index) => (
-            <AssignmentRow
-              key={`assignment-${index}`}
-              assignment={assignment}
-              index={index}
-              canRemove={form.assignments.length > 1}
-              disabled={isSubmitting || isLoadingCourses}
-              courses={courses}
-              onChange={handleAssignmentChange}
-              onRemove={removeAssignment}
-            />
-          ))}
+          {form.assignments.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Sin cursos asignados.</p>
+          ) : (
+            form.assignments.map((assignment, index) => (
+              <AssignmentRow
+                key={`assignment-${index}`}
+                assignment={assignment}
+                index={index}
+                canRemove={true}
+                disabled={isSubmitting || isLoadingCourses}
+                courses={courses}
+                onChange={handleAssignmentChange}
+                onRemove={removeAssignment}
+              />
+            ))
+          )}
         </div>
 
         {error && (
@@ -306,7 +326,7 @@ function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
         <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
           Cancelar
         </Button>
-        <Button type="submit" disabled={isSubmitting}>
+        <Button type="submit" disabled={isSubmitting || hasInvalidCourses}>
           {isSubmitting ? "Guardando..." : isEditing ? "Actualizar" : "Crear"}
         </Button>
       </div>
@@ -314,8 +334,37 @@ function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
   );
 }
 
+function getFirstAllowedShift(cycle) {
+  const [first] = allowedShiftsForCycle(cycle);
+  return first ?? null;
+}
+
 function AssignmentRow({ assignment, index, canRemove, disabled, courses, onChange, onRemove }) {
   const cycleAnchor = useComboboxAnchor();
+  const selectedCourse = courses.find((course) => course.name === assignment.courseName) ?? null;
+
+  const handleCourseSelect = (course) => {
+    const nextCourseName = course?.name ?? "";
+    const nextCycle = course?.cycle ?? assignment.cycle;
+    const nextAllowedShifts = allowedShiftsForCycle(nextCycle);
+    const nextShift = assignment.shift && nextAllowedShifts.includes(assignment.shift)
+      ? assignment.shift
+      : getFirstAllowedShift(nextCycle);
+    onChange(index, "courseName", nextCourseName);
+    if (course) {
+      onChange(index, "cycle", nextCycle);
+      onChange(index, "shift", nextShift);
+    }
+  };
+
+  const handleCycleChange = (cycle) => {
+    const nextAllowedShifts = allowedShiftsForCycle(cycle);
+    const nextShift = assignment.shift && nextAllowedShifts.includes(assignment.shift)
+      ? assignment.shift
+      : getFirstAllowedShift(cycle);
+    onChange(index, "cycle", cycle);
+    onChange(index, "shift", nextShift);
+  };
 
   return (
     <div className="rounded-md border p-3">
@@ -335,26 +384,27 @@ function AssignmentRow({ assignment, index, canRemove, disabled, courses, onChan
         )}
       </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor={`assignment-course-${index}`}>Nombre del curso</Label>
-            <CourseSearchInput
-              value={assignment.courseName}
-              onChange={(value) => onChange(index, "courseName", value)}
-              disabled={disabled}
-              courses={courses}
-            />
-          </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor={`assignment-course-${index}`}>Nombre del curso</Label>
+          <CourseSearchInput
+            inputId={`assignment-course-${index}`}
+            value={selectedCourse}
+            onSelect={handleCourseSelect}
+            disabled={disabled}
+            courses={courses}
+          />
+        </div>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor={`assignment-cycle-${index}`}>Ciclo</Label>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor={`assignment-cycle-${index}`}>Ciclo</Label>
           <div ref={cycleAnchor} className="w-full">
             <Combobox
-              items={CYCLES.map((item) => item.label)}
-              value={getCycleLabel(assignment.cycle)}
+              items={CYCLE_OPTIONS.map((item) => item.label)}
+              value={CYCLE_OPTIONS.find((option) => option.id === assignment.cycle)?.label ?? "Sin asignar"}
               onValueChange={(label) => {
-                const item = CYCLES.find((option) => option.label === label);
-                onChange(index, "cycle", item?.id ?? 1);
+                const item = CYCLE_OPTIONS.find((option) => option.label === label);
+                handleCycleChange(item?.id ?? null);
               }}
               disabled={disabled}
             >
@@ -375,6 +425,26 @@ function AssignmentRow({ assignment, index, canRemove, disabled, courses, onChan
               </ComboboxContent>
             </Combobox>
           </div>
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-col gap-2">
+        <Label>Turno</Label>
+        <div className="flex flex-wrap gap-1">
+          {TEACHER_SHIFTS.filter((item) => {
+            const allowed = allowedShiftsForCycle(assignment.cycle);
+            return allowed.includes(item.value);
+          }).map((item) => (
+            <Button
+              key={item.value}
+              type="button"
+              variant={assignment.shift === item.value ? "default" : "outline"}
+              onClick={() => onChange(index, "shift", item.value)}
+              disabled={disabled}
+            >
+              {getTeacherShiftLabel(item.value)}
+            </Button>
+          ))}
         </div>
       </div>
     </div>

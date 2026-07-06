@@ -2,12 +2,16 @@ package com.example.schedule.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+
+import com.example.schedule.model.TeacherShift;
 
 @Entity
 @Table(name = "space_assignments")
@@ -20,8 +24,10 @@ public class SpaceAssignment {
     @Column(name = "course_name", nullable = false)
     private String courseName;
 
-    @Column(nullable = false)
     private Integer cycle;
+
+    @Enumerated(EnumType.STRING)
+    private TeacherShift shift;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "space_id", nullable = false)
@@ -49,6 +55,14 @@ public class SpaceAssignment {
 
     public void setCycle(Integer cycle) {
         this.cycle = cycle;
+    }
+
+    public TeacherShift getShift() {
+        return shift;
+    }
+
+    public void setShift(TeacherShift shift) {
+        this.shift = shift;
     }
 
     public Space getSpace() {

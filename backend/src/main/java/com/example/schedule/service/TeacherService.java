@@ -23,6 +23,7 @@ import com.example.schedule.entity.Course;
 import com.example.schedule.entity.CourseTeacherAssignment;
 import com.example.schedule.entity.Teacher;
 import com.example.schedule.model.CourseCategory;
+import com.example.schedule.model.CourseCycleRules;
 import com.example.schedule.model.CourseType;
 import com.example.schedule.model.EmploymentType;
 import com.example.schedule.model.TeacherShift;
@@ -298,10 +299,15 @@ public class TeacherService {
                     .orElseThrow(() -> new ResponseStatusException(
                             HttpStatus.BAD_REQUEST, "Curso no encontrado: " + req.courseId()));
             categories.add(categoryFor(course.getType()));
-            if (isNightOnlyCycle(course.getCycle()) && req.shift() != TeacherShift.NOCHE) {
+            if (CourseCycleRules.isNightOnlyCycle(course.getCycle()) && req.shift() != TeacherShift.NOCHE) {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_REQUEST,
                         "El curso " + course.getCode() + " es de ciclo nocturno, solo turno NOCHE");
+            }
+            if (CourseCycleRules.isDayOnlyCycle(course.getCycle()) && req.shift() == TeacherShift.NOCHE) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "El curso " + course.getCode() + " es de ciclo diurno (I–VIII), solo turnos MAÑANA o TARDE");
             }
         }
         if (categories.size() > 1 || (!categories.isEmpty() && !categories.contains(expectedCategory))) {
@@ -322,10 +328,6 @@ public class TeacherService {
             return CourseCategory.ESTUDIOS_GENERALES;
         }
         return CourseCategory.CARRERA;
-    }
-
-    private boolean isNightOnlyCycle(Integer cycle) {
-        return cycle != null && (cycle == 9 || cycle == 10);
     }
 
     private void applyTeacherFields(

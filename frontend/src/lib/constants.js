@@ -17,6 +17,20 @@ export function isNightOnlyCycle(cycleId) {
   return NIGHT_ONLY_CYCLES.includes(cycleId);
 }
 
+export function isDayOnlyCycle(cycleId) {
+  return Number.isInteger(cycleId) && cycleId >= 1 && cycleId <= 8;
+}
+
+export function allowedShiftsForCycle(cycleId) {
+  if (isNightOnlyCycle(cycleId)) {
+    return ["NOCHE"];
+  }
+  if (isDayOnlyCycle(cycleId)) {
+    return ["MANANA", "TARDE"];
+  }
+  return ["MANANA", "TARDE", "NOCHE"];
+}
+
 export const EMPLOYMENT_TYPES = [
   { value: "NOMBRADO", label: "Nombrado" },
   { value: "CONTRATADO", label: "Contratado" },

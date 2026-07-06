@@ -1,17 +1,20 @@
 package com.example.schedule.dto;
 
 import com.example.schedule.entity.SpaceAssignment;
+import com.example.schedule.model.TeacherShift;
 
 public record SpaceAssignmentResponse(
         Long id,
         String courseName,
-        Integer cycle
+        Integer cycle,
+        TeacherShift shift
 ) {
 
     public static SpaceAssignmentResponse from(SpaceAssignment assignment) {
         return new SpaceAssignmentResponse(
                 assignment.getId(),
                 assignment.getCourseName(),
-                assignment.getCycle());
+                assignment.getCycle(),
+                assignment.getShift());
     }
 }
