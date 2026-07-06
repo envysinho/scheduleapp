@@ -3,8 +3,6 @@ package com.example.schedule.config;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.example.schedule.model.TeacherShift;
-
 public final class NombradosSeedData {
 
     public static final String SEED_FLAG = "nombrados_v2";
@@ -36,7 +34,6 @@ public final class NombradosSeedData {
             String lastName,
             String email,
             DayChoicePattern dayPattern,
-            List<TeacherShift> shifts,
             List<TeacherCourseChoice> courses) {
     }
 
@@ -64,41 +61,33 @@ public final class NombradosSeedData {
                     choice("ISEE240403", "Estadística y Probabilidades", 4, ShiftModality.BOTH)),
             teacherOptionA("Miguel", "Castillo", "miguel.castillo@unc.edu.pe",
                     choice("ISES240407", "Desarrollo Web Full Stack", 4, ShiftModality.BOTH)),
-            // Opción B: 2 cursos en turnos distintos (docentes 9–17)
-            teacherOptionB("Carmen", "Vásquez", "carmen.vasquez@unc.edu.pe", dayShifts(),
+            // Opción B: 2 cursos en turnos distintos (docentes 9–17) — 2 turnos por docente
+            teacherOptionB("Carmen", "Vásquez", "carmen.vasquez@unc.edu.pe",
                     choice("ISES240206", "Dibujo CAD", 2, ShiftModality.MORNING),
                     choice("ISEE240305", "Investigación Operativa I", 3, ShiftModality.AFTERNOON)),
-            teacherOptionB("Fernando", "Ríos", "fernando.rios@unc.edu.pe", dayAndNightShifts(),
+            teacherOptionB("Fernando", "Ríos", "fernando.rios@unc.edu.pe",
                     choice("ISEE240404", "Investigación Operativa II", 4, ShiftModality.MORNING),
-                    choice("ISES240405", "Sistemas Digitales", 4, ShiftModality.AFTERNOON),
                     choice("ISEE240901", "Seminario Tesis I", 9, ShiftModality.NIGHT)),
-            teacherOptionB("Lucía", "Paredes", "lucia.paredes@unc.edu.pe", dayAndNightShifts(),
+            teacherOptionB("Lucía", "Paredes", "lucia.paredes@unc.edu.pe",
                     choice("ISES240406", "Fundamentos de Base de Datos", 4, ShiftModality.MORNING),
-                    choice("ISEE240501", "Estadística Inferencial", 5, ShiftModality.AFTERNOON),
                     choice("ISEE240902", "Práctica Preprofesional I", 9, ShiftModality.NIGHT)),
-            teacherOptionB("Ricardo", "Salazar", "ricardo.salazar@unc.edu.pe", dayAndNightShifts(),
+            teacherOptionB("Ricardo", "Salazar", "ricardo.salazar@unc.edu.pe",
                     choice("ISES240502", "Introducción al Networking", 5, ShiftModality.MORNING),
-                    choice("ISES240503", "Arquitectura de Computadoras", 5, ShiftModality.AFTERNOON),
                     choice("ISES240903", "Ciberseguridad", 9, ShiftModality.NIGHT)),
-            teacherOptionB("Elena", "Morales", "elena.morales@unc.edu.pe", dayAndNightShifts(),
+            teacherOptionB("Elena", "Morales", "elena.morales@unc.edu.pe",
                     choice("ISES240504", "Administración de Base de Datos", 5, ShiftModality.MORNING),
-                    choice("ISES240505", "Desarrollo de Aplicaciones Móviles", 5, ShiftModality.AFTERNOON),
                     choice("ISES240904", "Programación Funcional y Reactiva", 9, ShiftModality.NIGHT)),
-            teacherOptionB("Diego", "Flores", "diego.flores@unc.edu.pe", dayAndNightShifts(),
+            teacherOptionB("Diego", "Flores", "diego.flores@unc.edu.pe",
                     choice("ISES240506", "Simulación de Sistemas", 5, ShiftModality.MORNING),
-                    choice("ISES240507", "Ingeniería de Costos", 5, ShiftModality.AFTERNOON),
                     choice("ISES240905", "Inteligencia de Negocios", 9, ShiftModality.NIGHT)),
-            teacherOptionB("Sofía", "Herrera", "sofia.herrera@unc.edu.pe", dayAndNightShifts(),
+            teacherOptionB("Sofía", "Herrera", "sofia.herrera@unc.edu.pe",
                     choice("ISES240601", "Diseño de Redes de Comunicaciones", 6, ShiftModality.MORNING),
-                    choice("ISES240602", "Configuración de Servidores", 6, ShiftModality.AFTERNOON),
                     choice("IS-ELECTIVO-I", "Electivo I", 9, ShiftModality.NIGHT)),
-            teacherOptionB("Andrés", "Campos", "andres.campos@unc.edu.pe", dayAndNightShifts(),
+            teacherOptionB("Andrés", "Campos", "andres.campos@unc.edu.pe",
                     choice("ISES240603", "Data Warehouse", 6, ShiftModality.MORNING),
-                    choice("ISES240604", "Arquitectura de Software", 6, ShiftModality.AFTERNOON),
                     choice("ISEE241001", "Seminario Tesis II", 10, ShiftModality.NIGHT)),
-            teacherOptionB("Valeria", "Núñez", "valeria.nunez@unc.edu.pe", dayAndNightShifts(),
+            teacherOptionB("Valeria", "Núñez", "valeria.nunez@unc.edu.pe",
                     choice("ISES240605", "Inteligencia Artificial y Sistemas Expertos", 6, ShiftModality.MORNING),
-                    choice("ISES240606", "Diseño de Procesos de Negocios", 6, ShiftModality.AFTERNOON),
                     choice("ISEE241002", "Práctica Preprofesional II", 10, ShiftModality.NIGHT)));
 
     public static final List<CourseAssignment> COURSE_ASSIGNMENTS = buildCourseAssignments();
@@ -127,7 +116,6 @@ public final class NombradosSeedData {
                 lastName,
                 email,
                 DayChoicePattern.OPTION_A,
-                dayShifts(),
                 List.of(course));
     }
 
@@ -135,14 +123,12 @@ public final class NombradosSeedData {
             String firstName,
             String lastName,
             String email,
-            List<TeacherShift> shifts,
             TeacherCourseChoice... courses) {
         return new TeacherSeed(
                 firstName,
                 lastName,
                 email,
                 DayChoicePattern.OPTION_B,
-                shifts,
                 List.of(courses));
     }
 
@@ -152,13 +138,5 @@ public final class NombradosSeedData {
             int cycle,
             ShiftModality modality) {
         return new TeacherCourseChoice(courseCode, courseName, cycle, modality);
-    }
-
-    private static List<TeacherShift> dayShifts() {
-        return List.of(TeacherShift.MANANA, TeacherShift.TARDE);
-    }
-
-    private static List<TeacherShift> dayAndNightShifts() {
-        return List.of(TeacherShift.MANANA, TeacherShift.TARDE, TeacherShift.NOCHE);
     }
 }

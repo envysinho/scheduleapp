@@ -42,7 +42,5 @@ public class DataInitializer implements ApplicationRunner {
         courseService.migrateLectivosIfNeeded();
         courseService.migrateCourseCodesIfNeeded();
         courseService.seedFromPlanIfEmpty();
-        teacherService.seedNombradosIfNeeded();
-        courseService.applyNombradosAssignmentsIfNeeded();
     }
 }

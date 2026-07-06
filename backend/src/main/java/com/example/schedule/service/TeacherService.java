@@ -1,7 +1,9 @@
 package com.example.schedule.service;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
@@ -13,51 +15,47 @@ import org.springframework.web.server.ResponseStatusException;
 import com.example.schedule.config.NombradosSeedData;
 import com.example.schedule.config.NombradosSeedData.DayChoicePattern;
 import com.example.schedule.config.NombradosSeedData.TeacherSeed;
+import com.example.schedule.dto.CourseTeacherAssignmentRequest;
 import com.example.schedule.dto.CreateTeacherRequest;
-import com.example.schedule.dto.TeacherAssignmentRequest;
 import com.example.schedule.dto.TeacherResponse;
 import com.example.schedule.dto.UpdateTeacherRequest;
 import com.example.schedule.entity.Course;
+import com.example.schedule.entity.CourseTeacherAssignment;
 import com.example.schedule.entity.Teacher;
-import com.example.schedule.entity.TeacherAssignment;
 import com.example.schedule.model.CourseCategory;
+import com.example.schedule.model.CourseType;
 import com.example.schedule.model.EmploymentType;
 import com.example.schedule.model.TeacherShift;
 import com.example.schedule.repository.CourseRepository;
+import com.example.schedule.repository.CourseTeacherAssignmentRepository;
 import com.example.schedule.repository.TeacherRepository;
 
 @Service
 public class TeacherService {
 
+    private static final int MAX_SHIFTS_PER_TEACHER = 2;
+
     private final TeacherRepository teacherRepository;
     private final CourseRepository courseRepository;
+    private final CourseTeacherAssignmentRepository assignmentRepository;
     private final JdbcTemplate jdbcTemplate;
 
     public TeacherService(
             TeacherRepository teacherRepository,
             CourseRepository courseRepository,
+            CourseTeacherAssignmentRepository assignmentRepository,
             JdbcTemplate jdbcTemplate) {
         this.teacherRepository = teacherRepository;
         this.courseRepository = courseRepository;
+        this.assignmentRepository = assignmentRepository;
         this.jdbcTemplate = jdbcTemplate;
     }
 
     @Transactional(readOnly = true)
-    public List<TeacherResponse> findAll(
-            EmploymentType employmentType,
-            TeacherShift shift,
-            Integer cycle) {
+    public List<TeacherResponse> findAll(EmploymentType employmentType, Integer cycle) {
         return teacherRepository.findByFilters(employmentType, cycle).stream()
-                .filter(teacher -> matchesShift(teacher, shift))
                 .map(TeacherResponse::from)
                 .toList();
-    }
-
-    private boolean matchesShift(Teacher teacher, TeacherShift shift) {
-        if (shift == null) {
-            return true;
-        }
-        return teacher.getShifts().contains(shift);
     }
 
     @Transactional(readOnly = true)
@@ -67,22 +65,63 @@ public class TeacherService {
 
     @Transactional
     public TeacherResponse create(CreateTeacherRequest request) {
-        validateAssignments(request.employmentType(), request.assignments());
+        validateAssignments(request.employmentType(), request.courseAssignments());
         Teacher teacher = new Teacher();
         applyTeacherFields(teacher, request.firstName(), request.lastName(),
-                request.email(), request.phone(), request.employmentType(), request.shifts());
-        teacher.replaceAssignments(toAssignments(request.assignments()));
-        return TeacherResponse.from(teacherRepository.save(teacher));
+                request.email(), request.phone(), request.employmentType());
+        teacher.replaceCourseAssignments(toAssignments(teacher, request.courseAssignments()));
+        Teacher saved = teacherRepository.save(teacher);
+        syncDerivedCourses(saved);
+        return TeacherResponse.from(saved);
     }
 
     @Transactional
     public TeacherResponse update(Long id, UpdateTeacherRequest request) {
-        validateAssignments(request.employmentType(), request.assignments());
+        validateAssignments(request.employmentType(), request.courseAssignments());
         Teacher teacher = getTeacherOrThrow(id);
+        Set<Long> previousCourseIds = teacher.getCourseAssignments().stream()
+                .map(a -> a.getCourse().getId())
+                .collect(Collectors.toSet());
+
+        // Eliminar asignaciones viejas físicamente antes de agregar las nuevas
+        // para evitar duplicados (Hibernate reordena INSERT antes que DELETE).
+        List<Long> assignmentIds = teacher.getCourseAssignments().stream()
+                .map(CourseTeacherAssignment::getId)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        teacher.getCourseAssignments().clear();
+        teacherRepository.save(teacher);
+        teacherRepository.flush();
+        for (Long assignmentId : assignmentIds) {
+            assignmentRepository.deleteById(assignmentId);
+        }
+        assignmentRepository.flush();
+
         applyTeacherFields(teacher, request.firstName(), request.lastName(),
-                request.email(), request.phone(), request.employmentType(), request.shifts());
-        teacher.replaceAssignments(toAssignments(request.assignments()));
-        return TeacherResponse.from(teacherRepository.save(teacher));
+                request.email(), request.phone(), request.employmentType());
+        teacher.replaceCourseAssignments(toAssignments(teacher, request.courseAssignments()));
+        Teacher saved = teacherRepository.save(teacher);
+        syncDerivedCourses(saved);
+
+        Set<Long> currentCourseIds = saved.getCourseAssignments().stream()
+                .map(a -> a.getCourse().getId())
+                .collect(Collectors.toSet());
+        previousCourseIds.addAll(currentCourseIds);
+        for (Long courseId : previousCourseIds) {
+            courseRepository.findById(courseId).ifPresent(course -> {
+                course.deriveShiftTeachers();
+                courseRepository.save(course);
+            });
+        }
+        return TeacherResponse.from(saved);
+    }
+
+    private void syncDerivedCourses(Teacher teacher) {
+        for (var assignment : teacher.getCourseAssignments()) {
+            Course course = assignment.getCourse();
+            course.deriveShiftTeachers();
+            courseRepository.save(course);
+        }
     }
 
     @Transactional
@@ -109,10 +148,11 @@ public class TeacherService {
 
         ensureSeedFlagsTable();
         clearCourseTeacherReferences();
+        assignmentRepository.deleteAll();
         teacherRepository.deleteAll();
 
         for (TeacherSeed seed : NombradosSeedData.TEACHERS) {
-            List<TeacherAssignmentRequest> assignments = toSeedAssignmentRequests(seed);
+            List<CourseTeacherAssignmentRequest> assignments = toSeedAssignmentRequests(seed);
 
             create(new CreateTeacherRequest(
                     seed.firstName(),
@@ -120,35 +160,36 @@ public class TeacherService {
                     seed.email(),
                     null,
                     EmploymentType.NOMBRADO,
-                    seed.shifts(),
                     assignments));
         }
     }
 
-    private List<TeacherAssignmentRequest> toSeedAssignmentRequests(TeacherSeed seed) {
-        List<TeacherAssignmentRequest> assignments = NombradosSeedData.preferenceCourses(seed).stream()
-                .map(course -> new TeacherAssignmentRequest(
-                        course.courseName(),
-                        CourseCategory.CARRERA,
-                        course.cycle()))
-                .toList();
-
-        if (seed.dayPattern() == DayChoicePattern.OPTION_A) {
-            if (assignments.size() != 1) {
-                throw new IllegalStateException(
-                        "Opción A requiere 1 preferencia de curso: " + seed.email());
+    private List<CourseTeacherAssignmentRequest> toSeedAssignmentRequests(TeacherSeed seed) {
+        List<CourseTeacherAssignmentRequest> requests = new ArrayList<>();
+        for (NombradosSeedData.TeacherCourseChoice course : NombradosSeedData.preferenceCourses(seed)) {
+            Long courseId = resolveCourseIdByCode(course.courseCode());
+            for (TeacherShift shift : shiftsFor(course.modality())) {
+                requests.add(new CourseTeacherAssignmentRequest(courseId, shift));
             }
-            return assignments;
         }
+        return requests;
+    }
 
-        long dayCourses = NombradosSeedData.preferenceCourses(seed).stream()
-                .filter(course -> course.modality() != NombradosSeedData.ShiftModality.NIGHT)
-                .count();
-        if (dayCourses != 2) {
-            throw new IllegalStateException(
-                    "Opción B requiere 2 cursos de día: " + seed.email());
-        }
-        return assignments;
+    private List<TeacherShift> shiftsFor(NombradosSeedData.ShiftModality modality) {
+        return switch (modality) {
+            case BOTH -> List.of(TeacherShift.MANANA, TeacherShift.TARDE);
+            case MORNING -> List.of(TeacherShift.MANANA);
+            case AFTERNOON -> List.of(TeacherShift.TARDE);
+            case NIGHT -> List.of(TeacherShift.NOCHE);
+        };
+    }
+
+    private Long resolveCourseIdByCode(String courseCode) {
+        return courseRepository.findByCode(courseCode)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.INTERNAL_SERVER_ERROR,
+                        "Curso de seed no encontrado: " + courseCode))
+                .getId();
     }
 
     private void clearCourseTeacherReferences() {
@@ -160,7 +201,6 @@ public class TeacherService {
                         night_teacher_id = NULL
                     """);
         } catch (Exception ignored) {
-            // Table may not exist yet on first bootstrap.
         }
     }
 
@@ -173,7 +213,6 @@ public class TeacherService {
                     )
                     """);
         } catch (Exception ignored) {
-            // Database may not be ready yet.
         }
     }
 
@@ -215,36 +254,67 @@ public class TeacherService {
                     CHECK (employment_type IN ('NOMBRADO', 'CONTRATADO', 'ESTUDIOS_GENERALES'))
                     """);
         } catch (Exception ignored) {
-            // Table may not exist yet on first bootstrap.
         }
     }
 
     @Transactional
     public void migrateLegacyShiftsIfNeeded() {
         try {
-            jdbcTemplate.execute("""
-                    INSERT INTO teacher_shifts (teacher_id, shift)
-                    SELECT t.id, t.shift
-                    FROM teachers t
-                    WHERE t.shift IS NOT NULL
-                      AND NOT EXISTS (
-                        SELECT 1 FROM teacher_shifts ts WHERE ts.teacher_id = t.id
-                      )
-                    """);
+            jdbcTemplate.execute("DROP TABLE IF EXISTS teacher_shifts");
         } catch (Exception ignored) {
-            // Legacy column may not exist on fresh databases.
         }
     }
 
-    private void validateAssignments(EmploymentType employmentType, List<TeacherAssignmentRequest> assignments) {
+    private void validateAssignments(EmploymentType employmentType,
+                                     List<CourseTeacherAssignmentRequest> assignments) {
         CourseCategory expectedCategory = expectedCourseCategory(employmentType);
-        boolean hasMismatch = assignments.stream()
-                .anyMatch(assignment -> assignment.courseCategory() != expectedCategory);
-        if (hasMismatch) {
+
+        long distinctPairs = assignments.stream()
+                .map(a -> a.courseId() + ":" + a.shift())
+                .distinct()
+                .count();
+        if (distinctPairs != assignments.size()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Un docente no puede tener el mismo curso y turno asignado más de una vez");
+        }
+
+        long dayShifts = assignments.stream()
+                .filter(a -> a.shift() == TeacherShift.MANANA || a.shift() == TeacherShift.TARDE)
+                .count();
+        long nightShifts = assignments.stream()
+                .filter(a -> a.shift() == TeacherShift.NOCHE)
+                .count();
+        if (dayShifts + nightShifts > MAX_SHIFTS_PER_TEACHER) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Un docente puede tener como máximo 2 turnos (día o noche). Actualmente: "
+                            + dayShifts + " de día y " + nightShifts + " de noche.");
+        }
+
+        Set<CourseCategory> categories = new LinkedHashSet<>();
+        for (CourseTeacherAssignmentRequest req : assignments) {
+            Course course = courseRepository.findById(req.courseId())
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST, "Curso no encontrado: " + req.courseId()));
+            categories.add(categoryFor(course.getType()));
+            if (isNightOnlyCycle(course.getCycle()) && req.shift() != TeacherShift.NOCHE) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "El curso " + course.getCode() + " es de ciclo nocturno, solo turno NOCHE");
+            }
+        }
+        if (categories.size() > 1 || (!categories.isEmpty() && !categories.contains(expectedCategory))) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Las asignaciones no coinciden con el tipo de docente seleccionado");
         }
+    }
+
+    private CourseCategory categoryFor(CourseType type) {
+        return type == CourseType.ESTUDIOS_GENERALES
+                ? CourseCategory.ESTUDIOS_GENERALES
+                : CourseCategory.CARRERA;
     }
 
     private CourseCategory expectedCourseCategory(EmploymentType employmentType) {
@@ -254,33 +324,39 @@ public class TeacherService {
         return CourseCategory.CARRERA;
     }
 
+    private boolean isNightOnlyCycle(Integer cycle) {
+        return cycle != null && (cycle == 9 || cycle == 10);
+    }
+
     private void applyTeacherFields(
             Teacher teacher,
             String firstName,
             String lastName,
             String email,
             String phone,
-            EmploymentType employmentType,
-            List<TeacherShift> shifts) {
+            EmploymentType employmentType) {
         teacher.setFirstName(firstName.trim());
         teacher.setLastName(lastName.trim());
         teacher.setEmail(blankToNull(email));
         teacher.setPhone(blankToNull(phone));
         teacher.setEmploymentType(employmentType);
-        teacher.setShifts(new LinkedHashSet<>(shifts));
     }
 
-    private List<TeacherAssignment> toAssignments(List<TeacherAssignmentRequest> requests) {
+    private List<CourseTeacherAssignment> toAssignments(Teacher teacher,
+                                                         List<CourseTeacherAssignmentRequest> requests) {
         return requests.stream()
-                .map(this::toAssignment)
+                .map(req -> toAssignment(teacher, req))
                 .toList();
     }
 
-    private TeacherAssignment toAssignment(TeacherAssignmentRequest request) {
-        TeacherAssignment assignment = new TeacherAssignment();
-        assignment.setCourseName(request.courseName().trim());
-        assignment.setCourseCategory(request.courseCategory());
-        assignment.setCycle(request.cycle());
+    private CourseTeacherAssignment toAssignment(Teacher teacher, CourseTeacherAssignmentRequest request) {
+        Course course = courseRepository.findById(request.courseId())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "Curso no encontrado: " + request.courseId()));
+        CourseTeacherAssignment assignment = new CourseTeacherAssignment();
+        assignment.setTeacher(teacher);
+        assignment.setCourse(course);
+        assignment.setShift(request.shift());
         return assignment;
     }
 

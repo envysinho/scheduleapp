@@ -99,6 +99,16 @@ function Courses({ searchFilter, onClearSearchFilter }) {
   }, [loadCourses, pageView]);
 
   useEffect(() => {
+    const handleTeachersUpdated = () => {
+      if (pageView === "list") {
+        loadCourses();
+      }
+    };
+    window.addEventListener("teachers-updated", handleTeachersUpdated);
+    return () => window.removeEventListener("teachers-updated", handleTeachersUpdated);
+  }, [loadCourses, pageView]);
+
+  useEffect(() => {
     if (searchFilter?.type !== "course" || !searchFilter.id) {
       return;
     }
@@ -139,6 +149,7 @@ function Courses({ searchFilter, onClearSearchFilter }) {
       } else {
         await createCourse(payload, handleUnauthorized);
       }
+      window.dispatchEvent(new CustomEvent("courses-updated"));
       closeForm();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Error al guardar curso");
@@ -161,6 +172,7 @@ function Courses({ searchFilter, onClearSearchFilter }) {
       if (editingCourse?.id === course.id) {
         closeForm();
       }
+      window.dispatchEvent(new CustomEvent("courses-updated"));
       await loadCourses();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al eliminar curso");

@@ -22,30 +22,13 @@ function getInitials(firstName, lastName) {
   return `${first}${last}`.toUpperCase() || "?";
 }
 
-function formatShiftsLabel(shifts) {
-  if (!shifts?.length) {
-    return "";
-  }
-  return shifts.map(getTeacherShiftLabel).join(", ");
-}
-
-function formatAssignment(assignment, shifts) {
-  const parts = [assignment.courseName, getCycleLabel(assignment.cycle)];
-  const shiftsLabel = formatShiftsLabel(shifts);
-  if (shiftsLabel) {
-    parts.push(shiftsLabel);
-  }
-  return parts.join(" · ");
-}
-
-function getTeacherShifts(teacher) {
-  if (teacher.shifts?.length) {
-    return teacher.shifts;
-  }
-  if (teacher.shift) {
-    return [teacher.shift];
-  }
-  return [];
+function formatAssignment(assignment) {
+  const courseLabel = assignment.courseCode
+    ? `${assignment.courseCode} · ${assignment.courseName}`
+    : assignment.courseName;
+  const cycleLabel = assignment.cycle != null ? getCycleLabel(assignment.cycle) : null;
+  const shiftLabel = assignment.shift ? getTeacherShiftLabel(assignment.shift) : null;
+  return [courseLabel, cycleLabel, shiftLabel].filter(Boolean).join(" · ");
 }
 
 function TeacherBadges({ teacher }) {
@@ -106,7 +89,7 @@ function TeacherContact({ teacher, compact = false }) {
   );
 }
 
-function TeacherAssignments({ assignments, shifts = [], compact = false }) {
+function TeacherAssignments({ assignments, compact = false }) {
   if (!assignments?.length) {
     return null;
   }
@@ -114,7 +97,7 @@ function TeacherAssignments({ assignments, shifts = [], compact = false }) {
   if (compact) {
     return (
       <p className="truncate text-xs text-muted-foreground">
-        {assignments.map((assignment) => formatAssignment(assignment, shifts)).join(" · ")}
+        {assignments.map((assignment) => formatAssignment(assignment)).join(" · ")}
       </p>
     );
   }
@@ -123,10 +106,10 @@ function TeacherAssignments({ assignments, shifts = [], compact = false }) {
     <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto">
       {assignments.map((assignment) => (
         <li
-          key={assignment.id ?? `${assignment.courseName}-${assignment.cycle}`}
+          key={assignment.id ?? `${assignment.courseId}-${assignment.shift}`}
           className="rounded-md bg-muted/50 px-2 py-1 text-xs"
         >
-          {formatAssignment(assignment, shifts)}
+          {formatAssignment(assignment)}
         </li>
       ))}
     </ul>
@@ -149,8 +132,7 @@ function TeacherCardGrid({ teacher, isAdmin, onEdit, onDelete }) {
       <CardContent className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden text-sm">
         <TeacherContact teacher={teacher} />
         <TeacherAssignments
-          assignments={teacher.assignments}
-          shifts={getTeacherShifts(teacher)}
+          assignments={teacher.courseAssignments}
         />
       </CardContent>
 
@@ -180,8 +162,7 @@ function TeacherCardList({ teacher, isAdmin, onEdit, onDelete }) {
         <div className="min-w-0 space-y-1 text-sm">
           <TeacherContact teacher={teacher} compact />
           <TeacherAssignments
-            assignments={teacher.assignments}
-            shifts={getTeacherShifts(teacher)}
+            assignments={teacher.courseAssignments}
             compact
           />
         </div>

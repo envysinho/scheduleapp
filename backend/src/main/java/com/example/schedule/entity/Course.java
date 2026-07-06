@@ -3,11 +3,14 @@ package com.example.schedule.entity;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import com.example.schedule.model.CourseCycleRules;
 import com.example.schedule.model.CourseType;
+import com.example.schedule.model.TeacherShift;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -60,6 +63,9 @@ public class Course {
 
     @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CourseSpaceAssignment> spaceAssignments = new ArrayList<>();
+
+    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<CourseTeacherAssignment> teacherAssignments = new ArrayList<>();
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -147,6 +153,46 @@ public class Course {
 
     public void setSpaceAssignments(List<CourseSpaceAssignment> spaceAssignments) {
         this.spaceAssignments = spaceAssignments;
+    }
+
+    public List<CourseTeacherAssignment> getTeacherAssignments() {
+        return teacherAssignments;
+    }
+
+    public void setTeacherAssignments(List<CourseTeacherAssignment> teacherAssignments) {
+        this.teacherAssignments = teacherAssignments;
+    }
+
+    public void deriveShiftTeachers() {
+        if (CourseCycleRules.isNightOnlyCycle(cycle)) {
+            this.morningTeacher = null;
+            this.afternoonTeacher = null;
+            this.nightTeacher = teacherAssignments.stream()
+                    .filter(a -> a.getShift() == TeacherShift.NOCHE)
+                    .map(CourseTeacherAssignment::getTeacher)
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .orElse(null);
+            return;
+        }
+        this.morningTeacher = teacherAssignments.stream()
+                .filter(a -> a.getShift() == TeacherShift.MANANA)
+                .map(CourseTeacherAssignment::getTeacher)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+        this.afternoonTeacher = teacherAssignments.stream()
+                .filter(a -> a.getShift() == TeacherShift.TARDE)
+                .map(CourseTeacherAssignment::getTeacher)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+        this.nightTeacher = teacherAssignments.stream()
+                .filter(a -> a.getShift() == TeacherShift.NOCHE)
+                .map(CourseTeacherAssignment::getTeacher)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
     }
 
     public Instant getCreatedAt() {

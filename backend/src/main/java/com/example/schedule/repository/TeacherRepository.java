@@ -14,9 +14,9 @@ public interface TeacherRepository extends JpaRepository<Teacher, Long> {
 
     @Query("""
             SELECT DISTINCT t FROM Teacher t
-            LEFT JOIN t.assignments a
+            LEFT JOIN t.courseAssignments a
             WHERE (:employmentType IS NULL OR t.employmentType = :employmentType)
-              AND (:cycle IS NULL OR a.cycle = :cycle)
+              AND (:cycle IS NULL OR a.course.cycle = :cycle)
             ORDER BY t.lastName ASC, t.firstName ASC
             """)
     List<Teacher> findByFilters(

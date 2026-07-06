@@ -1,11 +1,9 @@
 package com.example.schedule.dto;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import com.example.schedule.entity.Teacher;
 import com.example.schedule.model.EmploymentType;
-import com.example.schedule.model.TeacherShift;
 
 public record TeacherResponse(
         Long id,
@@ -15,8 +13,7 @@ public record TeacherResponse(
         String email,
         String phone,
         EmploymentType employmentType,
-        List<TeacherShift> shifts,
-        List<TeacherAssignmentResponse> assignments
+        List<CourseTeacherAssignmentResponse> courseAssignments
 ) {
 
     public static TeacherResponse from(Teacher teacher) {
@@ -28,9 +25,8 @@ public record TeacherResponse(
                 teacher.getEmail(),
                 teacher.getPhone(),
                 teacher.getEmploymentType(),
-                new ArrayList<>(teacher.getShifts()),
-                teacher.getAssignments().stream()
-                        .map(TeacherAssignmentResponse::from)
+                teacher.getCourseAssignments().stream()
+                        .map(CourseTeacherAssignmentResponse::from)
                         .toList());
     }
 }

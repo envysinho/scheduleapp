@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import CourseSearchInput from "@/components/spaces/CourseSearchInput";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +13,8 @@ import {
   ComboboxList,
   useComboboxAnchor,
 } from "@/components/ui/combobox";
+import { useAuth } from "@/contexts/AuthContext";
+import { listCourses } from "@/lib/api";
 import {
   AVAILABILITY_STATUSES,
   CYCLES,
@@ -57,9 +60,36 @@ function spaceToForm(space) {
 }
 
 function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
+  const { logout } = useAuth();
   const [form, setForm] = useState(EMPTY_FORM);
+  const [courses, setCourses] = useState([]);
+  const [isLoadingCourses, setIsLoadingCourses] = useState(false);
   const spaceTypeAnchor = useComboboxAnchor();
   const availabilityAnchor = useComboboxAnchor();
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoadingCourses(true);
+    listCourses({}, logout)
+      .then((data) => {
+        if (!cancelled) {
+          setCourses(data ?? []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCourses([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingCourses(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [logout]);
 
   useEffect(() => {
     setForm(spaceToForm(space));
@@ -257,7 +287,8 @@ function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
               assignment={assignment}
               index={index}
               canRemove={form.assignments.length > 1}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isLoadingCourses}
+              courses={courses}
               onChange={handleAssignmentChange}
               onRemove={removeAssignment}
             />
@@ -283,7 +314,7 @@ function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
   );
 }
 
-function AssignmentRow({ assignment, index, canRemove, disabled, onChange, onRemove }) {
+function AssignmentRow({ assignment, index, canRemove, disabled, courses, onChange, onRemove }) {
   const cycleAnchor = useComboboxAnchor();
 
   return (
@@ -304,20 +335,19 @@ function AssignmentRow({ assignment, index, canRemove, disabled, onChange, onRem
         )}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor={`assignment-course-${index}`}>Nombre del curso</Label>
-          <Input
-            id={`assignment-course-${index}`}
-            value={assignment.courseName}
-            onChange={(event) => onChange(index, "courseName", event.target.value)}
-            required
-            disabled={disabled}
-          />
-        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor={`assignment-course-${index}`}>Nombre del curso</Label>
+            <CourseSearchInput
+              value={assignment.courseName}
+              onChange={(value) => onChange(index, "courseName", value)}
+              disabled={disabled}
+              courses={courses}
+            />
+          </div>
 
-        <div className="flex flex-col gap-2">
-          <Label htmlFor={`assignment-cycle-${index}`}>Ciclo</Label>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor={`assignment-cycle-${index}`}>Ciclo</Label>
           <div ref={cycleAnchor} className="w-full">
             <Combobox
               items={CYCLES.map((item) => item.label)}

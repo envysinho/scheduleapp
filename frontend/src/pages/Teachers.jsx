@@ -19,7 +19,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   CYCLE_FILTERS,
   EMPLOYMENT_TYPE_FILTERS,
-  TEACHER_SHIFT_FILTERS,
 } from "@/lib/constants";
 import {
   createTeacher,
@@ -37,7 +36,6 @@ function Teachers({ searchFilter, onClearSearchFilter }) {
   const [teachers, setTeachers] = useState([]);
   const [viewMode, setViewMode] = useState("grid");
   const [employmentType, setEmploymentType] = useState(null);
-  const [shift, setShift] = useState(null);
   const [cycle, setCycle] = useState(null);
 
   const [pageView, setPageView] = useState("list");
@@ -68,7 +66,7 @@ function Teachers({ searchFilter, onClearSearchFilter }) {
       }
 
       const data = await listTeachers(
-        { employmentType, shift, cycle },
+        { employmentType, cycle },
         handleUnauthorized
       );
       setTeachers(data);
@@ -82,7 +80,6 @@ function Teachers({ searchFilter, onClearSearchFilter }) {
     }
   }, [
     employmentType,
-    shift,
     cycle,
     isSearchActive,
     searchFilter?.id,
@@ -96,6 +93,16 @@ function Teachers({ searchFilter, onClearSearchFilter }) {
   }, [loadTeachers, pageView]);
 
   useEffect(() => {
+    const handleCoursesUpdated = () => {
+      if (pageView === "list") {
+        loadTeachers();
+      }
+    };
+    window.addEventListener("courses-updated", handleCoursesUpdated);
+    return () => window.removeEventListener("courses-updated", handleCoursesUpdated);
+  }, [loadTeachers, pageView]);
+
+  useEffect(() => {
     if (searchFilter?.type !== "teacher" || !searchFilter.id) {
       return;
     }
@@ -104,7 +111,6 @@ function Teachers({ searchFilter, onClearSearchFilter }) {
     setEditingTeacher(null);
     setFormError(null);
     setEmploymentType(null);
-    setShift(null);
     setCycle(null);
   }, [searchFilter]);
 
@@ -135,6 +141,7 @@ function Teachers({ searchFilter, onClearSearchFilter }) {
       } else {
         await createTeacher(payload, handleUnauthorized);
       }
+      window.dispatchEvent(new CustomEvent("teachers-updated"));
       closeForm();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Error al guardar docente");
@@ -157,6 +164,7 @@ function Teachers({ searchFilter, onClearSearchFilter }) {
       if (editingTeacher?.id === teacher.id) {
         closeForm();
       }
+      window.dispatchEvent(new CustomEvent("teachers-updated"));
       await loadTeachers();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al eliminar docente");
@@ -171,11 +179,6 @@ function Teachers({ searchFilter, onClearSearchFilter }) {
 
   const handleEmploymentFilter = (value) => {
     setEmploymentType(value);
-    resetFormOnFilterChange();
-  };
-
-  const handleShiftFilter = (value) => {
-    setShift(value);
     resetFormOnFilterChange();
   };
 
@@ -206,6 +209,7 @@ function Teachers({ searchFilter, onClearSearchFilter }) {
           onCancel={closeForm}
           isSubmitting={isSubmitting}
           error={formError}
+          onUnauthorized={handleUnauthorized}
         />
       ) : (
         <div className="flex flex-col gap-6">
@@ -239,22 +243,6 @@ function Teachers({ searchFilter, onClearSearchFilter }) {
                     </ComboboxList>
                   </ComboboxContent>
                 </Combobox>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label>Turno</Label>
-              <div className="flex flex-wrap gap-1">
-                {TEACHER_SHIFT_FILTERS.map((item) => (
-                  <Button
-                    key={item.label}
-                    type="button"
-                    variant={shift === item.value ? "default" : "outline"}
-                    onClick={() => handleShiftFilter(item.value)}
-                  >
-                    {item.label}
-                  </Button>
-                ))}
               </div>
             </div>
 

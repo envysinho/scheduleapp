@@ -121,12 +121,9 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
     loadOptions().catch(() => {});
   }, [loadOptions]);
 
-  const teacherHasShift = (teacher, shift) =>
-    (teacher.shifts ?? []).includes(shift);
-
-  const morningTeachers = teachers.filter((teacher) => teacherHasShift(teacher, "MANANA"));
-  const afternoonTeachers = teachers.filter((teacher) => teacherHasShift(teacher, "TARDE"));
-  const nightTeachers = teachers.filter((teacher) => teacherHasShift(teacher, "NOCHE"));
+  const morningTeachers = teachers;
+  const afternoonTeachers = teachers;
+  const nightTeachers = teachers;
 
   const morningTeacherLabels = morningTeachers.map((teacher) => teacher.fullName);
   const afternoonTeacherLabels = afternoonTeachers.map((teacher) => teacher.fullName);

@@ -1,5 +1,6 @@
 package com.example.schedule.service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -10,16 +11,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import com.example.schedule.config.NombradosSeedData;
-import com.example.schedule.config.NombradosSeedData.CourseAssignment;
-import com.example.schedule.config.NombradosSeedData.ShiftModality;
-import com.example.schedule.config.NombradosSeedData.TeacherSeed;
 import com.example.schedule.dto.CourseResponse;
 import com.example.schedule.dto.CourseSpaceAssignmentRequest;
 import com.example.schedule.dto.CreateCourseRequest;
 import com.example.schedule.dto.UpdateCourseRequest;
 import com.example.schedule.entity.Course;
 import com.example.schedule.entity.CourseSpaceAssignment;
+import com.example.schedule.entity.CourseTeacherAssignment;
 import com.example.schedule.entity.Space;
 import com.example.schedule.entity.Teacher;
 import com.example.schedule.model.CourseAvailability;
@@ -27,6 +25,7 @@ import com.example.schedule.model.CourseCycleRules;
 import com.example.schedule.model.CourseType;
 import com.example.schedule.model.TeacherShift;
 import com.example.schedule.repository.CourseRepository;
+import com.example.schedule.repository.CourseTeacherAssignmentRepository;
 import com.example.schedule.repository.SpaceRepository;
 import com.example.schedule.repository.TeacherRepository;
 
@@ -36,6 +35,7 @@ public class CourseService {
     private final CourseRepository courseRepository;
     private final TeacherRepository teacherRepository;
     private final SpaceRepository spaceRepository;
+    private final CourseTeacherAssignmentRepository assignmentRepository;
     private final TeacherService teacherService;
     private final JdbcTemplate jdbcTemplate;
 
@@ -43,11 +43,13 @@ public class CourseService {
             CourseRepository courseRepository,
             TeacherRepository teacherRepository,
             SpaceRepository spaceRepository,
+            CourseTeacherAssignmentRepository assignmentRepository,
             TeacherService teacherService,
             JdbcTemplate jdbcTemplate) {
         this.courseRepository = courseRepository;
         this.teacherRepository = teacherRepository;
         this.spaceRepository = spaceRepository;
+        this.assignmentRepository = assignmentRepository;
         this.teacherService = teacherService;
         this.jdbcTemplate = jdbcTemplate;
     }
@@ -153,48 +155,8 @@ public class CourseService {
 
     @Transactional
     public void applyNombradosAssignmentsIfNeeded() {
-        if (teacherService.hasNombradosSeedFlag()) {
-            return;
-        }
-
-        for (CourseAssignment assignment : NombradosSeedData.COURSE_ASSIGNMENTS) {
-            TeacherSeed teacherSeed = NombradosSeedData.TEACHERS.get(assignment.teacherIndex());
-            Teacher teacher = teacherRepository.findByEmail(teacherSeed.email())
-                    .orElseThrow(() -> new ResponseStatusException(
-                            HttpStatus.INTERNAL_SERVER_ERROR,
-                            "Docente de seed no encontrado: " + teacherSeed.email()));
-            Course course = courseRepository.findByCode(assignment.courseCode())
-                    .orElseThrow(() -> new ResponseStatusException(
-                            HttpStatus.INTERNAL_SERVER_ERROR,
-                            "Curso de seed no encontrado: " + assignment.courseCode()));
-
-            applyNombradoAssignment(course, teacher, assignment.modality());
-            courseRepository.save(course);
-        }
-
-        teacherService.markNombradosSeedFlag();
-    }
-
-    private void applyNombradoAssignment(Course course, Teacher teacher, ShiftModality modality) {
-        if (CourseCycleRules.isNightOnlyCycle(course.getCycle())) {
-            if (modality != ShiftModality.NIGHT) {
-                throw new ResponseStatusException(
-                        HttpStatus.INTERNAL_SERVER_ERROR,
-                        "Asignación inválida para ciclo nocturno: " + course.getCode());
-            }
-            course.setNightTeacher(teacher);
-            return;
-        }
-
-        switch (modality) {
-            case BOTH -> {
-                course.setMorningTeacher(teacher);
-                course.setAfternoonTeacher(teacher);
-            }
-            case MORNING -> course.setMorningTeacher(teacher);
-            case AFTERNOON -> course.setAfternoonTeacher(teacher);
-            case NIGHT -> course.setNightTeacher(teacher);
-        }
+        // Las asignaciones de los 17 nombrados ahora se crean en TeacherService.seedNombradosIfNeeded
+        // a través de CourseTeacherAssignment. Este método queda como no-op para mantener compatibilidad.
     }
 
     @Transactional
@@ -218,7 +180,6 @@ public class CourseService {
                     CREATE UNIQUE INDEX IF NOT EXISTS idx_courses_code ON courses (code)
                     """);
         } catch (Exception ignored) {
-            // Table or column may not exist yet on first bootstrap.
         }
     }
 
@@ -257,7 +218,6 @@ public class CourseService {
                     WHERE type = 'LECTIVOS'
                     """);
         } catch (Exception ignored) {
-            // Table or column may not exist yet on first bootstrap.
         }
     }
 
@@ -276,21 +236,40 @@ public class CourseService {
         course.setType(type);
         course.setLectivo(lectivo);
         course.setCycle(cycle);
+
+        List<CourseTeacherAssignment> assignments = new ArrayList<>();
         if (CourseCycleRules.isNightOnlyCycle(cycle)) {
-            morningTeacherId = null;
-            afternoonTeacherId = null;
+            if (nightTeacherId != null) {
+                assignments.add(buildAssignment(course, nightTeacherId, TeacherShift.NOCHE));
+            }
+        } else {
+            if (morningTeacherId != null) {
+                assignments.add(buildAssignment(course, morningTeacherId, TeacherShift.MANANA));
+            }
+            if (afternoonTeacherId != null) {
+                assignments.add(buildAssignment(course, afternoonTeacherId, TeacherShift.TARDE));
+            }
+            if (nightTeacherId != null) {
+                assignments.add(buildAssignment(course, nightTeacherId, TeacherShift.NOCHE));
+            }
         }
-        course.setMorningTeacher(resolveTeacher(morningTeacherId));
-        course.setAfternoonTeacher(resolveTeacher(afternoonTeacherId));
-        course.setNightTeacher(resolveTeacher(nightTeacherId));
+
+        course.getTeacherAssignments().clear();
+        for (CourseTeacherAssignment a : assignments) {
+            a.setCourse(course);
+            course.getTeacherAssignments().add(a);
+        }
+        course.deriveShiftTeachers();
     }
 
-    private Teacher resolveTeacher(Long teacherId) {
-        if (teacherId == null) {
-            return null;
-        }
-        return teacherRepository.findById(teacherId)
+    private CourseTeacherAssignment buildAssignment(Course course, Long teacherId, TeacherShift shift) {
+        Teacher teacher = teacherRepository.findById(teacherId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Docente no encontrado"));
+        CourseTeacherAssignment assignment = new CourseTeacherAssignment();
+        assignment.setCourse(course);
+        assignment.setTeacher(teacher);
+        assignment.setShift(shift);
+        return assignment;
     }
 
     private List<CourseSpaceAssignment> toSpaceAssignments(List<CourseSpaceAssignmentRequest> requests) {

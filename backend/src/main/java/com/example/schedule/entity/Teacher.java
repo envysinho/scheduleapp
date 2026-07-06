@@ -2,28 +2,21 @@ package com.example.schedule.entity;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import com.example.schedule.model.EmploymentType;
-import com.example.schedule.model.TeacherShift;
 
 import jakarta.persistence.CascadeType;
-import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
-import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
@@ -51,14 +44,8 @@ public class Teacher {
     @Column(name = "employment_type", nullable = false)
     private EmploymentType employmentType;
 
-    @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(name = "teacher_shifts", joinColumns = @JoinColumn(name = "teacher_id"))
-    @Enumerated(EnumType.STRING)
-    @Column(name = "shift")
-    private Set<TeacherShift> shifts = new LinkedHashSet<>();
-
     @OneToMany(mappedBy = "teacher", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<TeacherAssignment> assignments = new ArrayList<>();
+    private List<CourseTeacherAssignment> courseAssignments = new ArrayList<>();
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -116,20 +103,12 @@ public class Teacher {
         this.employmentType = employmentType;
     }
 
-    public Set<TeacherShift> getShifts() {
-        return shifts;
+    public List<CourseTeacherAssignment> getCourseAssignments() {
+        return courseAssignments;
     }
 
-    public void setShifts(Set<TeacherShift> shifts) {
-        this.shifts = shifts;
-    }
-
-    public List<TeacherAssignment> getAssignments() {
-        return assignments;
-    }
-
-    public void setAssignments(List<TeacherAssignment> assignments) {
-        this.assignments = assignments;
+    public void setCourseAssignments(List<CourseTeacherAssignment> courseAssignments) {
+        this.courseAssignments = courseAssignments;
     }
 
     public Instant getCreatedAt() {
@@ -140,11 +119,11 @@ public class Teacher {
         return updatedAt;
     }
 
-    public void replaceAssignments(List<TeacherAssignment> newAssignments) {
-        assignments.clear();
-        for (TeacherAssignment assignment : newAssignments) {
+    public void replaceCourseAssignments(List<CourseTeacherAssignment> newAssignments) {
+        courseAssignments.clear();
+        for (CourseTeacherAssignment assignment : newAssignments) {
             assignment.setTeacher(this);
-            assignments.add(assignment);
+            courseAssignments.add(assignment);
         }
     }
 }

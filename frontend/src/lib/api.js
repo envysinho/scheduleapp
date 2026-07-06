@@ -86,9 +86,6 @@ function buildTeachersQuery(filters = {}) {
   if (filters.employmentType) {
     params.set("employmentType", filters.employmentType);
   }
-  if (filters.shift) {
-    params.set("shift", filters.shift);
-  }
   if (filters.cycle) {
     params.set("cycle", String(filters.cycle));
   }

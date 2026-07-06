@@ -3,7 +3,6 @@ package com.example.schedule.dto;
 import java.util.List;
 
 import com.example.schedule.model.EmploymentType;
-import com.example.schedule.model.TeacherShift;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -17,7 +16,6 @@ public record CreateTeacherRequest(
         @Size(max = 150) String email,
         @Size(max = 30) String phone,
         @NotNull EmploymentType employmentType,
-        @NotEmpty List<TeacherShift> shifts,
-        @NotEmpty @Valid List<TeacherAssignmentRequest> assignments
+        @NotEmpty @Valid List<CourseTeacherAssignmentRequest> courseAssignments
 ) {
 }
