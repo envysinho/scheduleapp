@@ -11,6 +11,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
+import com.example.schedule.model.SubShift;
 import com.example.schedule.model.TeacherShift;
 
 @Entity
@@ -28,6 +29,10 @@ public class SpaceAssignment {
 
     @Enumerated(EnumType.STRING)
     private TeacherShift shift;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "sub_shift")
+    private SubShift subShift;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "space_id", nullable = false)
@@ -63,6 +68,14 @@ public class SpaceAssignment {
 
     public void setShift(TeacherShift shift) {
         this.shift = shift;
+    }
+
+    public SubShift getSubShift() {
+        return subShift;
+    }
+
+    public void setSubShift(SubShift subShift) {
+        this.subShift = subShift;
     }
 
     public Space getSpace() {

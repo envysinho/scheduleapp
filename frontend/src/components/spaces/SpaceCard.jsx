@@ -9,10 +9,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getAvailabilityLabel, getCycleLabel } from "@/lib/constants";
+import { getAvailabilityLabel, getCycleLabel, getSubShiftLabel, getTeacherShiftLabel } from "@/lib/constants";
 
 function formatAssignment(assignment) {
-  return `${assignment.courseName} · ${getCycleLabel(assignment.cycle)}`;
+  const shiftLabel = assignment.shift ? getTeacherShiftLabel(assignment.shift) : null;
+  const subShiftLabel = assignment.subShift ? getSubShiftLabel(assignment.subShift) : null;
+  return [assignment.courseName, getCycleLabel(assignment.cycle), shiftLabel, subShiftLabel]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function getAvailabilityClassName(availability) {
@@ -113,12 +117,14 @@ function SpaceAssignments({ assignments, compact = false }) {
     <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto">
       {assignments.map((assignment) => (
         <li
-          key={assignment.id ?? `${assignment.courseName}-${assignment.cycle}`}
+          key={assignment.id ?? `${assignment.courseName}-${assignment.cycle}-${assignment.subShift ?? ""}`}
           className="rounded-md bg-muted/50 px-2 py-1 text-xs"
         >
           <span className="font-medium">{assignment.courseName}</span>
           {" · "}
           {getCycleLabel(assignment.cycle)}
+          {assignment.shift ? ` · ${getTeacherShiftLabel(assignment.shift)}` : null}
+          {assignment.subShift ? ` · ${getSubShiftLabel(assignment.subShift)}` : null}
         </li>
       ))}
     </ul>

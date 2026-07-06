@@ -4,6 +4,7 @@ import java.time.Instant;
 
 import org.hibernate.annotations.CreationTimestamp;
 
+import com.example.schedule.model.SubShift;
 import com.example.schedule.model.TeacherShift;
 
 import jakarta.persistence.Column;
@@ -24,7 +25,7 @@ import jakarta.persistence.UniqueConstraint;
         name = "course_teacher_assignments",
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_course_teacher_shift",
-                columnNames = {"teacher_id", "course_id", "shift"}
+                columnNames = {"teacher_id", "course_id", "shift", "sub_shift"}
         )
 )
 public class CourseTeacherAssignment {
@@ -44,6 +45,10 @@ public class CourseTeacherAssignment {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private TeacherShift shift;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "sub_shift")
+    private SubShift subShift;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -79,6 +84,14 @@ public class CourseTeacherAssignment {
 
     public void setShift(TeacherShift shift) {
         this.shift = shift;
+    }
+
+    public SubShift getSubShift() {
+        return subShift;
+    }
+
+    public void setSubShift(SubShift subShift) {
+        this.subShift = subShift;
     }
 
     public Instant getCreatedAt() {

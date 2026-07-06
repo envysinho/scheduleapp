@@ -26,6 +26,8 @@ import com.example.schedule.model.CourseCategory;
 import com.example.schedule.model.CourseCycleRules;
 import com.example.schedule.model.CourseType;
 import com.example.schedule.model.EmploymentType;
+import com.example.schedule.model.SpaceType;
+import com.example.schedule.model.SubShift;
 import com.example.schedule.model.TeacherShift;
 import com.example.schedule.repository.CourseRepository;
 import com.example.schedule.repository.CourseTeacherAssignmentRepository;
@@ -169,11 +171,20 @@ public class TeacherService {
         List<CourseTeacherAssignmentRequest> requests = new ArrayList<>();
         for (NombradosSeedData.TeacherCourseChoice course : NombradosSeedData.preferenceCourses(seed)) {
             Long courseId = resolveCourseIdByCode(course.courseCode());
+            Course resolved = courseRepository.findById(courseId).orElse(null);
             for (TeacherShift shift : shiftsFor(course.modality())) {
-                requests.add(new CourseTeacherAssignmentRequest(courseId, shift));
+                requests.add(new CourseTeacherAssignmentRequest(courseId, shift, seedSubShift(resolved, shift)));
             }
         }
         return requests;
+    }
+
+    private SubShift seedSubShift(Course course, TeacherShift shift) {
+        if (course == null || course.getRequiredSpaceType() != SpaceType.LABORATORIO) {
+            return null;
+        }
+        List<SubShift> allowed = CourseCycleRules.allowedSubShiftsForLabCycle(course.getCycle(), shift);
+        return allowed.isEmpty() ? null : allowed.get(0);
     }
 
     private List<TeacherShift> shiftsFor(NombradosSeedData.ShiftModality modality) {
@@ -266,18 +277,35 @@ public class TeacherService {
         }
     }
 
+    @Transactional
+    public void migrateSubShiftConstraintIfNeeded() {
+        try {
+            jdbcTemplate.execute(
+                    "ALTER TABLE course_teacher_assignments DROP CONSTRAINT IF EXISTS uk_course_teacher_shift");
+        } catch (Exception ignored) {
+        }
+        try {
+            jdbcTemplate.execute("""
+                    ALTER TABLE course_teacher_assignments
+                    ADD CONSTRAINT uk_course_teacher_shift
+                    UNIQUE (teacher_id, course_id, shift, sub_shift)
+                    """);
+        } catch (Exception ignored) {
+        }
+    }
+
     private void validateAssignments(EmploymentType employmentType,
                                      List<CourseTeacherAssignmentRequest> assignments) {
         CourseCategory expectedCategory = expectedCourseCategory(employmentType);
 
         long distinctPairs = assignments.stream()
-                .map(a -> a.courseId() + ":" + a.shift())
+                .map(a -> a.courseId() + ":" + a.shift() + ":" + (a.subShift() == null ? "" : a.subShift()))
                 .distinct()
                 .count();
         if (distinctPairs != assignments.size()) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Un docente no puede tener el mismo curso y turno asignado más de una vez");
+                    "Un docente no puede tener el mismo curso, turno y sub-turno asignado más de una vez");
         }
 
         long dayShifts = assignments.stream()
@@ -309,6 +337,7 @@ public class TeacherService {
                         HttpStatus.BAD_REQUEST,
                         "El curso " + course.getCode() + " es de ciclo diurno (I–VIII), solo turnos MAÑANA o TARDE");
             }
+            validateSubShift(course, req);
         }
         if (categories.size() > 1 || (!categories.isEmpty() && !categories.contains(expectedCategory))) {
             throw new ResponseStatusException(
@@ -359,7 +388,48 @@ public class TeacherService {
         assignment.setTeacher(teacher);
         assignment.setCourse(course);
         assignment.setShift(request.shift());
+        assignment.setSubShift(resolveSubShift(course, request));
         return assignment;
+    }
+
+    private void validateSubShift(Course course, CourseTeacherAssignmentRequest req) {
+        boolean isLab = course.getRequiredSpaceType() == SpaceType.LABORATORIO;
+        List<SubShift> allowed = CourseCycleRules.allowedSubShiftsForLabCycle(
+                course.getCycle(), req.shift());
+        if (!isLab || allowed.isEmpty()) {
+            if (req.subShift() != null) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "El curso " + course.getCode()
+                                + " no admite sub-turno para el turno seleccionado");
+            }
+            return;
+        }
+        if (req.subShift() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "El curso de laboratorio " + course.getCode()
+                            + " requiere un sub-turno (" + allowed + ")");
+        }
+        if (!allowed.contains(req.subShift())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Sub-turno inválido para el curso " + course.getCode()
+                            + ": " + req.subShift() + ". Válidos: " + allowed);
+        }
+    }
+
+    private SubShift resolveSubShift(Course course, CourseTeacherAssignmentRequest req) {
+        boolean isLab = course.getRequiredSpaceType() == SpaceType.LABORATORIO;
+        List<SubShift> allowed = CourseCycleRules.allowedSubShiftsForLabCycle(
+                course.getCycle(), req.shift());
+        if (!isLab || allowed.isEmpty()) {
+            return null;
+        }
+        if (req.subShift() != null && allowed.contains(req.subShift())) {
+            return req.subShift();
+        }
+        return null;
     }
 
     private String blankToNull(String value) {

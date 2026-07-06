@@ -38,9 +38,11 @@ public class DataInitializer implements ApplicationRunner {
         scheduleSettingsService.seedDefaultsIfEmpty();
         teacherService.migrateEmploymentTypesIfNeeded();
         teacherService.migrateLegacyShiftsIfNeeded();
+        teacherService.migrateSubShiftConstraintIfNeeded();
         spaceService.seedDemoIfEmpty();
         courseService.migrateLectivosIfNeeded();
         courseService.migrateCourseCodesIfNeeded();
+        courseService.migrateRequiredSpaceTypeIfNeeded();
         courseService.seedFromPlanIfEmpty();
     }
 }

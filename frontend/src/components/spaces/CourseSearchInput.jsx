@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import {
   Combobox,
@@ -10,7 +10,7 @@ import {
   useComboboxAnchor,
 } from "@/components/ui/combobox";
 import { cn } from "@/lib/utils";
-import { matchesSearchQuery, normalizeSearchText } from "@/lib/search";
+import { matchesSearchQuery } from "@/lib/search";
 
 const MIN_QUERY_LENGTH = 1;
 
@@ -27,16 +27,6 @@ function CourseSearchInput({
   const anchor = useComboboxAnchor();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
-  const selectedByUserRef = useRef(false);
-
-  const selectedLabel = useMemo(() => (value ? getLabel(value) : ""), [value, getLabel]);
-
-  useEffect(() => {
-    if (!selectedByUserRef.current) {
-      setQuery(selectedLabel);
-    }
-    selectedByUserRef.current = false;
-  }, [selectedLabel]);
 
   const filteredCourses = useMemo(() => {
     const trimmed = query.trim();
@@ -47,14 +37,13 @@ function CourseSearchInput({
   }, [courses, query, getLabel]);
 
   const isValid = useMemo(() => {
-    const normalized = normalizeSearchText(selectedLabel);
-    if (!normalized) {
+    if (!value) {
       return true;
     }
-    return courses.some((course) => normalizeSearchText(getLabel(course)) === normalized);
-  }, [courses, selectedLabel, getLabel]);
+    return courses.some((course) => getLabel(course) === getLabel(value));
+  }, [courses, value, getLabel]);
 
-  const showInvalid = !isValid && selectedLabel.trim().length > 0;
+  const showInvalid = !isValid;
 
   const handleInputValueChange = (nextValue) => {
     setQuery(nextValue);
@@ -65,8 +54,6 @@ function CourseSearchInput({
     if (!course) {
       return;
     }
-    selectedByUserRef.current = true;
-    setQuery(getLabel(course));
     onSelect(course);
     setOpen(false);
   };
@@ -90,13 +77,13 @@ function CourseSearchInput({
         <Search className="pointer-events-none absolute top-1/2 left-2.5 z-10 size-4 -translate-y-1/2 text-muted-foreground" />
         <Combobox
           items={courseItems}
-          value={null}
-          inputValue={query}
+          value={value}
           open={open}
           onOpenChange={setOpen}
           onValueChange={handleValueChange}
           onInputValueChange={handleInputValueChange}
-          itemToStringValue={(item) => item.label}
+          itemToStringLabel={getLabel}
+          itemToStringValue={(item) => String(item.id)}
           filter={null}
         >
           <ComboboxInput

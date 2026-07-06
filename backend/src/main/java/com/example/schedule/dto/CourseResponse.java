@@ -6,6 +6,7 @@ import com.example.schedule.entity.Course;
 import com.example.schedule.model.CourseAvailability;
 import com.example.schedule.model.CourseCycleRules;
 import com.example.schedule.model.CourseType;
+import com.example.schedule.model.SpaceType;
 import com.example.schedule.model.TeacherShift;
 
 public record CourseResponse(
@@ -15,11 +16,13 @@ public record CourseResponse(
         CourseType type,
         boolean lectivo,
         Integer cycle,
+        SpaceType requiredSpaceType,
         CourseAvailability availability,
         CourseTeacherSummary morningTeacher,
         CourseTeacherSummary afternoonTeacher,
         CourseTeacherSummary nightTeacher,
-        List<CourseSpaceAssignmentResponse> spaceAssignments
+        List<CourseSpaceAssignmentResponse> spaceAssignments,
+        List<CourseTeacherAssignmentResponse> teacherAssignments
 ) {
 
     public static CourseResponse from(Course course) {
@@ -31,12 +34,16 @@ public record CourseResponse(
                 course.getType(),
                 course.isLectivo(),
                 course.getCycle(),
+                course.getRequiredSpaceType(),
                 availability,
                 CourseTeacherSummary.from(course.getMorningTeacher(), TeacherShift.MANANA),
                 CourseTeacherSummary.from(course.getAfternoonTeacher(), TeacherShift.TARDE),
                 CourseTeacherSummary.from(course.getNightTeacher(), TeacherShift.NOCHE),
                 course.getSpaceAssignments().stream()
                         .map(CourseSpaceAssignmentResponse::from)
+                        .toList(),
+                course.getTeacherAssignments().stream()
+                        .map(CourseTeacherAssignmentResponse::from)
                         .toList());
     }
 

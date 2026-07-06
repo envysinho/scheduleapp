@@ -14,6 +14,7 @@ import {
   getCourseAvailabilityLabel,
   getCourseTypeLabel,
   getCycleLabel,
+  getSpaceTypeLabel,
   getTeacherShiftLabel,
   isCourseLectivo,
   isNightOnlyCycle,
@@ -106,6 +107,9 @@ function CourseBadges({ course, compact = false }) {
         <Badge variant="outline">{getCycleLabel(course.cycle)}</Badge>
       )}
       <Badge variant="secondary">{typeLabel}</Badge>
+      {course.requiredSpaceType && (
+        <Badge variant="outline">{getSpaceTypeLabel(course.requiredSpaceType)}</Badge>
+      )}
       {lectivo && <Badge variant="outline">{COURSE_LECTIVO_LABEL}</Badge>}
       <Badge className={getAvailabilityClassName(course.availability)}>
         {getCourseAvailabilityLabel(course.availability)}

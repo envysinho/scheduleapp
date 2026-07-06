@@ -37,6 +37,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
 
     Optional<Course> findByCode(String code);
 
+    Optional<Course> findByName(String name);
+
     boolean existsByCode(String code);
 
     boolean existsByCodeAndIdNot(String code, Long id);

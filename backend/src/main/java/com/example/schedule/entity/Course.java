@@ -10,6 +10,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import com.example.schedule.model.CourseCycleRules;
 import com.example.schedule.model.CourseType;
+import com.example.schedule.model.SpaceType;
 import com.example.schedule.model.TeacherShift;
 
 import jakarta.persistence.CascadeType;
@@ -48,6 +49,10 @@ public class Course {
 
     @Column(nullable = false)
     private Integer cycle;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "required_space_type", nullable = false)
+    private SpaceType requiredSpaceType = SpaceType.AULA;
 
     @ManyToOne
     @JoinColumn(name = "morning_teacher_id")
@@ -121,6 +126,14 @@ public class Course {
 
     public void setCycle(Integer cycle) {
         this.cycle = cycle;
+    }
+
+    public SpaceType getRequiredSpaceType() {
+        return requiredSpaceType;
+    }
+
+    public void setRequiredSpaceType(SpaceType requiredSpaceType) {
+        this.requiredSpaceType = requiredSpaceType;
     }
 
     public Teacher getMorningTeacher() {

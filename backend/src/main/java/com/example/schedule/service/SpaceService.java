@@ -16,16 +16,20 @@ import com.example.schedule.entity.SpaceAssignment;
 import com.example.schedule.model.CourseCycleRules;
 import com.example.schedule.model.SpaceAvailability;
 import com.example.schedule.model.SpaceType;
+import com.example.schedule.model.SubShift;
 import com.example.schedule.model.TeacherShift;
+import com.example.schedule.repository.CourseRepository;
 import com.example.schedule.repository.SpaceRepository;
 
 @Service
 public class SpaceService {
 
     private final SpaceRepository spaceRepository;
+    private final CourseRepository courseRepository;
 
-    public SpaceService(SpaceRepository spaceRepository) {
+    public SpaceService(SpaceRepository spaceRepository, CourseRepository courseRepository) {
         this.spaceRepository = spaceRepository;
+        this.courseRepository = courseRepository;
     }
 
     @Transactional(readOnly = true)
@@ -107,8 +111,8 @@ public class SpaceService {
                     encargados[i - 1],
                     phones[i - 1],
                     List.of(
-                            new SpaceAssignmentRequest("Cálculo I", i, null),
-                            new SpaceAssignmentRequest("Matemática General", i, null))));
+                            new SpaceAssignmentRequest("Cálculo I", i, null, null),
+                            new SpaceAssignmentRequest("Matemática General", i, null, null))));
         }
 
         SpaceAvailability[] labAvailabilities = {
@@ -152,8 +156,8 @@ public class SpaceService {
                     labEncargados[i - 1],
                     labPhones[i - 1],
                     List.of(
-                            new SpaceAssignmentRequest("Programación I", ((i - 1) % 10) + 1, null),
-                            new SpaceAssignmentRequest("Química Orgánica", ((i + 1) % 10) + 1, null))));
+                            new SpaceAssignmentRequest("Programación I", ((i - 1) % 10) + 1, null, null),
+                            new SpaceAssignmentRequest("Química Orgánica", ((i + 1) % 10) + 1, null, null))));
         }
     }
 
@@ -182,7 +186,12 @@ public class SpaceService {
         assignment.setCourseName(request.courseName().trim());
         assignment.setCycle(request.cycle());
         assignment.setShift(request.shift());
+        assignment.setSubShift(resolveSubShift(request));
         return assignment;
+    }
+
+    private SubShift resolveSubShift(SpaceAssignmentRequest request) {
+        return request.subShift();
     }
 
     private void validateAssignments(List<SpaceAssignmentRequest> requests) {
@@ -202,6 +211,39 @@ public class SpaceService {
                         HttpStatus.BAD_REQUEST,
                         "El curso asignado es de ciclo diurno (I–VIII), solo turnos MAÑANA o TARDE");
             }
+            validateSubShift(request);
+        }
+    }
+
+    private void validateSubShift(SpaceAssignmentRequest request) {
+        if (request.cycle() == null || request.shift() == null) {
+            return;
+        }
+        var course = courseRepository.findByName(request.courseName().trim()).orElse(null);
+        boolean isLab = course != null
+                && course.getRequiredSpaceType() == SpaceType.LABORATORIO;
+        List<SubShift> allowed = CourseCycleRules.allowedSubShiftsForLabCycle(
+                request.cycle(), request.shift());
+        if (!isLab || allowed.isEmpty()) {
+            if (request.subShift() != null) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "El curso \"" + request.courseName()
+                                + "\" no admite sub-turno para el turno seleccionado");
+            }
+            return;
+        }
+        if (request.subShift() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "El curso de laboratorio \"" + request.courseName()
+                            + "\" requiere un sub-turno (" + allowed + ")");
+        }
+        if (!allowed.contains(request.subShift())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Sub-turno inválido para \"" + request.courseName()
+                            + "\": " + request.subShift() + ". Válidos: " + allowed);
         }
     }
 

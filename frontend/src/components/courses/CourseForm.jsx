@@ -15,8 +15,13 @@ import {
 import {
   COURSE_TYPES,
   CYCLES,
+  SPACE_TYPES,
+  allowedSubShiftsForLabCycle,
   getCourseTypeLabel,
   getCycleLabel,
+  getSpaceTypeLabel,
+  getSubShiftLabel,
+  getTeacherShiftLabel,
   isNightOnlyCycle,
 } from "@/lib/constants";
 import { listSpaces, listTeachers } from "@/lib/api";
@@ -31,6 +36,7 @@ const EMPTY_FORM = {
   type: "DE_CARRERA",
   lectivo: false,
   cycle: 1,
+  requiredSpaceType: "AULA",
   sameTeacher: true,
   morningTeacherId: null,
   afternoonTeacherId: null,
@@ -78,6 +84,7 @@ function courseToForm(course) {
     type: isLegacyLectivo ? "DE_CARRERA" : (course.type ?? "DE_CARRERA"),
     lectivo: course.lectivo ?? isLegacyLectivo,
     cycle,
+    requiredSpaceType: course.requiredSpaceType ?? "AULA",
     sameTeacher: nightOnly
       ? true
       : sameTeacher || (!course.afternoonTeacher && Boolean(course.morningTeacher)),
@@ -100,6 +107,7 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
 
   const typeAnchor = useComboboxAnchor();
   const cycleAnchor = useComboboxAnchor();
+  const requiredSpaceTypeAnchor = useComboboxAnchor();
   const morningTeacherAnchor = useComboboxAnchor();
   const afternoonTeacherAnchor = useComboboxAnchor();
   const nightTeacherAnchor = useComboboxAnchor();
@@ -130,6 +138,40 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
   const nightTeacherLabels = nightTeachers.map((teacher) => teacher.fullName);
   const spaceLabels = spaces.map((space) => space.name);
   const nightOnly = isNightOnlyCycle(form.cycle);
+  const requiredSpaceType = form.requiredSpaceType;
+
+  const labSubShifts = (() => {
+    if (requiredSpaceType !== "LABORATORIO") {
+      return [];
+    }
+    const shifts = nightOnly ? ["NOCHE"] : ["MANANA", "TARDE"];
+    return shifts.flatMap((shift) =>
+      allowedSubShiftsForLabCycle(form.cycle, shift).map((subShift) => ({
+        shift,
+        subShift,
+        teacher:
+          course?.teacherAssignments?.find(
+            (assignment) =>
+              assignment.shift === shift && assignment.subShift === subShift
+          )?.teacherName ?? null,
+      }))
+    );
+  })();
+  const hasLabSubShifts = labSubShifts.length > 0;
+
+  const spaceMismatch = form.spaceAssignments
+    .map((assignment, index) => {
+      if (assignment.spaceId == null) {
+        return null;
+      }
+      const space = spaces.find((item) => item.id === assignment.spaceId);
+      if (!space || space.spaceType === requiredSpaceType) {
+        return null;
+      }
+      return { index, spaceName: space.name, spaceType: space.spaceType };
+    })
+    .filter(Boolean);
+  const hasSpaceMismatch = spaceMismatch.length > 0;
 
   const getTeacherLabel = (teacherId) => {
     if (teacherId == null) {
@@ -177,6 +219,7 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
       type: form.type,
       lectivo: form.lectivo,
       cycle: Number(form.cycle),
+      requiredSpaceType: form.requiredSpaceType,
       morningTeacherId: morningTeacherId || null,
       afternoonTeacherId: afternoonTeacherId || null,
       nightTeacherId: nightOnly ? (form.nightTeacherId || null) : null,
@@ -302,6 +345,42 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
               >
                 <ComboboxInput id="course-cycle" placeholder="Ciclo" readOnly />
                 <ComboboxContent anchor={cycleAnchor}>
+                  <ComboboxEmpty>Sin opciones.</ComboboxEmpty>
+                  <ComboboxList>
+                    {(label) => (
+                      <ComboboxItem key={label} value={label}>
+                        {label}
+                      </ComboboxItem>
+                    )}
+                  </ComboboxList>
+                </ComboboxContent>
+              </Combobox>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="course-required-space-type">Ambiente requerido</Label>
+            <div ref={requiredSpaceTypeAnchor} className="w-full">
+              <Combobox
+                items={SPACE_TYPES.map((item) => item.label)}
+                value={getSpaceTypeLabel(form.requiredSpaceType)}
+                onValueChange={(label) => {
+                  const item = SPACE_TYPES.find((option) => option.label === label);
+                  setForm((current) => ({
+                    ...current,
+                    requiredSpaceType: item?.value ?? "AULA",
+                  }));
+                }}
+                disabled={isSubmitting}
+              >
+                <ComboboxInput
+                  id="course-required-space-type"
+                  placeholder="Seleccionar ambiente"
+                  readOnly
+                />
+                <ComboboxContent anchor={requiredSpaceTypeAnchor}>
                   <ComboboxEmpty>Sin opciones.</ComboboxEmpty>
                   <ComboboxList>
                     {(label) => (
@@ -456,6 +535,35 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
           )}
         </div>
 
+        {hasLabSubShifts && (
+          <div className="flex flex-col gap-2 rounded-md border p-3">
+            <div>
+              <Label>Sub-turnos de laboratorio</Label>
+              <p className="text-xs text-muted-foreground">
+                Docentes asignados por sub-turno (se asignan desde la pestaña Docentes).
+              </p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {labSubShifts.map(({ shift, subShift, teacher }) => (
+                <div
+                  key={`${shift}-${subShift}`}
+                  className="flex items-center justify-between rounded-md bg-muted/50 px-2 py-1.5 text-sm"
+                >
+                  <span className="font-medium">
+                    {getSubShiftLabel(subShift)}
+                    <span className="ml-1 text-xs font-normal text-muted-foreground">
+                      ({getTeacherShiftLabel(shift)})
+                    </span>
+                  </span>
+                  <span className={teacher ? "" : "text-muted-foreground"}>
+                    {teacher ?? "Sin asignar"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <Label>Ambientes asignados</Label>
@@ -481,6 +589,7 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
                 index={index}
                 spaceLabels={spaceLabels}
                 spaces={spaces}
+                requiredSpaceType={requiredSpaceType}
                 disabled={isSubmitting}
                 onChange={handleSpaceAssignmentChange}
                 onRemove={removeSpaceAssignment}
@@ -494,13 +603,19 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
             {error}
           </p>
         )}
+        {hasSpaceMismatch && (
+          <p className="text-sm text-destructive" role="alert">
+            Corrige los ambientes que no coincen con el tipo requerido antes de
+            guardar.
+          </p>
+        )}
       </div>
 
       <div className="flex justify-end gap-2 border-t pt-4">
         <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
           Cancelar
         </Button>
-        <Button type="submit" disabled={isSubmitting}>
+        <Button type="submit" disabled={isSubmitting || hasSpaceMismatch}>
           {isSubmitting ? "Guardando..." : isEditing ? "Actualizar" : "Crear"}
         </Button>
       </div>
@@ -513,15 +628,19 @@ function SpaceAssignmentRow({
   index,
   spaceLabels,
   spaces,
+  requiredSpaceType,
   disabled,
   onChange,
   onRemove,
 }) {
   const spaceAnchor = useComboboxAnchor();
-  const selectedLabel =
+  const selectedSpace =
     assignment.spaceId == null
-      ? UNASSIGNED_LABEL
-      : (spaces.find((space) => space.id === assignment.spaceId)?.name ?? "");
+      ? null
+      : (spaces.find((space) => space.id === assignment.spaceId) ?? null);
+  const selectedLabel = selectedSpace?.name ?? UNASSIGNED_LABEL;
+  const mismatch =
+    selectedSpace != null && selectedSpace.spaceType !== requiredSpaceType;
 
   return (
     <div className="rounded-md border p-3">
@@ -567,6 +686,14 @@ function SpaceAssignmentRow({
             </ComboboxContent>
           </Combobox>
         </div>
+        {mismatch && (
+          <p className="text-sm text-destructive" role="alert">
+            Este curso requiere un ambiente de tipo{" "}
+            {getSpaceTypeLabel(requiredSpaceType).toLowerCase()}, pero
+            &quot;{selectedSpace.name}&quot; es{" "}
+            {getSpaceTypeLabel(selectedSpace.spaceType).toLowerCase()}.
+          </p>
+        )}
       </div>
     </div>
   );

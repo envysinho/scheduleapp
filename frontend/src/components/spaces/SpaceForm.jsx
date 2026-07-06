@@ -18,12 +18,15 @@ import { listCourses } from "@/lib/api";
 import { normalizeSearchText } from "@/lib/search";
 import {
   allowedShiftsForCycle,
+  allowedSubShiftsForLabCycle,
   AVAILABILITY_STATUSES,
   CYCLES,
   getAvailabilityLabel,
   getCycleLabel,
   getSpaceTypeLabel,
+  getSubShiftLabel,
   getTeacherShiftLabel,
+  requiresSubShift,
   SPACE_TYPES,
   TEACHER_SHIFTS,
 } from "@/lib/constants";
@@ -32,6 +35,7 @@ const EMPTY_ASSIGNMENT = {
   courseName: "",
   cycle: null,
   shift: null,
+  subShift: null,
 };
 
 const CYCLE_OPTIONS = [
@@ -65,6 +69,7 @@ function spaceToForm(space) {
             courseName: assignment.courseName ?? "",
             cycle: assignment.cycle ?? null,
             shift: assignment.shift ?? null,
+            subShift: assignment.subShift ?? null,
           }))
         : [{ ...EMPTY_ASSIGNMENT }],
   };
@@ -114,6 +119,13 @@ function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
     return !courses.some((course) => normalizeSearchText(course.name) === normalized);
   });
 
+  const hasMissingSubShift = form.assignments.some((assignment) => {
+    const matchedCourse = courses.find(
+      (course) => normalizeSearchText(course.name) === normalizeSearchText(assignment.courseName)
+    );
+    return requiresSubShift(matchedCourse, assignment.shift) && !assignment.subShift;
+  });
+
   const handleAssignmentChange = (index, field, value) => {
     setForm((current) => ({
       ...current,
@@ -147,11 +159,20 @@ function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
       managerPhone: form.managerPhone.trim() || null,
       assignments: form.assignments
         .filter((assignment) => assignment.courseName.trim())
-        .map((assignment) => ({
-          courseName: assignment.courseName.trim(),
-          cycle: assignment.cycle == null ? null : Number(assignment.cycle),
-          shift: assignment.shift ?? null,
-        })),
+        .map((assignment) => {
+          const matchedCourse = courses.find(
+            (course) => course.name === assignment.courseName.trim()
+          );
+          const subShift = requiresSubShift(matchedCourse, assignment.shift)
+            ? assignment.subShift
+            : null;
+          return {
+            courseName: assignment.courseName.trim(),
+            cycle: assignment.cycle == null ? null : Number(assignment.cycle),
+            shift: assignment.shift ?? null,
+            ...(subShift ? { subShift } : {}),
+          };
+        }),
     };
 
     await onSubmit(payload);
@@ -326,7 +347,7 @@ function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
         <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
           Cancelar
         </Button>
-        <Button type="submit" disabled={isSubmitting || hasInvalidCourses}>
+        <Button type="submit" disabled={isSubmitting || hasInvalidCourses || hasMissingSubShift}>
           {isSubmitting ? "Guardando..." : isEditing ? "Actualizar" : "Crear"}
         </Button>
       </div>
@@ -342,6 +363,24 @@ function getFirstAllowedShift(cycle) {
 function AssignmentRow({ assignment, index, canRemove, disabled, courses, onChange, onRemove }) {
   const cycleAnchor = useComboboxAnchor();
   const selectedCourse = courses.find((course) => course.name === assignment.courseName) ?? null;
+  const allowedSubShifts = selectedCourse
+    ? allowedSubShiftsForLabCycle(selectedCourse.cycle, assignment.shift)
+    : [];
+  const showSubShifts = Boolean(selectedCourse)
+    && selectedCourse.requiredSpaceType === "LABORATORIO"
+    && allowedSubShifts.length > 0;
+  const subShiftMissing = showSubShifts && !assignment.subShift;
+
+  function resolveSubShift(course, shift, currentSubShift) {
+    const allowed = allowedSubShiftsForLabCycle(course?.cycle, shift);
+    if (allowed.length === 0) {
+      return null;
+    }
+    if (currentSubShift && allowed.includes(currentSubShift)) {
+      return currentSubShift;
+    }
+    return null;
+  }
 
   const handleCourseSelect = (course) => {
     const nextCourseName = course?.name ?? "";
@@ -350,10 +389,12 @@ function AssignmentRow({ assignment, index, canRemove, disabled, courses, onChan
     const nextShift = assignment.shift && nextAllowedShifts.includes(assignment.shift)
       ? assignment.shift
       : getFirstAllowedShift(nextCycle);
+    const nextSubShift = resolveSubShift(course, nextShift, assignment.subShift);
     onChange(index, "courseName", nextCourseName);
     if (course) {
       onChange(index, "cycle", nextCycle);
       onChange(index, "shift", nextShift);
+      onChange(index, "subShift", nextSubShift);
     }
   };
 
@@ -362,8 +403,16 @@ function AssignmentRow({ assignment, index, canRemove, disabled, courses, onChan
     const nextShift = assignment.shift && nextAllowedShifts.includes(assignment.shift)
       ? assignment.shift
       : getFirstAllowedShift(cycle);
+    const nextSubShift = resolveSubShift(selectedCourse, nextShift, assignment.subShift);
     onChange(index, "cycle", cycle);
     onChange(index, "shift", nextShift);
+    onChange(index, "subShift", nextSubShift);
+  };
+
+  const handleShiftChange = (shift) => {
+    const nextSubShift = resolveSubShift(selectedCourse, shift, assignment.subShift);
+    onChange(index, "shift", shift);
+    onChange(index, "subShift", nextSubShift);
   };
 
   return (
@@ -439,7 +488,7 @@ function AssignmentRow({ assignment, index, canRemove, disabled, courses, onChan
               key={item.value}
               type="button"
               variant={assignment.shift === item.value ? "default" : "outline"}
-              onClick={() => onChange(index, "shift", item.value)}
+              onClick={() => handleShiftChange(item.value)}
               disabled={disabled}
             >
               {getTeacherShiftLabel(item.value)}
@@ -447,6 +496,30 @@ function AssignmentRow({ assignment, index, canRemove, disabled, courses, onChan
           ))}
         </div>
       </div>
+
+      {showSubShifts && (
+        <div className="mt-3 flex flex-col gap-2">
+          <Label>Sub-turno (laboratorio)</Label>
+          <div className="flex flex-wrap gap-1">
+            {allowedSubShifts.map((value) => (
+              <Button
+                key={value}
+                type="button"
+                variant={assignment.subShift === value ? "default" : "outline"}
+                onClick={() => onChange(index, "subShift", value)}
+                disabled={disabled}
+              >
+                {getSubShiftLabel(value)}
+              </Button>
+            ))}
+          </div>
+          {subShiftMissing && (
+            <p className="text-sm text-destructive" role="alert">
+              Selecciona un sub-turno para este curso de laboratorio.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

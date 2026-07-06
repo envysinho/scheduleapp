@@ -27,4 +27,26 @@ public final class CourseCycleRules {
         }
         return List.of(TeacherShift.MANANA, TeacherShift.TARDE, TeacherShift.NOCHE);
     }
+
+    public static boolean isLabSubShiftCycle(Integer cycle) {
+        return cycle != null && (cycle == 8 || cycle == 9 || cycle == 10);
+    }
+
+    public static List<SubShift> allowedSubShiftsForLabCycle(Integer cycle, TeacherShift shift) {
+        if (cycle == null || shift == null) {
+            return List.of();
+        }
+        if (isNightOnlyCycle(cycle) && shift == TeacherShift.NOCHE) {
+            return List.of(SubShift.NA1, SubShift.NA2, SubShift.NB1, SubShift.NB2);
+        }
+        if (isDayOnlyCycle(cycle)) {
+            if (shift == TeacherShift.MANANA) {
+                return List.of(SubShift.A1, SubShift.A2);
+            }
+            if (shift == TeacherShift.TARDE) {
+                return List.of(SubShift.B1, SubShift.B2);
+            }
+        }
+        return List.of();
+    }
 }

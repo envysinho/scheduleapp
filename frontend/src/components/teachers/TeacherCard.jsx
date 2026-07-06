@@ -13,6 +13,7 @@ import {
 import {
   getCycleLabel,
   getEmploymentTypeLabel,
+  getSubShiftLabel,
   getTeacherShiftLabel,
 } from "@/lib/constants";
 
@@ -28,7 +29,8 @@ function formatAssignment(assignment) {
     : assignment.courseName;
   const cycleLabel = assignment.cycle != null ? getCycleLabel(assignment.cycle) : null;
   const shiftLabel = assignment.shift ? getTeacherShiftLabel(assignment.shift) : null;
-  return [courseLabel, cycleLabel, shiftLabel].filter(Boolean).join(" · ");
+  const subShiftLabel = assignment.subShift ? getSubShiftLabel(assignment.subShift) : null;
+  return [courseLabel, cycleLabel, shiftLabel, subShiftLabel].filter(Boolean).join(" · ");
 }
 
 function TeacherBadges({ teacher }) {

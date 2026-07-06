@@ -3,6 +3,7 @@ package com.example.schedule.dto;
 import java.util.List;
 
 import com.example.schedule.model.CourseType;
+import com.example.schedule.model.SpaceType;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -17,6 +18,7 @@ public record UpdateCourseRequest(
         @NotNull CourseType type,
         @NotNull Boolean lectivo,
         @NotNull @Min(1) @Max(10) Integer cycle,
+        @NotNull SpaceType requiredSpaceType,
         Long morningTeacherId,
         Long afternoonTeacherId,
         Long nightTeacherId,
