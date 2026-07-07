@@ -410,48 +410,50 @@ function AssignmentRow({
           )}
         </div>
 
-        <div className="flex flex-col gap-2">
-          <Label>Turno</Label>
-          <div className="flex flex-wrap gap-1">
-            {TEACHER_SHIFTS.filter((item) =>
-              allowedShiftsForCycle(selectedCourse?.cycle).includes(item.value)
-            ).map((item) => (
-              <Button
-                key={item.value}
-                type="button"
-                variant={assignment.shift === item.value ? "default" : "outline"}
-                onClick={() => onShiftChange(index, item.value, selectedCourse)}
-                disabled={disabled}
-              >
-                {getTeacherShiftLabel(item.value)}
-              </Button>
-            ))}
-          </div>
-        </div>
-
-        {showSubShifts && (
-          <div className="flex flex-col gap-2">
-            <Label>Sub-turno</Label>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="flex flex-1 flex-col gap-2">
+            <Label>Turno</Label>
             <div className="flex flex-wrap gap-1">
-              {allowedSubShifts.map((value) => (
+              {TEACHER_SHIFTS.filter((item) =>
+                allowedShiftsForCycle(selectedCourse?.cycle).includes(item.value)
+              ).map((item) => (
                 <Button
-                  key={value}
+                  key={item.value}
                   type="button"
-                  variant={assignment.subShift === value ? "default" : "outline"}
-                  onClick={() => onChange(index, "subShift", value)}
+                  variant={assignment.shift === item.value ? "default" : "outline"}
+                  onClick={() => onShiftChange(index, item.value, selectedCourse)}
                   disabled={disabled}
                 >
-                  {getSubShiftLabel(value)}
+                  {getTeacherShiftLabel(item.value)}
                 </Button>
               ))}
             </div>
-            {subShiftMissing && (
-              <p className="text-sm text-destructive" role="alert">
-                Selecciona un sub-turno para este curso de laboratorio.
-              </p>
-            )}
           </div>
-        )}
+
+          {showSubShifts && (
+            <div className="flex flex-1 flex-col gap-2">
+              <Label>Sub-turno</Label>
+              <div className="flex flex-wrap gap-1">
+                {allowedSubShifts.map((value) => (
+                  <Button
+                    key={value}
+                    type="button"
+                    variant={assignment.subShift === value ? "default" : "outline"}
+                    onClick={() => onChange(index, "subShift", value)}
+                    disabled={disabled}
+                  >
+                    {getSubShiftLabel(value)}
+                  </Button>
+                ))}
+              </div>
+              {subShiftMissing && (
+                <p className="text-sm text-destructive" role="alert">
+                  Selecciona un sub-turno para este curso de laboratorio.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
