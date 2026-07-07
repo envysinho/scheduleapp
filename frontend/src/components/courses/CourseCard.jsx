@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { BookOpen, Building2, Pencil, Phone, Trash2, User } from "lucide-react";
+import { BookOpen, Building2, Pencil, Trash2, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,9 +15,9 @@ import {
   getCourseTypeLabel,
   getCycleLabel,
   getSpaceTypeLabel,
+  getSubShiftLabel,
   getTeacherShiftLabel,
   isCourseLectivo,
-  isNightOnlyCycle,
 } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
@@ -34,61 +34,56 @@ function getAvailabilityClassName(availability) {
   }
 }
 
-function hasSameTeacher(course) {
-  const morning = course.morningTeacher;
-  const afternoon = course.afternoonTeacher;
-  if (!morning || !afternoon) {
-    return false;
+const SHIFT_ORDER = { MANANA: 0, TARDE: 1, NOCHE: 2 };
+
+function compareShifts(a, b) {
+  const orderA = SHIFT_ORDER[a.shift] ?? 99;
+  const orderB = SHIFT_ORDER[b.shift] ?? 99;
+  if (orderA !== orderB) {
+    return orderA - orderB;
   }
-  return morning.id === afternoon.id;
+  return (a.subShift ?? "").localeCompare(b.subShift ?? "");
 }
 
-function getTeacherEntries(course) {
-  const morning = course.morningTeacher;
-  const afternoon = course.afternoonTeacher;
-  const night = course.nightTeacher;
-
-  if (isNightOnlyCycle(course.cycle)) {
-    if (!night) {
-      return [];
-    }
-    return [{ label: null, teacher: night, shiftLabel: getTeacherShiftLabel("NOCHE") }];
-  }
-
-  if (!morning && !afternoon) {
-    if (night) {
-      return [{ label: null, teacher: night, shiftLabel: getTeacherShiftLabel("NOCHE") }];
-    }
+function groupTeacherAssignments(assignments) {
+  if (!assignments?.length) {
     return [];
   }
 
-  if (hasSameTeacher(course)) {
-    return [{ label: null, teacher: morning, shiftLabel: "Mañana y tarde" }];
+  const grouped = new Map();
+
+  for (const assignment of assignments) {
+    if (!assignment.teacherId) {
+      continue;
+    }
+
+    if (!grouped.has(assignment.teacherId)) {
+      grouped.set(assignment.teacherId, {
+        id: assignment.teacherId,
+        name: assignment.teacherName,
+        shifts: [],
+      });
+    }
+
+    const entry = grouped.get(assignment.teacherId);
+    const shiftLabel = getTeacherShiftLabel(assignment.shift);
+    const subShiftLabel = assignment.subShift ? getSubShiftLabel(assignment.subShift) : null;
+    entry.shifts.push({
+      shift: assignment.shift,
+      subShift: assignment.subShift,
+      text: subShiftLabel ? `${shiftLabel} ${subShiftLabel}` : shiftLabel,
+    });
   }
 
-  const entries = [];
-  if (morning) {
-    entries.push({
-      label: entries.length === 0 && afternoon ? "Docente 1" : morning ? "Docente 1" : null,
-      teacher: morning,
-      shiftLabel: getTeacherShiftLabel("MANANA"),
-    });
-  }
-  if (afternoon) {
-    entries.push({
-      label: morning ? "Docente 2" : "Docente 1",
-      teacher: afternoon,
-      shiftLabel: getTeacherShiftLabel("TARDE"),
-    });
-  }
-  if (night) {
-    entries.push({
-      label: null,
-      teacher: night,
-      shiftLabel: getTeacherShiftLabel("NOCHE"),
-    });
-  }
-  return entries;
+  return Array.from(grouped.values())
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((entry) => ({
+      ...entry,
+      shiftsText: entry.shifts
+        .sort(compareShifts)
+        .map(({ text }) => text)
+        .join(" · "),
+    }));
 }
 
 function CourseBadges({ course, compact = false }) {
@@ -144,7 +139,7 @@ function CourseActions({ course, onEdit, onDelete }) {
 }
 
 function CourseTeachers({ course, compact = false }) {
-  const entries = getTeacherEntries(course);
+  const entries = groupTeacherAssignments(course.teacherAssignments);
 
   if (entries.length === 0) {
     return null;
@@ -153,39 +148,22 @@ function CourseTeachers({ course, compact = false }) {
   if (compact) {
     return (
       <p className="truncate text-xs text-muted-foreground">
-        {entries
-          .map(({ label, teacher, shiftLabel }) =>
-            label
-              ? `${label}: ${teacher.fullName} (${shiftLabel})`
-              : `${teacher.fullName} (${shiftLabel})`
-          )
-          .join(" · ")}
+        {entries.map(({ name, shiftsText }) => `${name} · ${shiftsText}`).join(" · ")}
       </p>
     );
   }
 
   return (
     <div className="shrink-0 space-y-1">
-      {entries.map(({ label, teacher, shiftLabel }) => (
-        <div key={`${teacher.id}-${shiftLabel}`} className="space-y-1">
-          {label && (
-            <p className="text-xs font-medium text-muted-foreground">{label}</p>
-          )}
-          <p className="flex min-w-0 items-center gap-2 text-muted-foreground">
-            <User className="size-3.5 shrink-0" />
-            <span className="truncate">
-              {teacher.fullName}
-              {" · "}
-              {shiftLabel}
-            </span>
-          </p>
-          {teacher.phone && (
-            <p className="flex items-center gap-2 text-muted-foreground">
-              <Phone className="size-3.5 shrink-0" />
-              <span>{teacher.phone}</span>
-            </p>
-          )}
-        </div>
+      {entries.map(({ id, name, shiftsText }) => (
+        <p key={id} className="flex min-w-0 items-center gap-2 text-muted-foreground">
+          <User className="size-3.5 shrink-0" />
+          <span className="truncate">
+            {name}
+            {" · "}
+            {shiftsText}
+          </span>
+        </p>
       ))}
     </div>
   );

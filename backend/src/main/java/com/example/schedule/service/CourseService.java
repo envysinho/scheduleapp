@@ -291,10 +291,12 @@ public class CourseService {
             }
         }
 
-        course.getTeacherAssignments().clear();
-        for (CourseTeacherAssignment a : assignments) {
-            a.setCourse(course);
-            course.getTeacherAssignments().add(a);
+        if (!assignments.isEmpty()) {
+            course.getTeacherAssignments().clear();
+            for (CourseTeacherAssignment a : assignments) {
+                a.setCourse(course);
+                course.getTeacherAssignments().add(a);
+            }
         }
         course.deriveShiftTeachers();
     }
