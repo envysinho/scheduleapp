@@ -1,12 +1,15 @@
 package com.example.schedule.dto;
 
 import java.util.List;
+import java.util.Set;
 
 import com.example.schedule.entity.Course;
+import com.example.schedule.entity.CourseTeacherAssignment;
 import com.example.schedule.model.CourseAvailability;
 import com.example.schedule.model.CourseCycleRules;
 import com.example.schedule.model.CourseType;
 import com.example.schedule.model.SpaceType;
+import com.example.schedule.model.SubShift;
 import com.example.schedule.model.TeacherShift;
 
 public record CourseResponse(
@@ -48,7 +51,29 @@ public record CourseResponse(
     }
 
     public static CourseAvailability computeAvailability(Course course) {
-        if (CourseCycleRules.isNightOnlyCycle(course.getCycle())) {
+        SpaceType requiredSpaceType = course.getRequiredSpaceType();
+        Integer cycle = course.getCycle();
+
+        if (requiredSpaceType == SpaceType.LABORATORIO) {
+            Set<SubShift> expected = CourseCycleRules.allowedSubShiftsForCourse(cycle, requiredSpaceType);
+            if (expected.isEmpty()) {
+                return CourseAvailability.LIBRE;
+            }
+            long filled = course.getTeacherAssignments().stream()
+                    .filter(a -> a.getSubShift() != null && expected.contains(a.getSubShift()))
+                    .map(CourseTeacherAssignment::getSubShift)
+                    .distinct()
+                    .count();
+            if (filled == 0) {
+                return CourseAvailability.LIBRE;
+            }
+            if (filled == expected.size()) {
+                return CourseAvailability.LLENO;
+            }
+            return CourseAvailability.INCOMPLETO;
+        }
+
+        if (CourseCycleRules.isNightOnlyCycle(cycle)) {
             return course.getNightTeacher() != null
                     ? CourseAvailability.LLENO
                     : CourseAvailability.LIBRE;

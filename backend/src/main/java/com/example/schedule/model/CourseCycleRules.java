@@ -1,5 +1,6 @@
 package com.example.schedule.model;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -57,5 +58,16 @@ public final class CourseCycleRules {
             return List.of();
         }
         return List.of();
+    }
+
+    public static Set<SubShift> allowedSubShiftsForCourse(Integer cycle, SpaceType requiredSpaceType) {
+        Set<SubShift> subShifts = new LinkedHashSet<>();
+        if (cycle == null || requiredSpaceType == null) {
+            return subShifts;
+        }
+        for (TeacherShift shift : allowedShiftsForCycle(cycle)) {
+            subShifts.addAll(allowedSubShiftsForCycle(cycle, shift, requiredSpaceType));
+        }
+        return subShifts;
     }
 }
