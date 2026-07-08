@@ -25,10 +25,39 @@ import {
   createSpace,
   deleteSpace,
   getSpace,
+  listPracticeHeads,
   listSpaces,
   updateSpace,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
+
+function buildPracticeHeadBySpaceId(practiceHeads) {
+  const practiceHeadBySpaceId = new Map();
+
+  for (const practiceHead of practiceHeads ?? []) {
+    for (const assignment of practiceHead.labAssignments ?? []) {
+      if (assignment?.spaceId != null && !practiceHeadBySpaceId.has(assignment.spaceId)) {
+        practiceHeadBySpaceId.set(assignment.spaceId, practiceHead);
+      }
+    }
+  }
+
+  return practiceHeadBySpaceId;
+}
+
+function withAssignedPracticeHeads(spaces, practiceHeads) {
+  const practiceHeadBySpaceId = buildPracticeHeadBySpaceId(practiceHeads);
+
+  return spaces.map((space) => {
+    const practiceHead = practiceHeadBySpaceId.get(space.id);
+
+    return {
+      ...space,
+      managerName: practiceHead?.fullName ?? null,
+      managerPhone: practiceHead?.phone ?? null,
+    };
+  });
+}
 
 function Spaces({ searchFilter, onClearSearchFilter }) {
   const { logout, user } = useAuth();
@@ -61,16 +90,19 @@ function Spaces({ searchFilter, onClearSearchFilter }) {
     setIsLoading(true);
     try {
       if (isSearchActive) {
-        const data = await getSpace(searchFilter.id, handleUnauthorized);
-        setSpaces([data]);
+        const [data, practiceHeads] = await Promise.all([
+          getSpace(searchFilter.id, handleUnauthorized),
+          listPracticeHeads(handleUnauthorized),
+        ]);
+        setSpaces(withAssignedPracticeHeads([data], practiceHeads));
         return;
       }
 
-      const data = await listSpaces(
-        { spaceType, availability, cycle },
-        handleUnauthorized
-      );
-      setSpaces(data);
+      const [data, practiceHeads] = await Promise.all([
+        listSpaces({ spaceType, availability, cycle }, handleUnauthorized),
+        listPracticeHeads(handleUnauthorized),
+      ]);
+      setSpaces(withAssignedPracticeHeads(data, practiceHeads));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar ambientes");
       if (isSearchActive) {

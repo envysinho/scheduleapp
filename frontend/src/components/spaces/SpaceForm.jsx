@@ -20,7 +20,6 @@ import {
   allowedShiftsForCycle,
   allowedSubShiftsForCycle,
   AVAILABILITY_STATUSES,
-  CYCLES,
   getAvailabilityLabel,
   getCycleLabel,
   getSpaceTypeLabel,
@@ -39,11 +38,6 @@ const EMPTY_ASSIGNMENT = {
 };
 
 const UNASSIGNED_MANAGER_LABEL = "Sin encargado";
-
-const CYCLE_OPTIONS = [
-  { id: null, label: "Sin asignar" },
-  ...CYCLES,
-];
 
 const EMPTY_FORM = {
   name: "",
@@ -75,6 +69,14 @@ function spaceToForm(space) {
           }))
         : [{ ...EMPTY_ASSIGNMENT }],
   };
+}
+
+function findCourseByName(courses, courseName) {
+  const normalized = normalizeSearchText(courseName);
+  if (!normalized) {
+    return null;
+  }
+  return courses.find((course) => normalizeSearchText(course.name) === normalized) ?? null;
 }
 
 function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
@@ -161,13 +163,11 @@ function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
     if (!normalized) {
       return false;
     }
-    return !courses.some((course) => normalizeSearchText(course.name) === normalized);
+    return !findCourseByName(courses, assignment.courseName);
   });
 
   const hasMissingSubShift = form.assignments.some((assignment) => {
-    const matchedCourse = courses.find(
-      (course) => normalizeSearchText(course.name) === normalizeSearchText(assignment.courseName)
-    );
+    const matchedCourse = findCourseByName(courses, assignment.courseName);
     return requiresSubShift(matchedCourse, assignment.shift) && !assignment.subShift;
   });
 
@@ -203,17 +203,15 @@ function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
       managerName: form.managerName.trim() || null,
       managerPhone: form.managerPhone.trim() || null,
       assignments: form.assignments
-        .filter((assignment) => assignment.courseName.trim())
+        .filter((assignment) => findCourseByName(courses, assignment.courseName))
         .map((assignment) => {
-          const matchedCourse = courses.find(
-            (course) => course.name === assignment.courseName.trim()
-          );
+          const matchedCourse = findCourseByName(courses, assignment.courseName);
           const subShift = requiresSubShift(matchedCourse, assignment.shift)
             ? assignment.subShift
             : null;
           return {
-            courseName: assignment.courseName.trim(),
-            cycle: assignment.cycle == null ? null : Number(assignment.cycle),
+            courseName: matchedCourse.name,
+            cycle: matchedCourse.cycle == null ? null : Number(matchedCourse.cycle),
             shift: assignment.shift ?? null,
             ...(subShift ? { subShift } : {}),
           };
@@ -441,8 +439,9 @@ function getFirstAllowedShift(cycle) {
 }
 
 function AssignmentRow({ assignment, index, canRemove, disabled, courses, onChange, onRemove }) {
-  const cycleAnchor = useComboboxAnchor();
-  const selectedCourse = courses.find((course) => course.name === assignment.courseName) ?? null;
+  const selectedCourse = findCourseByName(courses, assignment.courseName);
+  const cycleValue = selectedCourse?.cycle ?? assignment.cycle;
+  const cycleLabel = cycleValue == null ? "Sin asignar" : getCycleLabel(cycleValue);
   const allowedSubShifts = selectedCourse
     ? allowedSubShiftsForCycle(selectedCourse.cycle, assignment.shift, selectedCourse.requiredSpaceType)
     : [];
@@ -475,17 +474,6 @@ function AssignmentRow({ assignment, index, canRemove, disabled, courses, onChan
       onChange(index, "shift", nextShift);
       onChange(index, "subShift", nextSubShift);
     }
-  };
-
-  const handleCycleChange = (cycle) => {
-    const nextAllowedShifts = allowedShiftsForCycle(cycle);
-    const nextShift = assignment.shift && nextAllowedShifts.includes(assignment.shift)
-      ? assignment.shift
-      : getFirstAllowedShift(cycle);
-    const nextSubShift = resolveSubShift(selectedCourse, nextShift, assignment.subShift);
-    onChange(index, "cycle", cycle);
-    onChange(index, "shift", nextShift);
-    onChange(index, "subShift", nextSubShift);
   };
 
   const handleShiftChange = (shift) => {
@@ -526,33 +514,13 @@ function AssignmentRow({ assignment, index, canRemove, disabled, courses, onChan
 
         <div className="flex flex-col gap-2">
           <Label htmlFor={`assignment-cycle-${index}`}>Ciclo</Label>
-          <div ref={cycleAnchor} className="w-full">
-            <Combobox
-              items={CYCLE_OPTIONS.map((item) => item.label)}
-              value={CYCLE_OPTIONS.find((option) => option.id === assignment.cycle)?.label ?? "Sin asignar"}
-              onValueChange={(label) => {
-                const item = CYCLE_OPTIONS.find((option) => option.label === label);
-                handleCycleChange(item?.id ?? null);
-              }}
-              disabled={disabled}
-            >
-              <ComboboxInput
-                id={`assignment-cycle-${index}`}
-                placeholder="Ciclo"
-                readOnly
-              />
-              <ComboboxContent anchor={cycleAnchor}>
-                <ComboboxEmpty>Sin opciones.</ComboboxEmpty>
-                <ComboboxList>
-                  {(label) => (
-                    <ComboboxItem key={label} value={label}>
-                      {label}
-                    </ComboboxItem>
-                  )}
-                </ComboboxList>
-              </ComboboxContent>
-            </Combobox>
-          </div>
+          <Input
+            id={`assignment-cycle-${index}`}
+            value={cycleLabel}
+            readOnly
+            disabled={disabled || !selectedCourse}
+            placeholder="Selecciona un curso"
+          />
         </div>
       </div>
 
