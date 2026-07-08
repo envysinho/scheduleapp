@@ -125,6 +125,38 @@ export async function deleteTeacher(id, onUnauthorized) {
   );
 }
 
+export async function listPracticeHeads(onUnauthorized) {
+  return apiFetch("/api/practice-heads", {}, onUnauthorized);
+}
+
+export async function getPracticeHead(id, onUnauthorized) {
+  return apiFetch(`/api/practice-heads/${id}`, {}, onUnauthorized);
+}
+
+export async function createPracticeHead(data, onUnauthorized) {
+  return apiFetch(
+    "/api/practice-heads",
+    { method: "POST", body: JSON.stringify(data) },
+    onUnauthorized
+  );
+}
+
+export async function updatePracticeHead(id, data, onUnauthorized) {
+  return apiFetch(
+    `/api/practice-heads/${id}`,
+    { method: "PUT", body: JSON.stringify(data) },
+    onUnauthorized
+  );
+}
+
+export async function deletePracticeHead(id, onUnauthorized) {
+  return apiFetch(
+    `/api/practice-heads/${id}`,
+    { method: "DELETE" },
+    onUnauthorized
+  );
+}
+
 function buildSpacesQuery(filters = {}) {
   const params = new URLSearchParams();
   if (filters.spaceType) {

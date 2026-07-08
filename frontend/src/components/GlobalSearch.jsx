@@ -13,20 +13,28 @@ import {
   useComboboxAnchor,
 } from "@/components/ui/combobox";
 import { useAuth } from "@/contexts/AuthContext";
-import { listCourses, listSpaces, listTeachers } from "@/lib/api";
+import { listCourses, listPracticeHeads, listSpaces, listTeachers } from "@/lib/api";
 import { filterSearchItems } from "@/lib/search";
 
-const SEARCH_GROUPS = ["Docentes", "Ambientes", "Cursos"];
+const SEARCH_GROUPS = ["Docentes", "Jefes de Práctica", "Ambientes", "Cursos"];
 const MIN_QUERY_LENGTH = 3;
 const DEBOUNCE_MS = 250;
 
-function buildSearchItems(teachers, spaces, courses) {
+function buildSearchItems(teachers, practiceHeads, spaces, courses) {
   const teacherItems = teachers.map((teacher) => ({
     value: `teacher:${teacher.id}`,
     type: "teacher",
     id: teacher.id,
     label: teacher.fullName,
     group: "Docentes",
+  }));
+
+  const practiceHeadItems = practiceHeads.map((practiceHead) => ({
+    value: `practiceHead:${practiceHead.id}`,
+    type: "practiceHead",
+    id: practiceHead.id,
+    label: practiceHead.fullName,
+    group: "Jefes de Práctica",
   }));
 
   const spaceItems = spaces.map((space) => ({
@@ -45,7 +53,7 @@ function buildSearchItems(teachers, spaces, courses) {
     group: "Cursos",
   }));
 
-  return [...teacherItems, ...spaceItems, ...courseItems];
+  return [...teacherItems, ...practiceHeadItems, ...spaceItems, ...courseItems];
 }
 
 function GlobalSearch({ onSelect }) {
@@ -72,12 +80,13 @@ function GlobalSearch({ onSelect }) {
     setIsLoading(true);
 
     try {
-      const [teachers, spaces, courses] = await Promise.all([
+      const [teachers, practiceHeads, spaces, courses] = await Promise.all([
         listTeachers({}, handleUnauthorized),
+        listPracticeHeads(handleUnauthorized),
         listSpaces({}, handleUnauthorized),
         listCourses({}, handleUnauthorized),
       ]);
-      const built = buildSearchItems(teachers, spaces, courses);
+      const built = buildSearchItems(teachers, practiceHeads, spaces, courses);
       cacheRef.current = built;
       setItems(built);
     } catch {
@@ -202,7 +211,7 @@ function GlobalSearch({ onSelect }) {
         <ComboboxInput
           id="global-search"
           type="search"
-          placeholder="Buscar docentes, ambientes, cursos…"
+          placeholder="Buscar docentes, JP, ambientes, cursos…"
           aria-label="Búsqueda global"
           className="pl-8"
           showTrigger={false}

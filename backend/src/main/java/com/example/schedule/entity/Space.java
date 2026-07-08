@@ -40,7 +40,7 @@ public class Space {
     @Column(nullable = false)
     private SpaceAvailability availability;
 
-    @Column(name = "manager_name", nullable = false)
+    @Column(name = "manager_name")
     private String managerName;
 
     @Column(name = "manager_phone")

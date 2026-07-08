@@ -18,6 +18,7 @@ import Semesters from "@/pages/Semesters";
 
 const PAGE_BY_SEARCH_TYPE = {
   teacher: "teachers",
+  practiceHead: "practiceHeads",
   space: "spaces",
   course: "courses",
 };
@@ -81,7 +82,12 @@ function AppContent() {
           />
         );
       case "practiceHeads":
-        return <PracticeHeads />;
+        return (
+          <PracticeHeads
+            searchFilter={searchFilter}
+            onClearSearchFilter={() => setSearchFilter(null)}
+          />
+        );
       case "rules":
         return isAdmin ? <Rules /> : <Dashboard />;
       case "semesters":

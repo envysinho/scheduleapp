@@ -171,7 +171,7 @@ public class SpaceService {
         space.setName(name.trim());
         space.setSpaceType(spaceType);
         space.setAvailability(availability);
-        space.setManagerName(managerName.trim());
+        space.setManagerName(blankToEmpty(managerName));
         space.setManagerPhone(blankToNull(managerPhone));
     }
 
@@ -249,6 +249,13 @@ public class SpaceService {
     private String blankToNull(String value) {
         if (value == null || value.isBlank()) {
             return null;
+        }
+        return value.trim();
+    }
+
+    private String blankToEmpty(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
         }
         return value.trim();
     }

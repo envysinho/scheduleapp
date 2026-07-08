@@ -14,7 +14,7 @@ public record UpdateSpaceRequest(
         @NotBlank @Size(max = 150) String name,
         @NotNull SpaceType spaceType,
         @NotNull SpaceAvailability availability,
-        @NotBlank @Size(max = 150) String managerName,
+        @Size(max = 150) String managerName,
         @Size(max = 30) String managerPhone,
         @Valid List<SpaceAssignmentRequest> assignments
 ) {
