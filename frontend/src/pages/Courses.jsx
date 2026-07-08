@@ -16,6 +16,7 @@ import {
   useComboboxAnchor,
 } from "@/components/ui/combobox";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSemester } from "@/contexts/SemesterContext";
 import {
   COURSE_AVAILABILITY_FILTERS,
   COURSE_TYPE_FILTERS,
@@ -33,6 +34,7 @@ import { cn } from "@/lib/utils";
 
 function Courses({ searchFilter, onClearSearchFilter }) {
   const { logout, user } = useAuth();
+  const { semester } = useSemester();
   const isAdmin = user?.role === "ADMIN";
 
   const [courses, setCourses] = useState([]);
@@ -70,7 +72,7 @@ function Courses({ searchFilter, onClearSearchFilter }) {
       }
 
       const data = await listCourses(
-        { type, availability, shift, cycle },
+        { semester, type, availability, shift, cycle },
         handleUnauthorized
       );
       setCourses(data);
@@ -87,6 +89,7 @@ function Courses({ searchFilter, onClearSearchFilter }) {
     availability,
     shift,
     cycle,
+    semester,
     isSearchActive,
     searchFilter?.id,
     handleUnauthorized,
@@ -145,9 +148,9 @@ function Courses({ searchFilter, onClearSearchFilter }) {
     setIsSubmitting(true);
     try {
       if (editingCourse?.id) {
-        await updateCourse(editingCourse.id, payload, handleUnauthorized);
+        await updateCourse(editingCourse.id, { ...payload, semester }, handleUnauthorized);
       } else {
-        await createCourse(payload, handleUnauthorized);
+        await createCourse({ ...payload, semester }, handleUnauthorized);
       }
       window.dispatchEvent(new CustomEvent("courses-updated"));
       closeForm();

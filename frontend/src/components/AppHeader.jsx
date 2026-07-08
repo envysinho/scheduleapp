@@ -14,9 +14,9 @@ import {
 } from "@/components/ui/combobox";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSemester } from "@/contexts/SemesterContext";
 import { listNotifications } from "@/lib/api";
-
-const SEMESTER_OPTIONS = ["Semestre 26-I", "Semestre 26-II"];
+import { getSemesterLabel, SEMESTER_OPTIONS } from "@/lib/semesters";
 
 function getSeenStorageKey(user) {
   return `schedule.notifications.seen.${user?.id ?? user?.username ?? "current"}`;
@@ -50,7 +50,7 @@ function formatNotificationDate(value) {
 
 function AppHeader({ isDark, onToggleTheme, onSearchSelect }) {
   const { logout, user } = useAuth();
-  const [semester, setSemester] = useState(SEMESTER_OPTIONS[0]);
+  const { semester, setSemester } = useSemester();
   const [notifications, setNotifications] = useState([]);
   const [notificationsError, setNotificationsError] = useState(null);
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
@@ -174,9 +174,9 @@ function AppHeader({ isDark, onToggleTheme, onSearchSelect }) {
             <ComboboxContent anchor={semesterAnchor}>
               <ComboboxEmpty>Sin opciones.</ComboboxEmpty>
               <ComboboxList>
-                {(label) => (
-                  <ComboboxItem key={label} value={label}>
-                    {label}
+                {(value) => (
+                  <ComboboxItem key={value} value={value}>
+                    {getSemesterLabel(value)}
                   </ComboboxItem>
                 )}
               </ComboboxList>

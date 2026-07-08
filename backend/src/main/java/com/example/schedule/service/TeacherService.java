@@ -26,6 +26,7 @@ import com.example.schedule.model.CourseCategory;
 import com.example.schedule.model.CourseCycleRules;
 import com.example.schedule.model.CourseType;
 import com.example.schedule.model.EmploymentType;
+import com.example.schedule.model.Semester;
 import com.example.schedule.model.SpaceType;
 import com.example.schedule.model.SubShift;
 import com.example.schedule.model.TeacherShift;
@@ -58,8 +59,8 @@ public class TeacherService {
     }
 
     @Transactional(readOnly = true)
-    public List<TeacherResponse> findAll(EmploymentType employmentType, Integer cycle) {
-        return teacherRepository.findByFilters(employmentType, cycle).stream()
+    public List<TeacherResponse> findAll(String semester, EmploymentType employmentType, Integer cycle) {
+        return teacherRepository.findByFilters(Semester.normalize(semester), employmentType, cycle).stream()
                 .map(TeacherResponse::from)
                 .toList();
     }
@@ -71,10 +72,10 @@ public class TeacherService {
 
     @Transactional
     public TeacherResponse create(CreateTeacherRequest request) {
-        validateAssignments(request.employmentType(), request.courseAssignments());
+        validateAssignments(Semester.normalize(request.semester()), request.employmentType(), request.courseAssignments());
         Teacher teacher = new Teacher();
         applyTeacherFields(teacher, request.firstName(), request.lastName(),
-                request.email(), request.phone(), request.employmentType());
+                request.semester(), request.email(), request.phone(), request.employmentType());
         teacher.replaceCourseAssignments(toAssignments(teacher, request.courseAssignments()));
         Teacher saved = teacherRepository.save(teacher);
         syncDerivedCourses(saved);
@@ -85,7 +86,7 @@ public class TeacherService {
 
     @Transactional
     public TeacherResponse update(Long id, UpdateTeacherRequest request) {
-        validateAssignments(request.employmentType(), request.courseAssignments());
+        validateAssignments(Semester.normalize(request.semester()), request.employmentType(), request.courseAssignments());
         Teacher teacher = getTeacherOrThrow(id);
         Set<AssignmentLog> previousAssignments = assignmentLogs(teacher);
         Set<Long> previousCourseIds = teacher.getCourseAssignments().stream()
@@ -107,7 +108,7 @@ public class TeacherService {
         }
 
         applyTeacherFields(teacher, request.firstName(), request.lastName(),
-                request.email(), request.phone(), request.employmentType());
+                request.semester(), request.email(), request.phone(), request.employmentType());
         teacher.replaceCourseAssignments(toAssignments(teacher, request.courseAssignments()));
         Teacher saved = teacherRepository.save(teacher);
         syncDerivedCourses(saved);
@@ -211,6 +212,7 @@ public class TeacherService {
             create(new CreateTeacherRequest(
                     seed.firstName(),
                     seed.lastName(),
+                    Semester.CURRENT,
                     seed.email(),
                     null,
                     EmploymentType.NOMBRADO,
@@ -305,6 +307,19 @@ public class TeacherService {
         try {
             jdbcTemplate.execute("""
                     ALTER TABLE teachers
+                    ADD COLUMN IF NOT EXISTS semester VARCHAR(20)
+                    """);
+            jdbcTemplate.execute("""
+                    UPDATE teachers
+                    SET semester = '26-II'
+                    WHERE semester IS NULL OR semester = ''
+                    """);
+            jdbcTemplate.execute("""
+                    ALTER TABLE teachers
+                    ALTER COLUMN semester SET NOT NULL
+                    """);
+            jdbcTemplate.execute("""
+                    ALTER TABLE teachers
                     DROP CONSTRAINT IF EXISTS teachers_employment_type_check
                     """);
             jdbcTemplate.execute("""
@@ -367,7 +382,8 @@ public class TeacherService {
         }
     }
 
-    private void validateAssignments(EmploymentType employmentType,
+    private void validateAssignments(String semester,
+                                     EmploymentType employmentType,
                                      List<CourseTeacherAssignmentRequest> assignments) {
         CourseCategory expectedCategory = expectedCourseCategory(employmentType);
 
@@ -399,6 +415,11 @@ public class TeacherService {
             Course course = courseRepository.findById(req.courseId())
                     .orElseThrow(() -> new ResponseStatusException(
                             HttpStatus.BAD_REQUEST, "Curso no encontrado: " + req.courseId()));
+            if (!course.getSemester().equals(semester)) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "El curso " + course.getCode() + " no pertenece al semestre " + semester);
+            }
             categories.add(categoryFor(course.getType()));
             if (CourseCycleRules.isNightOnlyCycle(course.getCycle()) && req.shift() != TeacherShift.NOCHE) {
                 throw new ResponseStatusException(
@@ -436,11 +457,13 @@ public class TeacherService {
             Teacher teacher,
             String firstName,
             String lastName,
+            String semester,
             String email,
             String phone,
             EmploymentType employmentType) {
         teacher.setFirstName(firstName.trim());
         teacher.setLastName(lastName.trim());
+        teacher.setSemester(Semester.normalize(semester));
         teacher.setEmail(blankToNull(email));
         teacher.setPhone(blankToNull(phone));
         teacher.setEmploymentType(employmentType);

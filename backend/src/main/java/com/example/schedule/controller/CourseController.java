@@ -19,6 +19,7 @@ import com.example.schedule.dto.CreateCourseRequest;
 import com.example.schedule.dto.UpdateCourseRequest;
 import com.example.schedule.model.CourseAvailability;
 import com.example.schedule.model.CourseType;
+import com.example.schedule.model.Semester;
 import com.example.schedule.model.TeacherShift;
 import com.example.schedule.service.CourseService;
 
@@ -36,11 +37,12 @@ public class CourseController {
 
     @GetMapping
     public List<CourseResponse> listCourses(
+            @RequestParam(required = false) String semester,
             @RequestParam(required = false) CourseType type,
             @RequestParam(required = false) CourseAvailability availability,
             @RequestParam(required = false) TeacherShift shift,
             @RequestParam(required = false) Integer cycle) {
-        return courseService.findAll(type, availability, shift, cycle);
+        return courseService.findAll(Semester.normalize(semester), type, availability, shift, cycle);
     }
 
     @GetMapping("/{id}")

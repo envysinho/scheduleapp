@@ -14,13 +14,15 @@ public interface TeacherRepository extends JpaRepository<Teacher, Long> {
 
     @Query("""
             SELECT t FROM Teacher t
-            WHERE (:employmentType IS NULL OR t.employmentType = :employmentType)
+            WHERE t.semester = :semester
+              AND (:employmentType IS NULL OR t.employmentType = :employmentType)
               AND (:cycle IS NULL OR EXISTS (
                   SELECT 1 FROM t.courseAssignments a WHERE a.course.cycle = :cycle
               ))
             ORDER BY t.lastName ASC, t.firstName ASC
             """)
     List<Teacher> findByFilters(
+            @Param("semester") String semester,
             @Param("employmentType") EmploymentType employmentType,
             @Param("cycle") Integer cycle);
 

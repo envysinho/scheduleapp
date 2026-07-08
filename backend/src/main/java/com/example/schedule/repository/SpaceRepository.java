@@ -17,10 +17,11 @@ public interface SpaceRepository extends JpaRepository<Space, Long> {
             LEFT JOIN s.assignments a
             WHERE (:spaceType IS NULL OR s.spaceType = :spaceType)
               AND (:availability IS NULL OR s.availability = :availability)
-              AND (:cycle IS NULL OR a.cycle = :cycle)
+              AND (:cycle IS NULL OR (a.semester = :semester AND a.cycle = :cycle))
             ORDER BY s.name ASC
             """)
     List<Space> findByFilters(
+            @Param("semester") String semester,
             @Param("spaceType") SpaceType spaceType,
             @Param("availability") SpaceAvailability availability,
             @Param("cycle") Integer cycle);

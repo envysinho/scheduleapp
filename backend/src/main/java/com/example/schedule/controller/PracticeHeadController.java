@@ -10,12 +10,14 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.schedule.dto.CreatePracticeHeadRequest;
 import com.example.schedule.dto.PracticeHeadResponse;
 import com.example.schedule.dto.UpdatePracticeHeadRequest;
+import com.example.schedule.model.Semester;
 import com.example.schedule.service.PracticeHeadService;
 
 import jakarta.validation.Valid;
@@ -31,8 +33,8 @@ public class PracticeHeadController {
     }
 
     @GetMapping
-    public List<PracticeHeadResponse> listPracticeHeads() {
-        return practiceHeadService.findAll();
+    public List<PracticeHeadResponse> listPracticeHeads(@RequestParam(required = false) String semester) {
+        return practiceHeadService.findAll(Semester.normalize(semester));
     }
 
     @GetMapping("/{id}")

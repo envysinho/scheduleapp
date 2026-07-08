@@ -16,6 +16,7 @@ import {
   useComboboxAnchor,
 } from "@/components/ui/combobox";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSemester } from "@/contexts/SemesterContext";
 import {
   CYCLE_FILTERS,
   EMPLOYMENT_TYPE_FILTERS,
@@ -31,6 +32,7 @@ import { cn } from "@/lib/utils";
 
 function Teachers({ searchFilter, onClearSearchFilter }) {
   const { logout, user } = useAuth();
+  const { semester } = useSemester();
   const isAdmin = user?.role === "ADMIN";
 
   const [teachers, setTeachers] = useState([]);
@@ -66,7 +68,7 @@ function Teachers({ searchFilter, onClearSearchFilter }) {
       }
 
       const data = await listTeachers(
-        { employmentType, cycle },
+        { semester, employmentType, cycle },
         handleUnauthorized
       );
       setTeachers(data);
@@ -81,6 +83,7 @@ function Teachers({ searchFilter, onClearSearchFilter }) {
   }, [
     employmentType,
     cycle,
+    semester,
     isSearchActive,
     searchFilter?.id,
     handleUnauthorized,
@@ -137,9 +140,9 @@ function Teachers({ searchFilter, onClearSearchFilter }) {
     setIsSubmitting(true);
     try {
       if (editingTeacher?.id) {
-        await updateTeacher(editingTeacher.id, payload, handleUnauthorized);
+        await updateTeacher(editingTeacher.id, { ...payload, semester }, handleUnauthorized);
       } else {
-        await createTeacher(payload, handleUnauthorized);
+        await createTeacher({ ...payload, semester }, handleUnauthorized);
       }
       window.dispatchEvent(new CustomEvent("teachers-updated"));
       closeForm();
@@ -210,6 +213,7 @@ function Teachers({ searchFilter, onClearSearchFilter }) {
           isSubmitting={isSubmitting}
           error={formError}
           onUnauthorized={handleUnauthorized}
+          semester={semester}
         />
       ) : (
         <div className="flex flex-col gap-6">

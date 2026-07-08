@@ -18,6 +18,7 @@ import com.example.schedule.dto.CreateTeacherRequest;
 import com.example.schedule.dto.TeacherResponse;
 import com.example.schedule.dto.UpdateTeacherRequest;
 import com.example.schedule.model.EmploymentType;
+import com.example.schedule.model.Semester;
 import com.example.schedule.service.TeacherService;
 
 import jakarta.validation.Valid;
@@ -34,9 +35,10 @@ public class TeacherController {
 
     @GetMapping
     public List<TeacherResponse> listTeachers(
+            @RequestParam(required = false) String semester,
             @RequestParam(required = false) EmploymentType employmentType,
             @RequestParam(required = false) Integer cycle) {
-        return teacherService.findAll(employmentType, cycle);
+        return teacherService.findAll(Semester.normalize(semester), employmentType, cycle);
     }
 
     @GetMapping("/{id}")

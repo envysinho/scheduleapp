@@ -6,6 +6,7 @@ import PracticeHeadCard from "@/components/practice-heads/PracticeHeadCard";
 import PracticeHeadForm from "@/components/practice-heads/PracticeHeadForm";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSemester } from "@/contexts/SemesterContext";
 import {
   createPracticeHead,
   deletePracticeHead,
@@ -17,6 +18,7 @@ import { cn } from "@/lib/utils";
 
 function PracticeHeads({ searchFilter, onClearSearchFilter }) {
   const { logout, user } = useAuth();
+  const { semester } = useSemester();
   const isAdmin = user?.role === "ADMIN";
 
   const [practiceHeads, setPracticeHeads] = useState([]);
@@ -45,7 +47,7 @@ function PracticeHeads({ searchFilter, onClearSearchFilter }) {
         return;
       }
 
-      const data = await listPracticeHeads(handleUnauthorized);
+      const data = await listPracticeHeads({ semester }, handleUnauthorized);
       setPracticeHeads(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar jefes de práctica");
@@ -55,7 +57,7 @@ function PracticeHeads({ searchFilter, onClearSearchFilter }) {
     } finally {
       setIsLoading(false);
     }
-  }, [isSearchActive, searchFilter?.id, handleUnauthorized]);
+  }, [isSearchActive, searchFilter?.id, semester, handleUnauthorized]);
 
   useEffect(() => {
     if (pageView === "list") {
@@ -96,9 +98,9 @@ function PracticeHeads({ searchFilter, onClearSearchFilter }) {
     setIsSubmitting(true);
     try {
       if (editingPracticeHead?.id) {
-        await updatePracticeHead(editingPracticeHead.id, payload, handleUnauthorized);
+        await updatePracticeHead(editingPracticeHead.id, { ...payload, semester }, handleUnauthorized);
       } else {
-        await createPracticeHead(payload, handleUnauthorized);
+        await createPracticeHead({ ...payload, semester }, handleUnauthorized);
       }
       closeForm();
     } catch (err) {

@@ -14,6 +14,7 @@ public record CreateSpaceRequest(
         @NotBlank @Size(max = 150) String name,
         @NotNull SpaceType spaceType,
         @NotNull SpaceAvailability availability,
+        @Size(max = 20) String semester,
         @Size(max = 150) String managerName,
         @Size(max = 30) String managerPhone,
         @Valid List<SpaceAssignmentRequest> assignments

@@ -15,6 +15,7 @@ import jakarta.validation.constraints.Size;
 public record CreateCourseRequest(
         @NotBlank @Size(max = 200) String name,
         @NotBlank @Size(max = 50) String code,
+        @Size(max = 20) String semester,
         @NotNull CourseType type,
         @NotNull Boolean lectivo,
         @NotNull @Min(1) @Max(10) Integer cycle,

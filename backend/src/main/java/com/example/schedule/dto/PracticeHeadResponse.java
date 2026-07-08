@@ -9,6 +9,7 @@ public record PracticeHeadResponse(
         String firstName,
         String lastName,
         String fullName,
+        String semester,
         String email,
         String phone,
         List<PracticeHeadLabAssignmentResponse> labAssignments
@@ -20,6 +21,7 @@ public record PracticeHeadResponse(
                 practiceHead.getFirstName(),
                 practiceHead.getLastName(),
                 practiceHead.getFirstName() + " " + practiceHead.getLastName(),
+                practiceHead.getSemester(),
                 practiceHead.getEmail(),
                 practiceHead.getPhone(),
                 practiceHead.getLabAssignments().stream()

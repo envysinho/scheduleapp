@@ -14,6 +14,7 @@ import {
   useComboboxAnchor,
 } from "@/components/ui/combobox";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSemester } from "@/contexts/SemesterContext";
 import { listCourses, listPracticeHeads } from "@/lib/api";
 import { normalizeSearchText } from "@/lib/search";
 import {
@@ -81,6 +82,7 @@ function findCourseByName(courses, courseName) {
 
 function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
   const { logout } = useAuth();
+  const { semester } = useSemester();
   const [form, setForm] = useState(EMPTY_FORM);
   const [courses, setCourses] = useState([]);
   const [practiceHeads, setPracticeHeads] = useState([]);
@@ -93,7 +95,7 @@ function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
   useEffect(() => {
     let cancelled = false;
     setIsLoadingCourses(true);
-    listCourses({}, logout)
+    listCourses({ semester }, logout)
       .then((data) => {
         if (!cancelled) {
           setCourses(data ?? []);
@@ -112,7 +114,7 @@ function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
     return () => {
       cancelled = true;
     };
-  }, [logout]);
+  }, [semester, logout]);
 
   useEffect(() => {
     setForm(spaceToForm(space));
@@ -121,7 +123,7 @@ function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
   useEffect(() => {
     let cancelled = false;
     setIsLoadingPracticeHeads(true);
-    listPracticeHeads(logout)
+    listPracticeHeads({ semester }, logout)
       .then((data) => {
         if (!cancelled) {
           setPracticeHeads(data ?? []);
@@ -140,7 +142,7 @@ function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
     return () => {
       cancelled = true;
     };
-  }, [logout]);
+  }, [semester, logout]);
 
   useEffect(() => {
     if (!form.managerName || isLoadingPracticeHeads) {

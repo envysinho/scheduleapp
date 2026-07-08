@@ -34,6 +34,9 @@ public class Teacher {
     @Column(name = "last_name", nullable = false)
     private String lastName;
 
+    @Column(nullable = false, length = 20)
+    private String semester = "26-II";
+
     @Column
     private String email;
 
@@ -77,6 +80,14 @@ public class Teacher {
 
     public void setLastName(String lastName) {
         this.lastName = lastName;
+    }
+
+    public String getSemester() {
+        return semester;
+    }
+
+    public void setSemester(String semester) {
+        this.semester = semester;
     }
 
     public String getEmail() {

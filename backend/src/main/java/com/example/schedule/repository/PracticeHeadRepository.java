@@ -9,4 +9,6 @@ import com.example.schedule.entity.PracticeHead;
 public interface PracticeHeadRepository extends JpaRepository<PracticeHead, Long> {
 
     List<PracticeHead> findAllByOrderByLastNameAscFirstNameAsc();
+
+    List<PracticeHead> findBySemesterOrderByLastNameAscFirstNameAsc(String semester);
 }

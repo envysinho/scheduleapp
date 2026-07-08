@@ -19,11 +19,13 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             LEFT JOIN FETCH c.nightTeacher
             LEFT JOIN FETCH c.spaceAssignments sa
             LEFT JOIN FETCH sa.space
-            WHERE (:type IS NULL OR c.type = :type)
+            WHERE c.semester = :semester
+              AND (:type IS NULL OR c.type = :type)
               AND (:cycle IS NULL OR c.cycle = :cycle)
             ORDER BY c.cycle ASC, c.name ASC
             """)
     List<Course> findByFilters(
+            @Param("semester") String semester,
             @Param("type") CourseType type,
             @Param("cycle") Integer cycle);
 
@@ -39,7 +41,13 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
 
     Optional<Course> findByName(String name);
 
+    Optional<Course> findByNameAndSemester(String name, String semester);
+
     boolean existsByCode(String code);
 
     boolean existsByCodeAndIdNot(String code, Long id);
+
+    boolean existsByCodeAndSemester(String code, String semester);
+
+    boolean existsByCodeAndSemesterAndIdNot(String code, String semester, Long id);
 }

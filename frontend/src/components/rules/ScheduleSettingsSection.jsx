@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSemester } from "@/contexts/SemesterContext";
 import { getScheduleSettings, updateScheduleSettings } from "@/lib/api";
 import { cloneDefaultBlocks } from "@/lib/scheduleDefaults";
 import { validateScheduleBlocks } from "@/lib/scheduleTime";
 
 function ScheduleSettingsSection() {
   const { logout } = useAuth();
+  const { semester } = useSemester();
   const [blocks, setBlocks] = useState(cloneDefaultBlocks());
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -26,7 +28,7 @@ function ScheduleSettingsSection() {
     setError(null);
     setIsLoading(true);
     try {
-      const data = await getScheduleSettings(handleUnauthorized);
+      const data = await getScheduleSettings({ semester }, handleUnauthorized);
       setBlocks(data.blocks.map((block) => ({ ...block })));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar horarios");
@@ -34,7 +36,7 @@ function ScheduleSettingsSection() {
     } finally {
       setIsLoading(false);
     }
-  }, [handleUnauthorized]);
+  }, [semester, handleUnauthorized]);
 
   useEffect(() => {
     loadSettings();
@@ -52,7 +54,7 @@ function ScheduleSettingsSection() {
     setSuccessMessage(null);
     setIsSaving(true);
     try {
-      const data = await updateScheduleSettings({ blocks }, handleUnauthorized);
+      const data = await updateScheduleSettings({ blocks }, { semester }, handleUnauthorized);
       setBlocks(data.blocks.map((block) => ({ ...block })));
       setSuccessMessage("Horarios guardados correctamente.");
     } catch (err) {
@@ -69,7 +71,7 @@ function ScheduleSettingsSection() {
     setSuccessMessage(null);
     setIsSaving(true);
     try {
-      const data = await updateScheduleSettings({ blocks: defaults }, handleUnauthorized);
+      const data = await updateScheduleSettings({ blocks: defaults }, { semester }, handleUnauthorized);
       setBlocks(data.blocks.map((block) => ({ ...block })));
       setSuccessMessage("Horarios restaurados a los valores EPIS.");
     } catch (err) {

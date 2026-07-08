@@ -37,8 +37,11 @@ public class Course {
     @Column(nullable = false)
     private String name;
 
-    @Column(nullable = false, unique = true, length = 50)
+    @Column(nullable = false, length = 50)
     private String code;
+
+    @Column(nullable = false, length = 20)
+    private String semester = "26-II";
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -102,6 +105,14 @@ public class Course {
 
     public void setCode(String code) {
         this.code = code;
+    }
+
+    public String getSemester() {
+        return semester;
+    }
+
+    public void setSemester(String semester) {
+        this.semester = semester;
     }
 
     public CourseType getType() {

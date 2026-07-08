@@ -6,6 +6,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -17,6 +18,7 @@ import com.example.schedule.dto.UpdateSpaceRequest;
 import com.example.schedule.entity.Space;
 import com.example.schedule.entity.SpaceAssignment;
 import com.example.schedule.model.CourseCycleRules;
+import com.example.schedule.model.Semester;
 import com.example.schedule.model.SpaceAvailability;
 import com.example.schedule.model.SpaceType;
 import com.example.schedule.model.SubShift;
@@ -30,56 +32,61 @@ public class SpaceService {
     private final SpaceRepository spaceRepository;
     private final CourseRepository courseRepository;
     private final NotificationService notificationService;
+    private final JdbcTemplate jdbcTemplate;
 
     public SpaceService(
             SpaceRepository spaceRepository,
             CourseRepository courseRepository,
-            NotificationService notificationService) {
+            NotificationService notificationService,
+            JdbcTemplate jdbcTemplate) {
         this.spaceRepository = spaceRepository;
         this.courseRepository = courseRepository;
         this.notificationService = notificationService;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Transactional(readOnly = true)
     public List<SpaceResponse> findAll(
+            String semester,
             SpaceType spaceType,
             SpaceAvailability availability,
             Integer cycle) {
-        return spaceRepository.findByFilters(spaceType, availability, cycle).stream()
-                .map(SpaceResponse::from)
+        String normalizedSemester = Semester.normalize(semester);
+        return spaceRepository.findByFilters(normalizedSemester, spaceType, availability, cycle).stream()
+                .map(space -> SpaceResponse.from(space, normalizedSemester))
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public SpaceResponse findById(Long id) {
-        return SpaceResponse.from(getSpaceOrThrow(id));
+    public SpaceResponse findById(Long id, String semester) {
+        return SpaceResponse.from(getSpaceOrThrow(id), Semester.normalize(semester));
     }
 
     @Transactional
     public SpaceResponse create(CreateSpaceRequest request) {
-        validateAssignments(request.assignments());
+        validateAssignments(request.assignments(), request.semester());
         Space space = new Space();
         applySpaceFields(space, request.name(), request.spaceType(), request.availability(),
                 request.managerName(), request.managerPhone());
-        space.replaceAssignments(toAssignments(request.assignments()));
+        replaceAssignmentsForSemester(space, toAssignments(request.assignments(), request.semester()), request.semester());
         Space saved = spaceRepository.save(space);
         notificationService.record("agregó el ambiente " + saved.getName());
-        logAssignmentChanges(saved, Set.of(), assignmentLogs(saved));
-        return SpaceResponse.from(saved);
+        logAssignmentChanges(saved, Set.of(), assignmentLogs(saved, request.semester()));
+        return SpaceResponse.from(saved, Semester.normalize(request.semester()));
     }
 
     @Transactional
     public SpaceResponse update(Long id, UpdateSpaceRequest request) {
-        validateAssignments(request.assignments());
+        validateAssignments(request.assignments(), request.semester());
         Space space = getSpaceOrThrow(id);
-        Set<AssignmentLog> previousAssignments = assignmentLogs(space);
+        Set<AssignmentLog> previousAssignments = assignmentLogs(space, request.semester());
         applySpaceFields(space, request.name(), request.spaceType(), request.availability(),
                 request.managerName(), request.managerPhone());
-        space.replaceAssignments(toAssignments(request.assignments()));
+        replaceAssignmentsForSemester(space, toAssignments(request.assignments(), request.semester()), request.semester());
         Space saved = spaceRepository.save(space);
         notificationService.record("actualizó el ambiente " + saved.getName());
-        logAssignmentChanges(saved, previousAssignments, assignmentLogs(saved));
-        return SpaceResponse.from(saved);
+        logAssignmentChanges(saved, previousAssignments, assignmentLogs(saved, request.semester()));
+        return SpaceResponse.from(saved, Semester.normalize(request.semester()));
     }
 
     @Transactional
@@ -125,6 +132,7 @@ public class SpaceService {
                     "Aula " + i,
                     SpaceType.AULA,
                     aulaAvailabilities[i - 1],
+                    Semester.CURRENT,
                     encargados[i - 1],
                     phones[i - 1],
                     List.of(
@@ -170,11 +178,32 @@ public class SpaceService {
                     "Lab " + i,
                     SpaceType.LABORATORIO,
                     labAvailabilities[i - 1],
+                    Semester.CURRENT,
                     labEncargados[i - 1],
                     labPhones[i - 1],
                     List.of(
                             new SpaceAssignmentRequest("Programación I", ((i - 1) % 10) + 1, null, null),
                             new SpaceAssignmentRequest("Química Orgánica", ((i + 1) % 10) + 1, null, null))));
+        }
+    }
+
+    @Transactional
+    public void migrateAssignmentSemestersIfNeeded() {
+        try {
+            jdbcTemplate.execute("""
+                    ALTER TABLE space_assignments
+                    ADD COLUMN IF NOT EXISTS semester VARCHAR(20)
+                    """);
+            jdbcTemplate.execute("""
+                    UPDATE space_assignments
+                    SET semester = '26-II'
+                    WHERE semester IS NULL OR semester = ''
+                    """);
+            jdbcTemplate.execute("""
+                    ALTER TABLE space_assignments
+                    ALTER COLUMN semester SET NOT NULL
+                    """);
+        } catch (Exception ignored) {
         }
     }
 
@@ -192,15 +221,17 @@ public class SpaceService {
         space.setManagerPhone(blankToNull(managerPhone));
     }
 
-    private List<SpaceAssignment> toAssignments(List<SpaceAssignmentRequest> requests) {
+    private List<SpaceAssignment> toAssignments(List<SpaceAssignmentRequest> requests, String semester) {
+        String normalizedSemester = Semester.normalize(semester);
         return requests.stream()
-                .map(this::toAssignment)
+                .map(request -> toAssignment(request, normalizedSemester))
                 .toList();
     }
 
-    private SpaceAssignment toAssignment(SpaceAssignmentRequest request) {
+    private SpaceAssignment toAssignment(SpaceAssignmentRequest request, String semester) {
         SpaceAssignment assignment = new SpaceAssignment();
         assignment.setCourseName(request.courseName().trim());
+        assignment.setSemester(semester);
         assignment.setCycle(request.cycle());
         assignment.setShift(request.shift());
         assignment.setSubShift(resolveSubShift(request));
@@ -211,8 +242,19 @@ public class SpaceService {
         return request.subShift();
     }
 
-    private Set<AssignmentLog> assignmentLogs(Space space) {
+    private void replaceAssignmentsForSemester(Space space, List<SpaceAssignment> newAssignments, String semester) {
+        String normalizedSemester = Semester.normalize(semester);
+        space.getAssignments().removeIf(assignment -> normalizedSemester.equals(assignment.getSemester()));
+        for (SpaceAssignment assignment : newAssignments) {
+            assignment.setSpace(space);
+            space.getAssignments().add(assignment);
+        }
+    }
+
+    private Set<AssignmentLog> assignmentLogs(Space space, String semester) {
+        String normalizedSemester = Semester.normalize(semester);
         return space.getAssignments().stream()
+                .filter(assignment -> normalizedSemester.equals(assignment.getSemester()))
                 .map(assignment -> new AssignmentLog(
                         assignment.getCourseName(),
                         assignment.getCycle(),
@@ -249,7 +291,8 @@ public class SpaceService {
         return " (" + shift + ")";
     }
 
-    private void validateAssignments(List<SpaceAssignmentRequest> requests) {
+    private void validateAssignments(List<SpaceAssignmentRequest> requests, String semester) {
+        String normalizedSemester = Semester.normalize(semester);
         for (SpaceAssignmentRequest request : requests) {
             Integer cycle = request.cycle();
             TeacherShift shift = request.shift();
@@ -266,15 +309,15 @@ public class SpaceService {
                         HttpStatus.BAD_REQUEST,
                         "El curso asignado es de ciclo diurno (I–VIII), solo turnos MAÑANA o TARDE");
             }
-            validateSubShift(request);
+            validateSubShift(request, normalizedSemester);
         }
     }
 
-    private void validateSubShift(SpaceAssignmentRequest request) {
+    private void validateSubShift(SpaceAssignmentRequest request, String semester) {
         if (request.cycle() == null || request.shift() == null) {
             return;
         }
-        var course = courseRepository.findByName(request.courseName().trim()).orElse(null);
+        var course = courseRepository.findByNameAndSemester(request.courseName().trim(), semester).orElse(null);
         var requiredSpaceType = course != null ? course.getRequiredSpaceType() : null;
         List<SubShift> allowed = CourseCycleRules.allowedSubShiftsForCycle(
                 request.cycle(), request.shift(), requiredSpaceType);

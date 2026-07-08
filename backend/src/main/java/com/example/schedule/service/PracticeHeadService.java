@@ -6,6 +6,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -17,6 +18,7 @@ import com.example.schedule.dto.UpdatePracticeHeadRequest;
 import com.example.schedule.entity.PracticeHead;
 import com.example.schedule.entity.PracticeHeadLabAssignment;
 import com.example.schedule.entity.Space;
+import com.example.schedule.model.Semester;
 import com.example.schedule.model.SpaceType;
 import com.example.schedule.repository.PracticeHeadRepository;
 import com.example.schedule.repository.SpaceRepository;
@@ -27,19 +29,22 @@ public class PracticeHeadService {
     private final PracticeHeadRepository practiceHeadRepository;
     private final SpaceRepository spaceRepository;
     private final NotificationService notificationService;
+    private final JdbcTemplate jdbcTemplate;
 
     public PracticeHeadService(
             PracticeHeadRepository practiceHeadRepository,
             SpaceRepository spaceRepository,
-            NotificationService notificationService) {
+            NotificationService notificationService,
+            JdbcTemplate jdbcTemplate) {
         this.practiceHeadRepository = practiceHeadRepository;
         this.spaceRepository = spaceRepository;
         this.notificationService = notificationService;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Transactional(readOnly = true)
-    public List<PracticeHeadResponse> findAll() {
-        return practiceHeadRepository.findAllByOrderByLastNameAscFirstNameAsc().stream()
+    public List<PracticeHeadResponse> findAll(String semester) {
+        return practiceHeadRepository.findBySemesterOrderByLastNameAscFirstNameAsc(Semester.normalize(semester)).stream()
                 .map(PracticeHeadResponse::from)
                 .toList();
     }
@@ -54,7 +59,7 @@ public class PracticeHeadService {
         validateAssignments(request.labAssignments());
         PracticeHead practiceHead = new PracticeHead();
         applyPracticeHeadFields(practiceHead, request.firstName(), request.lastName(),
-                request.email(), request.phone());
+                request.semester(), request.email(), request.phone());
         practiceHead.replaceLabAssignments(toAssignments(request.labAssignments()));
         PracticeHead saved = practiceHeadRepository.save(practiceHead);
         notificationService.record("agregó al jefe de práctica " + practiceHeadName(saved));
@@ -68,7 +73,7 @@ public class PracticeHeadService {
         PracticeHead practiceHead = getPracticeHeadOrThrow(id);
         Set<AssignmentLog> previousAssignments = assignmentLogs(practiceHead);
         applyPracticeHeadFields(practiceHead, request.firstName(), request.lastName(),
-                request.email(), request.phone());
+                request.semester(), request.email(), request.phone());
         practiceHead.replaceLabAssignments(toAssignments(request.labAssignments()));
         PracticeHead saved = practiceHeadRepository.save(practiceHead);
         notificationService.record("actualizó al jefe de práctica " + practiceHeadName(saved));
@@ -82,6 +87,26 @@ public class PracticeHeadService {
         String deletedName = practiceHeadName(practiceHead);
         practiceHeadRepository.delete(practiceHead);
         notificationService.record("eliminó al jefe de práctica " + deletedName);
+    }
+
+    @Transactional
+    public void migrateSemestersIfNeeded() {
+        try {
+            jdbcTemplate.execute("""
+                    ALTER TABLE practice_heads
+                    ADD COLUMN IF NOT EXISTS semester VARCHAR(20)
+                    """);
+            jdbcTemplate.execute("""
+                    UPDATE practice_heads
+                    SET semester = '26-II'
+                    WHERE semester IS NULL OR semester = ''
+                    """);
+            jdbcTemplate.execute("""
+                    ALTER TABLE practice_heads
+                    ALTER COLUMN semester SET NOT NULL
+                    """);
+        } catch (Exception ignored) {
+        }
     }
 
     private String practiceHeadName(PracticeHead practiceHead) {
@@ -154,10 +179,12 @@ public class PracticeHeadService {
             PracticeHead practiceHead,
             String firstName,
             String lastName,
+            String semester,
             String email,
             String phone) {
         practiceHead.setFirstName(firstName.trim());
         practiceHead.setLastName(lastName.trim());
+        practiceHead.setSemester(Semester.normalize(semester));
         practiceHead.setEmail(blankToNull(email));
         practiceHead.setPhone(blankToNull(phone));
     }

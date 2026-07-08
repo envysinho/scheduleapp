@@ -5,6 +5,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
 import com.example.schedule.service.CourseService;
+import com.example.schedule.service.PracticeHeadService;
 import com.example.schedule.service.ScheduleSettingsService;
 import com.example.schedule.service.SpaceService;
 import com.example.schedule.service.TeacherService;
@@ -17,6 +18,7 @@ public class DataInitializer implements ApplicationRunner {
     private final TeacherService teacherService;
     private final SpaceService spaceService;
     private final CourseService courseService;
+    private final PracticeHeadService practiceHeadService;
     private final ScheduleSettingsService scheduleSettingsService;
 
     public DataInitializer(
@@ -24,11 +26,13 @@ public class DataInitializer implements ApplicationRunner {
             TeacherService teacherService,
             SpaceService spaceService,
             CourseService courseService,
+            PracticeHeadService practiceHeadService,
             ScheduleSettingsService scheduleSettingsService) {
         this.userService = userService;
         this.teacherService = teacherService;
         this.spaceService = spaceService;
         this.courseService = courseService;
+        this.practiceHeadService = practiceHeadService;
         this.scheduleSettingsService = scheduleSettingsService;
     }
 
@@ -39,6 +43,8 @@ public class DataInitializer implements ApplicationRunner {
         teacherService.migrateEmploymentTypesIfNeeded();
         teacherService.migrateLegacyShiftsIfNeeded();
         teacherService.migrateSubShiftConstraintIfNeeded();
+        practiceHeadService.migrateSemestersIfNeeded();
+        spaceService.migrateAssignmentSemestersIfNeeded();
         spaceService.seedDemoIfEmpty();
         courseService.migrateLectivosIfNeeded();
         courseService.migrateCourseCodesIfNeeded();

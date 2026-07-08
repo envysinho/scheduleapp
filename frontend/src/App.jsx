@@ -4,6 +4,7 @@ import AppSidebar from "@/components/AppSidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { SemesterProvider, useSemester } from "@/contexts/SemesterContext";
 import { useTheme } from "@/hooks/useTheme";
 import Dashboard from "@/pages/Dashboard";
 import Teachers from "@/pages/Teachers";
@@ -28,6 +29,7 @@ function AppContent() {
   const [searchFilter, setSearchFilter] = useState(null);
   const { isDark, toggleTheme } = useTheme();
   const { isAuthenticated, user } = useAuth();
+  const { semester } = useSemester();
   const isAdmin = user?.role === "ADMIN";
 
   useEffect(() => {
@@ -40,6 +42,10 @@ function AppContent() {
       setCurrentPage("dashboard");
     }
   }, [currentPage, isAdmin]);
+
+  useEffect(() => {
+    setSearchFilter(null);
+  }, [semester]);
 
   const handleNavigate = (page) => {
     if (searchFilter) {
@@ -130,7 +136,9 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <SemesterProvider>
+        <AppContent />
+      </SemesterProvider>
     </AuthProvider>
   );
 }

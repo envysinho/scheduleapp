@@ -25,6 +25,9 @@ public class SpaceAssignment {
     @Column(name = "course_name", nullable = false)
     private String courseName;
 
+    @Column(nullable = false, length = 20)
+    private String semester = "26-II";
+
     private Integer cycle;
 
     @Enumerated(EnumType.STRING)
@@ -52,6 +55,14 @@ public class SpaceAssignment {
 
     public void setCourseName(String courseName) {
         this.courseName = courseName;
+    }
+
+    public String getSemester() {
+        return semester;
+    }
+
+    public void setSemester(String semester) {
+        this.semester = semester;
     }
 
     public Integer getCycle() {

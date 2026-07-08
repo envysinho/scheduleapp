@@ -62,7 +62,7 @@ function teacherToForm(teacher) {
   };
 }
 
-function TeacherForm({ teacher, onSubmit, onCancel, isSubmitting, error, onUnauthorized }) {
+function TeacherForm({ teacher, onSubmit, onCancel, isSubmitting, error, onUnauthorized, semester }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [courses, setCourses] = useState([]);
 
@@ -70,12 +70,12 @@ function TeacherForm({ teacher, onSubmit, onCancel, isSubmitting, error, onUnaut
 
   const loadCourses = useCallback(async () => {
     try {
-      const data = await listCourses({}, onUnauthorized);
+      const data = await listCourses({ semester }, onUnauthorized);
       setCourses(data);
     } catch (err) {
       // ignore — keep previous list
     }
-  }, [onUnauthorized]);
+  }, [semester, onUnauthorized]);
 
   useEffect(() => {
     setForm(teacherToForm(teacher));

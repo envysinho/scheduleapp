@@ -7,6 +7,7 @@ import com.example.schedule.model.TeacherShift;
 public record SpaceAssignmentResponse(
         Long id,
         String courseName,
+        String semester,
         Integer cycle,
         TeacherShift shift,
         SubShift subShift
@@ -16,6 +17,7 @@ public record SpaceAssignmentResponse(
         return new SpaceAssignmentResponse(
                 assignment.getId(),
                 assignment.getCourseName(),
+                assignment.getSemester(),
                 assignment.getCycle(),
                 assignment.getShift(),
                 assignment.getSubShift());

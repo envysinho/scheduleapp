@@ -13,6 +13,7 @@ import {
   useComboboxAnchor,
 } from "@/components/ui/combobox";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSemester } from "@/contexts/SemesterContext";
 import { listCourses, listPracticeHeads, listSpaces, listTeachers } from "@/lib/api";
 import { filterSearchItems } from "@/lib/search";
 
@@ -58,6 +59,7 @@ function buildSearchItems(teachers, practiceHeads, spaces, courses) {
 
 function GlobalSearch({ onSelect }) {
   const { logout } = useAuth();
+  const { semester } = useSemester();
   const anchor = useComboboxAnchor();
   const cacheRef = useRef(null);
   const debounceRef = useRef(null);
@@ -81,10 +83,10 @@ function GlobalSearch({ onSelect }) {
 
     try {
       const [teachers, practiceHeads, spaces, courses] = await Promise.all([
-        listTeachers({}, handleUnauthorized),
-        listPracticeHeads(handleUnauthorized),
+        listTeachers({ semester }, handleUnauthorized),
+        listPracticeHeads({ semester }, handleUnauthorized),
         listSpaces({}, handleUnauthorized),
-        listCourses({}, handleUnauthorized),
+        listCourses({ semester }, handleUnauthorized),
       ]);
       const built = buildSearchItems(teachers, practiceHeads, spaces, courses);
       cacheRef.current = built;
@@ -94,7 +96,12 @@ function GlobalSearch({ onSelect }) {
     } finally {
       setIsLoading(false);
     }
-  }, [handleUnauthorized]);
+  }, [semester, handleUnauthorized]);
+
+  useEffect(() => {
+    cacheRef.current = null;
+    setItems([]);
+  }, [semester]);
 
   useEffect(() => {
     return () => {

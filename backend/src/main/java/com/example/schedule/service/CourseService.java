@@ -25,6 +25,7 @@ import com.example.schedule.entity.Teacher;
 import com.example.schedule.model.CourseAvailability;
 import com.example.schedule.model.CourseCycleRules;
 import com.example.schedule.model.CourseType;
+import com.example.schedule.model.Semester;
 import com.example.schedule.model.SpaceType;
 import com.example.schedule.model.TeacherShift;
 import com.example.schedule.repository.CourseRepository;
@@ -62,11 +63,12 @@ public class CourseService {
 
     @Transactional(readOnly = true)
     public List<CourseResponse> findAll(
+            String semester,
             CourseType type,
             CourseAvailability availability,
             TeacherShift shift,
             Integer cycle) {
-        return courseRepository.findByFilters(type, cycle).stream()
+        return courseRepository.findByFilters(Semester.normalize(semester), type, cycle).stream()
                 .filter(course -> matchesShift(course, shift))
                 .filter(course -> matchesAvailability(course, availability))
                 .map(CourseResponse::from)
@@ -99,12 +101,13 @@ public class CourseService {
 
     @Transactional
     public CourseResponse create(CreateCourseRequest request) {
-        ensureUniqueCode(request.code(), null);
+        ensureUniqueCode(request.code(), request.semester(), null);
         Course course = new Course();
         applyCourseFields(
                 course,
                 request.name(),
                 request.code(),
+                request.semester(),
                 request.type(),
                 request.lectivo(),
                 request.cycle(),
@@ -122,7 +125,7 @@ public class CourseService {
 
     @Transactional
     public CourseResponse update(Long id, UpdateCourseRequest request) {
-        ensureUniqueCode(request.code(), id);
+        ensureUniqueCode(request.code(), request.semester(), id);
         Course course = getCourseOrThrow(id);
         Set<TeacherAssignmentLog> previousTeachers = teacherAssignmentLogs(course);
         Set<SpaceAssignmentLog> previousSpaces = spaceAssignmentLogs(course);
@@ -141,6 +144,7 @@ public class CourseService {
                 course,
                 request.name(),
                 request.code(),
+                request.semester(),
                 request.type(),
                 request.lectivo(),
                 request.cycle(),
@@ -174,6 +178,7 @@ public class CourseService {
             create(new CreateCourseRequest(
                     seed.name(),
                     seed.code(),
+                    Semester.CURRENT,
                     seed.type(),
                     seed.lectivo(),
                     seed.cycle(),
@@ -198,6 +203,15 @@ public class CourseService {
                     ALTER TABLE courses
                     ADD COLUMN IF NOT EXISTS code VARCHAR(50)
                     """);
+            jdbcTemplate.execute("""
+                    ALTER TABLE courses
+                    ADD COLUMN IF NOT EXISTS semester VARCHAR(20)
+                    """);
+            jdbcTemplate.execute("""
+                    UPDATE courses
+                    SET semester = '26-II'
+                    WHERE semester IS NULL OR semester = ''
+                    """);
             for (Map.Entry<String, String> entry : COURSE_CODES_BY_NAME.entrySet()) {
                 jdbcTemplate.update(
                         "UPDATE courses SET code = ? WHERE name = ? AND (code IS NULL OR code = '')",
@@ -209,7 +223,18 @@ public class CourseService {
                     ALTER COLUMN code SET NOT NULL
                     """);
             jdbcTemplate.execute("""
-                    CREATE UNIQUE INDEX IF NOT EXISTS idx_courses_code ON courses (code)
+                    ALTER TABLE courses
+                    ALTER COLUMN semester SET NOT NULL
+                    """);
+            jdbcTemplate.execute("""
+                    DROP INDEX IF EXISTS idx_courses_code
+                    """);
+            jdbcTemplate.execute("""
+                    ALTER TABLE courses
+                    DROP CONSTRAINT IF EXISTS courses_code_key
+                    """);
+            jdbcTemplate.execute("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_courses_semester_code ON courses (semester, code)
                     """);
         } catch (Exception ignored) {
         }
@@ -288,6 +313,7 @@ public class CourseService {
             Course course,
             String name,
             String code,
+            String semester,
             CourseType type,
             boolean lectivo,
             Integer cycle,
@@ -297,6 +323,7 @@ public class CourseService {
             Long nightTeacherId) {
         course.setName(name.trim());
         course.setCode(normalizeCode(code));
+        course.setSemester(Semester.normalize(semester));
         course.setType(type);
         course.setLectivo(lectivo);
         course.setCycle(cycle);
@@ -330,6 +357,11 @@ public class CourseService {
     private CourseTeacherAssignment buildAssignment(Course course, Long teacherId, TeacherShift shift) {
         Teacher teacher = teacherRepository.findById(teacherId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Docente no encontrado"));
+        if (!teacher.getSemester().equals(course.getSemester())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "El docente no pertenece al semestre " + course.getSemester());
+        }
         CourseTeacherAssignment assignment = new CourseTeacherAssignment();
         assignment.setCourse(course);
         assignment.setTeacher(teacher);
@@ -433,11 +465,12 @@ public class CourseService {
         return subShift == null ? shift.name() : shift.name() + " " + subShift;
     }
 
-    private void ensureUniqueCode(String code, Long excludeId) {
+    private void ensureUniqueCode(String code, String semester, Long excludeId) {
         String normalized = normalizeCode(code);
+        String normalizedSemester = Semester.normalize(semester);
         boolean exists = excludeId == null
-                ? courseRepository.existsByCode(normalized)
-                : courseRepository.existsByCodeAndIdNot(normalized, excludeId);
+                ? courseRepository.existsByCodeAndSemester(normalized, normalizedSemester)
+                : courseRepository.existsByCodeAndSemesterAndIdNot(normalized, normalizedSemester, excludeId);
         if (exists) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El código de curso ya existe");
         }

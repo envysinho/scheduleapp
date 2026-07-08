@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -18,6 +19,7 @@ import com.example.schedule.dto.ScheduleSettingsResponse;
 import com.example.schedule.dto.UpdateScheduleSettingsRequest;
 import com.example.schedule.entity.ScheduleBlockSetting;
 import com.example.schedule.model.ScheduleBlockId;
+import com.example.schedule.model.Semester;
 import com.example.schedule.repository.ScheduleBlockSettingRepository;
 
 @Service
@@ -48,31 +50,37 @@ public class ScheduleSettingsService {
 
     private final ScheduleBlockSettingRepository repository;
     private final NotificationService notificationService;
+    private final JdbcTemplate jdbcTemplate;
 
     public ScheduleSettingsService(
             ScheduleBlockSettingRepository repository,
-            NotificationService notificationService) {
+            NotificationService notificationService,
+            JdbcTemplate jdbcTemplate) {
         this.repository = repository;
         this.notificationService = notificationService;
-    }
-
-    @Transactional(readOnly = true)
-    public ScheduleSettingsResponse getSettings() {
-        seedDefaultsIfEmpty();
-        return toResponse(loadOrderedBlocks());
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Transactional
-    public ScheduleSettingsResponse updateSettings(UpdateScheduleSettingsRequest request) {
+    public ScheduleSettingsResponse getSettings(String semester) {
+        String normalizedSemester = Semester.normalize(semester);
+        seedDefaultsIfEmpty(normalizedSemester);
+        return toResponse(loadOrderedBlocks(normalizedSemester));
+    }
+
+    @Transactional
+    public ScheduleSettingsResponse updateSettings(String semester, UpdateScheduleSettingsRequest request) {
+        String normalizedSemester = Semester.normalize(semester);
         List<ParsedBlock> parsedBlocks = parseAndValidate(request.blocks());
         Map<ScheduleBlockId, ScheduleBlockSetting> existingById = new EnumMap<>(ScheduleBlockId.class);
-        repository.findAll().forEach(setting -> existingById.put(setting.getBlockId(), setting));
+        repository.findBySemester(normalizedSemester).forEach(setting -> existingById.put(setting.getBlockId(), setting));
 
         List<ScheduleBlockSetting> saved = new ArrayList<>();
         for (ParsedBlock parsed : parsedBlocks) {
             ScheduleBlockSetting setting = existingById.get(parsed.id());
             if (setting == null) {
                 setting = new ScheduleBlockSetting();
+                setting.setSemester(normalizedSemester);
                 setting.setBlockId(parsed.id());
             }
             setting.setStartTime(parsed.start());
@@ -81,13 +89,21 @@ public class ScheduleSettingsService {
         }
 
         saved.sort(Comparator.comparing(setting -> BLOCK_ORDER.indexOf(setting.getBlockId())));
-        notificationService.record("actualizó las reglas de horario");
+        notificationService.record("actualizó las reglas de horario del semestre " + normalizedSemester);
         return toResponse(saved);
     }
 
     @Transactional
     public void seedDefaultsIfEmpty() {
-        if (repository.count() > 0) {
+        migrateSemesterColumnIfNeeded();
+        seedDefaultsIfEmpty(Semester.CURRENT);
+    }
+
+    @Transactional
+    public void seedDefaultsIfEmpty(String semester) {
+        String normalizedSemester = Semester.normalize(semester);
+        migrateSemesterColumnIfNeeded();
+        if (repository.countBySemester(normalizedSemester) > 0) {
             return;
         }
 
@@ -101,6 +117,7 @@ public class ScheduleSettingsService {
 
         for (DefaultBlock block : defaults) {
             ScheduleBlockSetting setting = new ScheduleBlockSetting();
+            setting.setSemester(normalizedSemester);
             setting.setBlockId(block.id());
             setting.setStartTime(parseTime(block.start()));
             setting.setEndTime(parseTime(block.end()));
@@ -108,10 +125,35 @@ public class ScheduleSettingsService {
         }
     }
 
-    private List<ScheduleBlockSetting> loadOrderedBlocks() {
-        List<ScheduleBlockSetting> blocks = repository.findAll();
+    private List<ScheduleBlockSetting> loadOrderedBlocks(String semester) {
+        List<ScheduleBlockSetting> blocks = repository.findBySemester(semester);
         blocks.sort(Comparator.comparing(setting -> BLOCK_ORDER.indexOf(setting.getBlockId())));
         return blocks;
+    }
+
+    private void migrateSemesterColumnIfNeeded() {
+        try {
+            jdbcTemplate.execute("""
+                    ALTER TABLE schedule_block_settings
+                    ADD COLUMN IF NOT EXISTS semester VARCHAR(20)
+                    """);
+            jdbcTemplate.execute("""
+                    UPDATE schedule_block_settings
+                    SET semester = '26-II'
+                    WHERE semester IS NULL OR semester = ''
+                    """);
+            jdbcTemplate.execute("""
+                    ALTER TABLE schedule_block_settings
+                    ALTER COLUMN semester SET NOT NULL
+                    """);
+            jdbcTemplate.execute("ALTER TABLE schedule_block_settings DROP CONSTRAINT IF EXISTS schedule_block_settings_pkey");
+            jdbcTemplate.execute("""
+                    ALTER TABLE schedule_block_settings
+                    ADD CONSTRAINT schedule_block_settings_pkey
+                    PRIMARY KEY (semester, block_id)
+                    """);
+        } catch (Exception ignored) {
+        }
     }
 
     private ScheduleSettingsResponse toResponse(List<ScheduleBlockSetting> blocks) {

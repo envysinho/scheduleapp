@@ -16,6 +16,7 @@ import {
   useComboboxAnchor,
 } from "@/components/ui/combobox";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSemester } from "@/contexts/SemesterContext";
 import {
   AVAILABILITY_FILTERS,
   CYCLE_FILTERS,
@@ -61,6 +62,7 @@ function withAssignedPracticeHeads(spaces, practiceHeads) {
 
 function Spaces({ searchFilter, onClearSearchFilter }) {
   const { logout, user } = useAuth();
+  const { semester } = useSemester();
   const isAdmin = user?.role === "ADMIN";
 
   const [spaces, setSpaces] = useState([]);
@@ -91,16 +93,16 @@ function Spaces({ searchFilter, onClearSearchFilter }) {
     try {
       if (isSearchActive) {
         const [data, practiceHeads] = await Promise.all([
-          getSpace(searchFilter.id, handleUnauthorized),
-          listPracticeHeads(handleUnauthorized),
+          getSpace(searchFilter.id, { semester }, handleUnauthorized),
+          listPracticeHeads({ semester }, handleUnauthorized),
         ]);
         setSpaces(withAssignedPracticeHeads([data], practiceHeads));
         return;
       }
 
       const [data, practiceHeads] = await Promise.all([
-        listSpaces({ spaceType, availability, cycle }, handleUnauthorized),
-        listPracticeHeads(handleUnauthorized),
+        listSpaces({ semester, spaceType, availability, cycle }, handleUnauthorized),
+        listPracticeHeads({ semester }, handleUnauthorized),
       ]);
       setSpaces(withAssignedPracticeHeads(data, practiceHeads));
     } catch (err) {
@@ -115,6 +117,7 @@ function Spaces({ searchFilter, onClearSearchFilter }) {
     spaceType,
     availability,
     cycle,
+    semester,
     isSearchActive,
     searchFilter?.id,
     handleUnauthorized,
@@ -162,9 +165,9 @@ function Spaces({ searchFilter, onClearSearchFilter }) {
     setIsSubmitting(true);
     try {
       if (editingSpace?.id) {
-        await updateSpace(editingSpace.id, payload, handleUnauthorized);
+        await updateSpace(editingSpace.id, { ...payload, semester }, handleUnauthorized);
       } else {
-        await createSpace(payload, handleUnauthorized);
+        await createSpace({ ...payload, semester }, handleUnauthorized);
       }
       closeForm();
     } catch (err) {

@@ -91,6 +91,9 @@ export async function listNotificationLogs(onUnauthorized) {
 
 function buildTeachersQuery(filters = {}) {
   const params = new URLSearchParams();
+  if (filters.semester) {
+    params.set("semester", filters.semester);
+  }
   if (filters.employmentType) {
     params.set("employmentType", filters.employmentType);
   }
@@ -133,8 +136,17 @@ export async function deleteTeacher(id, onUnauthorized) {
   );
 }
 
-export async function listPracticeHeads(onUnauthorized) {
-  return apiFetch("/api/practice-heads", {}, onUnauthorized);
+export async function listPracticeHeads(filtersOrUnauthorized, maybeOnUnauthorized) {
+  const filters =
+    typeof filtersOrUnauthorized === "function" ? {} : filtersOrUnauthorized ?? {};
+  const onUnauthorized =
+    typeof filtersOrUnauthorized === "function" ? filtersOrUnauthorized : maybeOnUnauthorized;
+  const params = new URLSearchParams();
+  if (filters.semester) {
+    params.set("semester", filters.semester);
+  }
+  const query = params.toString();
+  return apiFetch(`/api/practice-heads${query ? `?${query}` : ""}`, {}, onUnauthorized);
 }
 
 export async function getPracticeHead(id, onUnauthorized) {
@@ -167,6 +179,9 @@ export async function deletePracticeHead(id, onUnauthorized) {
 
 function buildSpacesQuery(filters = {}) {
   const params = new URLSearchParams();
+  if (filters.semester) {
+    params.set("semester", filters.semester);
+  }
   if (filters.spaceType) {
     params.set("spaceType", filters.spaceType);
   }
@@ -184,8 +199,17 @@ export async function listSpaces(filters, onUnauthorized) {
   return apiFetch(`/api/spaces${buildSpacesQuery(filters)}`, {}, onUnauthorized);
 }
 
-export async function getSpace(id, onUnauthorized) {
-  return apiFetch(`/api/spaces/${id}`, {}, onUnauthorized);
+export async function getSpace(id, filtersOrUnauthorized, maybeOnUnauthorized) {
+  const filters =
+    typeof filtersOrUnauthorized === "function" ? {} : filtersOrUnauthorized ?? {};
+  const onUnauthorized =
+    typeof filtersOrUnauthorized === "function" ? filtersOrUnauthorized : maybeOnUnauthorized;
+  const params = new URLSearchParams();
+  if (filters.semester) {
+    params.set("semester", filters.semester);
+  }
+  const query = params.toString();
+  return apiFetch(`/api/spaces/${id}${query ? `?${query}` : ""}`, {}, onUnauthorized);
 }
 
 export async function createSpace(data, onUnauthorized) {
@@ -214,6 +238,9 @@ export async function deleteSpace(id, onUnauthorized) {
 
 function buildCoursesQuery(filters = {}) {
   const params = new URLSearchParams();
+  if (filters.semester) {
+    params.set("semester", filters.semester);
+  }
   if (filters.type) {
     params.set("type", filters.type);
   }
@@ -262,13 +289,31 @@ export async function deleteCourse(id, onUnauthorized) {
   );
 }
 
-export async function getScheduleSettings(onUnauthorized) {
-  return apiFetch("/api/schedule-settings", {}, onUnauthorized);
+export async function getScheduleSettings(filtersOrUnauthorized, maybeOnUnauthorized) {
+  const filters =
+    typeof filtersOrUnauthorized === "function" ? {} : filtersOrUnauthorized ?? {};
+  const onUnauthorized =
+    typeof filtersOrUnauthorized === "function" ? filtersOrUnauthorized : maybeOnUnauthorized;
+  const params = new URLSearchParams();
+  if (filters.semester) {
+    params.set("semester", filters.semester);
+  }
+  const query = params.toString();
+  return apiFetch(`/api/schedule-settings${query ? `?${query}` : ""}`, {}, onUnauthorized);
 }
 
-export async function updateScheduleSettings(data, onUnauthorized) {
+export async function updateScheduleSettings(data, filtersOrUnauthorized, maybeOnUnauthorized) {
+  const filters =
+    typeof filtersOrUnauthorized === "function" ? {} : filtersOrUnauthorized ?? {};
+  const onUnauthorized =
+    typeof filtersOrUnauthorized === "function" ? filtersOrUnauthorized : maybeOnUnauthorized;
+  const params = new URLSearchParams();
+  if (filters.semester) {
+    params.set("semester", filters.semester);
+  }
+  const query = params.toString();
   return apiFetch(
-    "/api/schedule-settings",
+    `/api/schedule-settings${query ? `?${query}` : ""}`,
     { method: "PUT", body: JSON.stringify(data) },
     onUnauthorized
   );

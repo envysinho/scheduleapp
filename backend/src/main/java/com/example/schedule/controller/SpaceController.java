@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.example.schedule.dto.CreateSpaceRequest;
 import com.example.schedule.dto.SpaceResponse;
 import com.example.schedule.dto.UpdateSpaceRequest;
+import com.example.schedule.model.Semester;
 import com.example.schedule.model.SpaceAvailability;
 import com.example.schedule.model.SpaceType;
 import com.example.schedule.service.SpaceService;
@@ -35,15 +36,18 @@ public class SpaceController {
 
     @GetMapping
     public List<SpaceResponse> listSpaces(
+            @RequestParam(required = false) String semester,
             @RequestParam(required = false) SpaceType spaceType,
             @RequestParam(required = false) SpaceAvailability availability,
             @RequestParam(required = false) Integer cycle) {
-        return spaceService.findAll(spaceType, availability, cycle);
+        return spaceService.findAll(Semester.normalize(semester), spaceType, availability, cycle);
     }
 
     @GetMapping("/{id}")
-    public SpaceResponse getSpace(@PathVariable("id") Long id) {
-        return spaceService.findById(id);
+    public SpaceResponse getSpace(
+            @PathVariable("id") Long id,
+            @RequestParam(required = false) String semester) {
+        return spaceService.findById(id, Semester.normalize(semester));
     }
 
     @PostMapping
