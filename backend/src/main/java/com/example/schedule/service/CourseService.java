@@ -1,8 +1,10 @@
 package com.example.schedule.service;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
@@ -39,6 +41,7 @@ public class CourseService {
     private final CourseTeacherAssignmentRepository assignmentRepository;
     private final TeacherService teacherService;
     private final JdbcTemplate jdbcTemplate;
+    private final NotificationService notificationService;
 
     public CourseService(
             CourseRepository courseRepository,
@@ -46,13 +49,15 @@ public class CourseService {
             SpaceRepository spaceRepository,
             CourseTeacherAssignmentRepository assignmentRepository,
             TeacherService teacherService,
-            JdbcTemplate jdbcTemplate) {
+            JdbcTemplate jdbcTemplate,
+            NotificationService notificationService) {
         this.courseRepository = courseRepository;
         this.teacherRepository = teacherRepository;
         this.spaceRepository = spaceRepository;
         this.assignmentRepository = assignmentRepository;
         this.teacherService = teacherService;
         this.jdbcTemplate = jdbcTemplate;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -108,13 +113,30 @@ public class CourseService {
                 request.afternoonTeacherId(),
                 request.nightTeacherId());
         course.replaceSpaceAssignments(toSpaceAssignments(course, request.spaceAssignments()));
-        return CourseResponse.from(courseRepository.save(course));
+        Course saved = courseRepository.save(course);
+        notificationService.record("agregó el curso " + saved.getName());
+        logTeacherAssignmentChanges(saved, Set.of(), teacherAssignmentLogs(saved));
+        logSpaceAssignmentChanges(saved, Set.of(), spaceAssignmentLogs(saved));
+        return CourseResponse.from(saved);
     }
 
     @Transactional
     public CourseResponse update(Long id, UpdateCourseRequest request) {
         ensureUniqueCode(request.code(), id);
         Course course = getCourseOrThrow(id);
+        Set<TeacherAssignmentLog> previousTeachers = teacherAssignmentLogs(course);
+        Set<SpaceAssignmentLog> previousSpaces = spaceAssignmentLogs(course);
+        List<Long> teacherAssignmentIds = course.getTeacherAssignments().stream()
+                .map(CourseTeacherAssignment::getId)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        course.getTeacherAssignments().clear();
+        courseRepository.save(course);
+        courseRepository.flush();
+        if (!teacherAssignmentIds.isEmpty()) {
+            assignmentRepository.deleteAllByIdInBatch(teacherAssignmentIds);
+            assignmentRepository.flush();
+        }
         applyCourseFields(
                 course,
                 request.name(),
@@ -127,13 +149,19 @@ public class CourseService {
                 request.afternoonTeacherId(),
                 request.nightTeacherId());
         course.replaceSpaceAssignments(toSpaceAssignments(course, request.spaceAssignments()));
-        return CourseResponse.from(courseRepository.save(course));
+        Course saved = courseRepository.save(course);
+        notificationService.record("actualizó el curso " + saved.getName());
+        logTeacherAssignmentChanges(saved, previousTeachers, teacherAssignmentLogs(saved));
+        logSpaceAssignmentChanges(saved, previousSpaces, spaceAssignmentLogs(saved));
+        return CourseResponse.from(saved);
     }
 
     @Transactional
     public void delete(Long id) {
         Course course = getCourseOrThrow(id);
+        String deletedName = course.getName();
         courseRepository.delete(course);
+        notificationService.record("eliminó el curso " + deletedName);
     }
 
     @Transactional
@@ -291,12 +319,10 @@ public class CourseService {
             }
         }
 
-        if (!assignments.isEmpty()) {
-            course.getTeacherAssignments().clear();
-            for (CourseTeacherAssignment a : assignments) {
-                a.setCourse(course);
-                course.getTeacherAssignments().add(a);
-            }
+        course.getTeacherAssignments().clear();
+        for (CourseTeacherAssignment a : assignments) {
+            a.setCourse(course);
+            course.getTeacherAssignments().add(a);
         }
         course.deriveShiftTeachers();
     }
@@ -345,6 +371,68 @@ public class CourseService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Curso no encontrado"));
     }
 
+    private Set<TeacherAssignmentLog> teacherAssignmentLogs(Course course) {
+        return course.getTeacherAssignments().stream()
+                .map(assignment -> new TeacherAssignmentLog(
+                        assignment.getTeacher().getId(),
+                        teacherName(assignment.getTeacher()),
+                        assignment.getShift(),
+                        assignment.getSubShift() == null ? null : assignment.getSubShift().name()))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private Set<SpaceAssignmentLog> spaceAssignmentLogs(Course course) {
+        return course.getSpaceAssignments().stream()
+                .map(assignment -> new SpaceAssignmentLog(
+                        assignment.getSpace().getId(),
+                        assignment.getSpace().getName()))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private void logTeacherAssignmentChanges(
+            Course course,
+            Set<TeacherAssignmentLog> previous,
+            Set<TeacherAssignmentLog> current) {
+        for (TeacherAssignmentLog assignment : current) {
+            if (!previous.contains(assignment)) {
+                notificationService.record("asignó al docente " + assignment.teacherName()
+                        + " al curso " + course.getName() + " (" + shiftLabel(assignment.shift(), assignment.subShift()) + ")");
+            }
+        }
+        for (TeacherAssignmentLog assignment : previous) {
+            if (!current.contains(assignment)) {
+                notificationService.record("desasignó al docente " + assignment.teacherName()
+                        + " del curso " + course.getName() + " (" + shiftLabel(assignment.shift(), assignment.subShift()) + ")");
+            }
+        }
+    }
+
+    private void logSpaceAssignmentChanges(
+            Course course,
+            Set<SpaceAssignmentLog> previous,
+            Set<SpaceAssignmentLog> current) {
+        for (SpaceAssignmentLog assignment : current) {
+            if (!previous.contains(assignment)) {
+                notificationService.record("asignó el ambiente " + assignment.spaceName()
+                        + " al curso " + course.getName());
+            }
+        }
+        for (SpaceAssignmentLog assignment : previous) {
+            if (!current.contains(assignment)) {
+                notificationService.record("desasignó el ambiente " + assignment.spaceName()
+                        + " del curso " + course.getName());
+            }
+        }
+    }
+
+    private String teacherName(Teacher teacher) {
+        return (teacher.getFirstName() + " " + teacher.getLastName()).trim();
+    }
+
+    private String shiftLabel(TeacherShift shift, String subShift) {
+        return subShift == null ? shift.name() : shift.name() + " " + subShift;
+    }
+
     private void ensureUniqueCode(String code, Long excludeId) {
         String normalized = normalizeCode(code);
         boolean exists = excludeId == null
@@ -360,6 +448,12 @@ public class CourseService {
     }
 
     private record CourseSeed(String name, String code, CourseType type, boolean lectivo, int cycle, SpaceType requiredSpaceType) {
+    }
+
+    private record TeacherAssignmentLog(Long teacherId, String teacherName, TeacherShift shift, String subShift) {
+    }
+
+    private record SpaceAssignmentLog(Long spaceId, String spaceName) {
     }
 
     private static final List<String> LAB_COURSE_NAMES_2026_II = List.of(

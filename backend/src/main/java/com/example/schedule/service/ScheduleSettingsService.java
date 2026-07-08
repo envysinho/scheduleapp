@@ -47,9 +47,13 @@ public class ScheduleSettingsService {
     private static final int MIN_BLOCK_MINUTES = 15;
 
     private final ScheduleBlockSettingRepository repository;
+    private final NotificationService notificationService;
 
-    public ScheduleSettingsService(ScheduleBlockSettingRepository repository) {
+    public ScheduleSettingsService(
+            ScheduleBlockSettingRepository repository,
+            NotificationService notificationService) {
         this.repository = repository;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -77,6 +81,7 @@ public class ScheduleSettingsService {
         }
 
         saved.sort(Comparator.comparing(setting -> BLOCK_ORDER.indexOf(setting.getBlockId())));
+        notificationService.record("actualizó las reglas de horario");
         return toResponse(saved);
     }
 

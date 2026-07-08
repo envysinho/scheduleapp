@@ -42,16 +42,19 @@ public class TeacherService {
     private final CourseRepository courseRepository;
     private final CourseTeacherAssignmentRepository assignmentRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final NotificationService notificationService;
 
     public TeacherService(
             TeacherRepository teacherRepository,
             CourseRepository courseRepository,
             CourseTeacherAssignmentRepository assignmentRepository,
-            JdbcTemplate jdbcTemplate) {
+            JdbcTemplate jdbcTemplate,
+            NotificationService notificationService) {
         this.teacherRepository = teacherRepository;
         this.courseRepository = courseRepository;
         this.assignmentRepository = assignmentRepository;
         this.jdbcTemplate = jdbcTemplate;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -75,6 +78,8 @@ public class TeacherService {
         teacher.replaceCourseAssignments(toAssignments(teacher, request.courseAssignments()));
         Teacher saved = teacherRepository.save(teacher);
         syncDerivedCourses(saved);
+        notificationService.record("agregó al docente " + teacherName(saved));
+        logAssignmentChanges(saved, Set.of(), assignmentLogs(saved));
         return TeacherResponse.from(saved);
     }
 
@@ -82,6 +87,7 @@ public class TeacherService {
     public TeacherResponse update(Long id, UpdateTeacherRequest request) {
         validateAssignments(request.employmentType(), request.courseAssignments());
         Teacher teacher = getTeacherOrThrow(id);
+        Set<AssignmentLog> previousAssignments = assignmentLogs(teacher);
         Set<Long> previousCourseIds = teacher.getCourseAssignments().stream()
                 .map(a -> a.getCourse().getId())
                 .collect(Collectors.toSet());
@@ -95,10 +101,10 @@ public class TeacherService {
         teacher.getCourseAssignments().clear();
         teacherRepository.save(teacher);
         teacherRepository.flush();
-        for (Long assignmentId : assignmentIds) {
-            assignmentRepository.deleteById(assignmentId);
+        if (!assignmentIds.isEmpty()) {
+            assignmentRepository.deleteAllByIdInBatch(assignmentIds);
+            assignmentRepository.flush();
         }
-        assignmentRepository.flush();
 
         applyTeacherFields(teacher, request.firstName(), request.lastName(),
                 request.email(), request.phone(), request.employmentType());
@@ -116,6 +122,8 @@ public class TeacherService {
                 courseRepository.save(course);
             });
         }
+        notificationService.record("actualizó al docente " + teacherName(saved));
+        logAssignmentChanges(saved, previousAssignments, assignmentLogs(saved));
         return TeacherResponse.from(saved);
     }
 
@@ -140,7 +148,50 @@ public class TeacherService {
                     HttpStatus.CONFLICT,
                     "No se puede eliminar el docente porque está asignado a: " + courseNames);
         }
+        String deletedName = teacherName(teacher);
         teacherRepository.delete(teacher);
+        notificationService.record("eliminó al docente " + deletedName);
+    }
+
+    private String teacherName(Teacher teacher) {
+        return (teacher.getFirstName() + " " + teacher.getLastName()).trim();
+    }
+
+    private Set<AssignmentLog> assignmentLogs(Teacher teacher) {
+        return teacher.getCourseAssignments().stream()
+                .map(assignment -> new AssignmentLog(
+                        assignment.getCourse().getId(),
+                        assignment.getCourse().getName(),
+                        assignment.getShift(),
+                        assignment.getSubShift() == null ? null : assignment.getSubShift().name()))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private void logAssignmentChanges(
+            Teacher teacher,
+            Set<AssignmentLog> previous,
+            Set<AssignmentLog> current) {
+        for (AssignmentLog assignment : current) {
+            if (!previous.contains(assignment)) {
+                notificationService.record("asignó al docente " + teacherName(teacher)
+                        + " al curso " + assignment.courseName()
+                        + " (" + shiftLabel(assignment.shift(), assignment.subShift()) + ")");
+            }
+        }
+        for (AssignmentLog assignment : previous) {
+            if (!current.contains(assignment)) {
+                notificationService.record("desasignó al docente " + teacherName(teacher)
+                        + " del curso " + assignment.courseName()
+                        + " (" + shiftLabel(assignment.shift(), assignment.subShift()) + ")");
+            }
+        }
+    }
+
+    private String shiftLabel(TeacherShift shift, String subShift) {
+        return subShift == null ? shift.name() : shift.name() + " " + subShift;
+    }
+
+    private record AssignmentLog(Long courseId, String courseName, TeacherShift shift, String subShift) {
     }
 
     @Transactional

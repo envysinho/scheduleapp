@@ -81,6 +81,14 @@ export async function deleteUser(id, onUnauthorized) {
   );
 }
 
+export async function listNotifications(onUnauthorized) {
+  return apiFetch("/api/notifications", {}, onUnauthorized);
+}
+
+export async function listNotificationLogs(onUnauthorized) {
+  return apiFetch("/api/notifications/logs", {}, onUnauthorized);
+}
+
 function buildTeachersQuery(filters = {}) {
   const params = new URLSearchParams();
   if (filters.employmentType) {

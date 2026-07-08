@@ -3,6 +3,7 @@ package com.example.schedule.service;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -25,12 +26,15 @@ public class PracticeHeadService {
 
     private final PracticeHeadRepository practiceHeadRepository;
     private final SpaceRepository spaceRepository;
+    private final NotificationService notificationService;
 
     public PracticeHeadService(
             PracticeHeadRepository practiceHeadRepository,
-            SpaceRepository spaceRepository) {
+            SpaceRepository spaceRepository,
+            NotificationService notificationService) {
         this.practiceHeadRepository = practiceHeadRepository;
         this.spaceRepository = spaceRepository;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -52,23 +56,62 @@ public class PracticeHeadService {
         applyPracticeHeadFields(practiceHead, request.firstName(), request.lastName(),
                 request.email(), request.phone());
         practiceHead.replaceLabAssignments(toAssignments(request.labAssignments()));
-        return PracticeHeadResponse.from(practiceHeadRepository.save(practiceHead));
+        PracticeHead saved = practiceHeadRepository.save(practiceHead);
+        notificationService.record("agregó al jefe de práctica " + practiceHeadName(saved));
+        logAssignmentChanges(saved, Set.of(), assignmentLogs(saved));
+        return PracticeHeadResponse.from(saved);
     }
 
     @Transactional
     public PracticeHeadResponse update(Long id, UpdatePracticeHeadRequest request) {
         validateAssignments(request.labAssignments());
         PracticeHead practiceHead = getPracticeHeadOrThrow(id);
+        Set<AssignmentLog> previousAssignments = assignmentLogs(practiceHead);
         applyPracticeHeadFields(practiceHead, request.firstName(), request.lastName(),
                 request.email(), request.phone());
         practiceHead.replaceLabAssignments(toAssignments(request.labAssignments()));
-        return PracticeHeadResponse.from(practiceHeadRepository.save(practiceHead));
+        PracticeHead saved = practiceHeadRepository.save(practiceHead);
+        notificationService.record("actualizó al jefe de práctica " + practiceHeadName(saved));
+        logAssignmentChanges(saved, previousAssignments, assignmentLogs(saved));
+        return PracticeHeadResponse.from(saved);
     }
 
     @Transactional
     public void delete(Long id) {
         PracticeHead practiceHead = getPracticeHeadOrThrow(id);
+        String deletedName = practiceHeadName(practiceHead);
         practiceHeadRepository.delete(practiceHead);
+        notificationService.record("eliminó al jefe de práctica " + deletedName);
+    }
+
+    private String practiceHeadName(PracticeHead practiceHead) {
+        return (practiceHead.getFirstName() + " " + practiceHead.getLastName()).trim();
+    }
+
+    private Set<AssignmentLog> assignmentLogs(PracticeHead practiceHead) {
+        return practiceHead.getLabAssignments().stream()
+                .map(assignment -> new AssignmentLog(
+                        assignment.getSpace().getId(),
+                        assignment.getSpace().getName()))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private void logAssignmentChanges(
+            PracticeHead practiceHead,
+            Set<AssignmentLog> previous,
+            Set<AssignmentLog> current) {
+        for (AssignmentLog assignment : current) {
+            if (!previous.contains(assignment)) {
+                notificationService.record("asignó el laboratorio " + assignment.spaceName()
+                        + " al jefe de práctica " + practiceHeadName(practiceHead));
+            }
+        }
+        for (AssignmentLog assignment : previous) {
+            if (!current.contains(assignment)) {
+                notificationService.record("desasignó el laboratorio " + assignment.spaceName()
+                        + " del jefe de práctica " + practiceHeadName(practiceHead));
+            }
+        }
     }
 
     private void validateAssignments(List<PracticeHeadLabAssignmentRequest> requests) {
@@ -144,5 +187,8 @@ public class PracticeHeadService {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
                         "Jefe de práctica no encontrado"));
+    }
+
+    private record AssignmentLog(Long spaceId, String spaceName) {
     }
 }

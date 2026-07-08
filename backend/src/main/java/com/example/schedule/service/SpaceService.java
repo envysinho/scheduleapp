@@ -1,6 +1,9 @@
 package com.example.schedule.service;
 
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -26,10 +29,15 @@ public class SpaceService {
 
     private final SpaceRepository spaceRepository;
     private final CourseRepository courseRepository;
+    private final NotificationService notificationService;
 
-    public SpaceService(SpaceRepository spaceRepository, CourseRepository courseRepository) {
+    public SpaceService(
+            SpaceRepository spaceRepository,
+            CourseRepository courseRepository,
+            NotificationService notificationService) {
         this.spaceRepository = spaceRepository;
         this.courseRepository = courseRepository;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -54,23 +62,32 @@ public class SpaceService {
         applySpaceFields(space, request.name(), request.spaceType(), request.availability(),
                 request.managerName(), request.managerPhone());
         space.replaceAssignments(toAssignments(request.assignments()));
-        return SpaceResponse.from(spaceRepository.save(space));
+        Space saved = spaceRepository.save(space);
+        notificationService.record("agregó el ambiente " + saved.getName());
+        logAssignmentChanges(saved, Set.of(), assignmentLogs(saved));
+        return SpaceResponse.from(saved);
     }
 
     @Transactional
     public SpaceResponse update(Long id, UpdateSpaceRequest request) {
         validateAssignments(request.assignments());
         Space space = getSpaceOrThrow(id);
+        Set<AssignmentLog> previousAssignments = assignmentLogs(space);
         applySpaceFields(space, request.name(), request.spaceType(), request.availability(),
                 request.managerName(), request.managerPhone());
         space.replaceAssignments(toAssignments(request.assignments()));
-        return SpaceResponse.from(spaceRepository.save(space));
+        Space saved = spaceRepository.save(space);
+        notificationService.record("actualizó el ambiente " + saved.getName());
+        logAssignmentChanges(saved, previousAssignments, assignmentLogs(saved));
+        return SpaceResponse.from(saved);
     }
 
     @Transactional
     public void delete(Long id) {
         Space space = getSpaceOrThrow(id);
+        String deletedName = space.getName();
         spaceRepository.delete(space);
+        notificationService.record("eliminó el ambiente " + deletedName);
     }
 
     @Transactional
@@ -194,6 +211,44 @@ public class SpaceService {
         return request.subShift();
     }
 
+    private Set<AssignmentLog> assignmentLogs(Space space) {
+        return space.getAssignments().stream()
+                .map(assignment -> new AssignmentLog(
+                        assignment.getCourseName(),
+                        assignment.getCycle(),
+                        assignment.getShift(),
+                        assignment.getSubShift() == null ? null : assignment.getSubShift().name()))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private void logAssignmentChanges(
+            Space space,
+            Set<AssignmentLog> previous,
+            Set<AssignmentLog> current) {
+        for (AssignmentLog assignment : current) {
+            if (!previous.contains(assignment)) {
+                notificationService.record("asignó el curso " + assignment.courseName()
+                        + " al ambiente " + space.getName() + assignmentSuffix(assignment));
+            }
+        }
+        for (AssignmentLog assignment : previous) {
+            if (!current.contains(assignment)) {
+                notificationService.record("desasignó el curso " + assignment.courseName()
+                        + " del ambiente " + space.getName() + assignmentSuffix(assignment));
+            }
+        }
+    }
+
+    private String assignmentSuffix(AssignmentLog assignment) {
+        if (assignment.shift() == null) {
+            return "";
+        }
+        String shift = assignment.subShift() == null
+                ? assignment.shift().name()
+                : assignment.shift().name() + " " + assignment.subShift();
+        return " (" + shift + ")";
+    }
+
     private void validateAssignments(List<SpaceAssignmentRequest> requests) {
         for (SpaceAssignmentRequest request : requests) {
             Integer cycle = request.cycle();
@@ -263,5 +318,8 @@ public class SpaceService {
     private Space getSpaceOrThrow(Long id) {
         return spaceRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Espacio no encontrado"));
+    }
+
+    private record AssignmentLog(String courseName, Integer cycle, TeacherShift shift, String subShift) {
     }
 }

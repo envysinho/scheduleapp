@@ -26,10 +26,16 @@ const ROLE_OPTIONS = ["USER", "ADMIN"];
 
 const EMPTY_FORM = {
   username: "",
+  firstName: "",
+  lastName: "",
   password: "",
   role: "USER",
   enabled: true,
 };
+
+function getFullName(user) {
+  return [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || "-";
+}
 
 function Users() {
   const { logout } = useAuth();
@@ -85,6 +91,8 @@ function Users() {
       if (isEditing) {
         const payload = {
           username: form.username.trim(),
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
           role: form.role,
           enabled: form.enabled,
         };
@@ -96,6 +104,8 @@ function Users() {
         await createUser(
           {
             username: form.username.trim(),
+            firstName: form.firstName.trim(),
+            lastName: form.lastName.trim(),
             password: form.password,
             role: form.role,
           },
@@ -118,6 +128,8 @@ function Users() {
     setSuccessMessage(null);
     setForm({
       username: user.username,
+      firstName: user.firstName ?? "",
+      lastName: user.lastName ?? "",
       password: "",
       role: user.role,
       enabled: user.enabled,
@@ -174,6 +186,7 @@ function Users() {
             <thead className="border-b bg-muted/40">
               <tr>
                 <th className="px-4 py-3 text-left font-medium">Usuario</th>
+                <th className="px-4 py-3 text-left font-medium">Nombre</th>
                 <th className="px-4 py-3 text-left font-medium">Rol</th>
                 <th className="px-4 py-3 text-left font-medium">Estado</th>
                 <th className="px-4 py-3 text-right font-medium">Acciones</th>
@@ -182,13 +195,13 @@ function Users() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-6 text-muted-foreground">
+                  <td colSpan={5} className="px-4 py-6 text-muted-foreground">
                     Cargando usuarios...
                   </td>
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-6 text-muted-foreground">
+                  <td colSpan={5} className="px-4 py-6 text-muted-foreground">
                     No hay usuarios registrados.
                   </td>
                 </tr>
@@ -196,6 +209,7 @@ function Users() {
                 users.map((user) => (
                   <tr key={user.id} className="border-b last:border-b-0">
                     <td className="px-4 py-3">{user.username}</td>
+                    <td className="px-4 py-3">{getFullName(user)}</td>
                     <td className="px-4 py-3">{user.role}</td>
                     <td className="px-4 py-3">
                       {user.enabled ? "Activo" : "Inactivo"}
@@ -267,6 +281,33 @@ function Users() {
               required
               disabled={isSubmitting}
             />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="user-first-name">Nombre</Label>
+              <Input
+                id="user-first-name"
+                value={form.firstName}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, firstName: event.target.value }))
+                }
+                required
+                disabled={isSubmitting}
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="user-last-name">Apellido</Label>
+              <Input
+                id="user-last-name"
+                value={form.lastName}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, lastName: event.target.value }))
+                }
+                required
+                disabled={isSubmitting}
+              />
+            </div>
           </div>
 
           <div className="flex flex-col gap-2">

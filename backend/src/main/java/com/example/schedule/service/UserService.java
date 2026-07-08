@@ -20,10 +20,15 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final NotificationService notificationService;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserService(
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder,
+            NotificationService notificationService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -64,11 +69,15 @@ public class UserService {
 
         User user = new User();
         user.setUsername(username);
+        user.setFirstName(request.firstName().trim());
+        user.setLastName(request.lastName().trim());
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         user.setRole(request.role() != null ? request.role() : Role.USER);
         user.setEnabled(true);
 
-        return UserResponse.from(userRepository.save(user));
+        User saved = userRepository.save(user);
+        notificationService.record("creó al usuario " + displayName(saved));
+        return UserResponse.from(saved);
     }
 
     @Transactional
@@ -81,6 +90,14 @@ public class UserService {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "El usuario ya existe");
             }
             user.setUsername(username);
+        }
+
+        if (request.firstName() != null) {
+            user.setFirstName(request.firstName().trim());
+        }
+
+        if (request.lastName() != null) {
+            user.setLastName(request.lastName().trim());
         }
 
         if (request.password() != null && !request.password().isBlank()) {
@@ -101,7 +118,9 @@ public class UserService {
             user.setEnabled(request.enabled());
         }
 
-        return UserResponse.from(userRepository.save(user));
+        User saved = userRepository.save(user);
+        notificationService.record("actualizó al usuario " + displayName(saved));
+        return UserResponse.from(saved);
     }
 
     @Transactional
@@ -113,7 +132,9 @@ public class UserService {
                     HttpStatus.CONFLICT, "No se puede eliminar el último administrador");
         }
 
+        String deletedName = displayName(user);
         userRepository.delete(user);
+        notificationService.record("eliminó al usuario " + deletedName);
     }
 
     @Transactional
@@ -126,7 +147,9 @@ public class UserService {
         }
 
         user.setEnabled(enabled);
-        return UserResponse.from(userRepository.save(user));
+        User saved = userRepository.save(user);
+        notificationService.record((enabled ? "activó" : "desactivó") + " al usuario " + displayName(saved));
+        return UserResponse.from(saved);
     }
 
     @Transactional
@@ -137,6 +160,8 @@ public class UserService {
 
         User admin = new User();
         admin.setUsername(username);
+        admin.setFirstName("Administrador");
+        admin.setLastName("Sistema");
         admin.setPasswordHash(passwordEncoder.encode(password));
         admin.setRole(Role.ADMIN);
         admin.setEnabled(true);
@@ -146,5 +171,11 @@ public class UserService {
     private User getUserOrThrow(Long id) {
         return userRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+    }
+
+    private String displayName(User user) {
+        String fullName = ((user.getFirstName() == null ? "" : user.getFirstName()) + " "
+                + (user.getLastName() == null ? "" : user.getLastName())).trim();
+        return fullName.isBlank() ? user.getUsername() : fullName;
     }
 }
