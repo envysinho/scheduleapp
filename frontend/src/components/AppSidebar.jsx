@@ -5,6 +5,7 @@ import {
   GraduationCap,
   BookOpen,
   School,
+  IdCard,
   CalendarDays,
   ChevronDown,
   ScrollText,
@@ -42,6 +43,7 @@ const NAV_ITEMS = [
   { id: "teachers", icon: GraduationCap, label: "Docentes" },
   { id: "courses", icon: BookOpen, label: "Cursos" },
   { id: "spaces", icon: School, label: "Ambientes" },
+  { id: "practiceHeads", icon: IdCard, label: "Jefes de Práctica" },
 ];
 
 function AppSidebar({ currentPage, onNavigate }) {

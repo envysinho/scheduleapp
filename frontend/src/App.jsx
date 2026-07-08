@@ -11,6 +11,7 @@ import Spaces from "@/pages/Spaces";
 import Courses from "@/pages/Courses";
 import Horarios from "@/pages/Horarios";
 import Login from "@/pages/Login";
+import PracticeHeads from "@/pages/PracticeHeads";
 import Users from "@/pages/Users";
 import Rules from "@/pages/Rules";
 import Semesters from "@/pages/Semesters";
@@ -79,6 +80,8 @@ function AppContent() {
             onClearSearchFilter={() => setSearchFilter(null)}
           />
         );
+      case "practiceHeads":
+        return <PracticeHeads />;
       case "rules":
         return isAdmin ? <Rules /> : <Dashboard />;
       case "semesters":
