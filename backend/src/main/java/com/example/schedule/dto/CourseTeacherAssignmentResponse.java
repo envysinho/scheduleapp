@@ -5,6 +5,7 @@ import com.example.schedule.entity.CourseTeacherAssignment;
 import com.example.schedule.entity.Teacher;
 import com.example.schedule.model.SubShift;
 import com.example.schedule.model.TeacherShift;
+import com.example.schedule.model.ScheduleWeekday;
 
 public record CourseTeacherAssignmentResponse(
         Long id,
@@ -15,7 +16,8 @@ public record CourseTeacherAssignmentResponse(
         String courseCode,
         Integer cycle,
         TeacherShift shift,
-        SubShift subShift
+        SubShift subShift,
+        ScheduleWeekday weekday
 ) {
 
     public static CourseTeacherAssignmentResponse from(CourseTeacherAssignment assignment) {
@@ -33,6 +35,7 @@ public record CourseTeacherAssignmentResponse(
                 course.getCode(),
                 course.getCycle(),
                 assignment.getShift(),
-                assignment.getSubShift());
+                assignment.getSubShift(),
+                assignment.getWeekday());
     }
 }

@@ -30,6 +30,7 @@ import com.example.schedule.model.Semester;
 import com.example.schedule.model.SpaceType;
 import com.example.schedule.model.SubShift;
 import com.example.schedule.model.TeacherShift;
+import com.example.schedule.model.ScheduleWeekday;
 import com.example.schedule.repository.CourseRepository;
 import com.example.schedule.repository.CourseTeacherAssignmentRepository;
 import com.example.schedule.repository.TeacherRepository;
@@ -226,7 +227,7 @@ public class TeacherService {
             Long courseId = resolveCourseIdByCode(course.courseCode());
             Course resolved = courseRepository.findById(courseId).orElse(null);
             for (TeacherShift shift : shiftsFor(course.modality())) {
-                requests.add(new CourseTeacherAssignmentRequest(courseId, shift, seedSubShift(resolved, shift)));
+                requests.add(new CourseTeacherAssignmentRequest(courseId, shift, seedSubShift(resolved, shift), null));
             }
         }
         return requests;
@@ -347,6 +348,13 @@ public class TeacherService {
     @Transactional
     public void migrateSubShiftConstraintIfNeeded() {
         try {
+            jdbcTemplate.execute("""
+                    ALTER TABLE course_teacher_assignments
+                    ADD COLUMN IF NOT EXISTS weekday VARCHAR(20)
+                    """);
+        } catch (Exception ignored) {
+        }
+        try {
             jdbcTemplate.execute(
                     "ALTER TABLE course_teacher_assignments DROP CONSTRAINT IF EXISTS uk_course_teacher_shift");
         } catch (Exception ignored) {
@@ -385,6 +393,7 @@ public class TeacherService {
     private void validateAssignments(String semester,
                                      EmploymentType employmentType,
                                      List<CourseTeacherAssignmentRequest> assignments) {
+        assignments = assignments == null ? List.of() : assignments;
         CourseCategory expectedCategory = expectedCourseCategory(employmentType);
 
         long distinctPairs = assignments.stream()
@@ -471,6 +480,9 @@ public class TeacherService {
 
     private List<CourseTeacherAssignment> toAssignments(Teacher teacher,
                                                          List<CourseTeacherAssignmentRequest> requests) {
+        if (requests == null || requests.isEmpty()) {
+            return List.of();
+        }
         return requests.stream()
                 .map(req -> toAssignment(teacher, req))
                 .toList();
@@ -485,7 +497,42 @@ public class TeacherService {
         assignment.setCourse(course);
         assignment.setShift(request.shift());
         assignment.setSubShift(resolveSubShift(course, request));
+        assignment.setWeekday(request.weekday());
         return assignment;
+    }
+
+    @Transactional
+    public CourseTeacherAssignment updateAssignmentWeekday(Long assignmentId, ScheduleWeekday weekday) {
+        CourseTeacherAssignment assignment = assignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Asignación no encontrada"));
+        validateWeekdayConflict(assignment, weekday);
+        assignment.setWeekday(weekday);
+        CourseTeacherAssignment saved = assignmentRepository.save(assignment);
+        notificationService.record("actualizó el día de " + saved.getCourse().getName()
+                + " (" + shiftLabel(saved.getShift(), saved.getSubShift() == null ? null : saved.getSubShift().name()) + ")");
+        return saved;
+    }
+
+    private void validateWeekdayConflict(CourseTeacherAssignment target, ScheduleWeekday weekday) {
+        if (weekday == null) {
+            return;
+        }
+        Course course = target.getCourse();
+        for (CourseTeacherAssignment assignment : assignmentRepository.findByWeekday(weekday)) {
+            Course otherCourse = assignment.getCourse();
+            if (java.util.Objects.equals(assignment.getId(), target.getId())
+                    || !java.util.Objects.equals(otherCourse.getSemester(), course.getSemester())
+                    || !java.util.Objects.equals(otherCourse.getCycle(), course.getCycle())
+                    || assignment.getShift() != target.getShift()) {
+                continue;
+            }
+            if (!java.util.Objects.equals(otherCourse.getId(), course.getId())) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "El día ya está ocupado por " + otherCourse.getCode()
+                                + " en el mismo ciclo y turno. Recomendado: mover a otro día.");
+            }
+        }
     }
 
     private void validateSubShift(Course course, CourseTeacherAssignmentRequest req) {

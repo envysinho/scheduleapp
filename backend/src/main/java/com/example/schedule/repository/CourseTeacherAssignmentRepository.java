@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.example.schedule.entity.CourseTeacherAssignment;
+import com.example.schedule.model.ScheduleWeekday;
 import com.example.schedule.model.TeacherShift;
 
 public interface CourseTeacherAssignmentRepository
@@ -15,4 +16,6 @@ public interface CourseTeacherAssignmentRepository
     long countByTeacherIdAndShift(Long teacherId, TeacherShift shift);
 
     List<CourseTeacherAssignment> findByCourseId(Long courseId);
+
+    List<CourseTeacherAssignment> findByWeekday(ScheduleWeekday weekday);
 }

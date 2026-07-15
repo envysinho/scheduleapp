@@ -6,6 +6,7 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import com.example.schedule.model.SubShift;
 import com.example.schedule.model.TeacherShift;
+import com.example.schedule.model.ScheduleWeekday;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -50,6 +51,10 @@ public class CourseTeacherAssignment {
     @Column(name = "sub_shift")
     private SubShift subShift;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "weekday")
+    private ScheduleWeekday weekday;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -92,6 +97,14 @@ public class CourseTeacherAssignment {
 
     public void setSubShift(SubShift subShift) {
         this.subShift = subShift;
+    }
+
+    public ScheduleWeekday getWeekday() {
+        return weekday;
+    }
+
+    public void setWeekday(ScheduleWeekday weekday) {
+        this.weekday = weekday;
     }
 
     public Instant getCreatedAt() {

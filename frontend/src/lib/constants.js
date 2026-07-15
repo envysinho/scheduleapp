@@ -11,6 +11,19 @@ export const CYCLES = [
   { id: 10, label: "Ciclo X" },
 ];
 
+export const WEEKDAYS = [
+  { value: "MONDAY", label: "Lun", longLabel: "Lunes" },
+  { value: "TUESDAY", label: "Mar", longLabel: "Martes" },
+  { value: "WEDNESDAY", label: "Mié", longLabel: "Miércoles" },
+  { value: "THURSDAY", label: "Jue", longLabel: "Jueves" },
+  { value: "FRIDAY", label: "Vie", longLabel: "Viernes" },
+];
+
+export function getWeekdayLabel(value, long = false) {
+  const weekday = WEEKDAYS.find((item) => item.value === value);
+  return long ? weekday?.longLabel ?? value : weekday?.label ?? value;
+}
+
 export const NIGHT_ONLY_CYCLES = [9, 10];
 
 export const LAB_SUB_SHIFT_CYCLES = [8, 9, 10];

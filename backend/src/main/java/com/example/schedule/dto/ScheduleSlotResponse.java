@@ -17,6 +17,8 @@ public record ScheduleSlotResponse(
         Integer cycle,
         TeacherShift shift,
         SubShift subShift,
+        Long assignmentId,
+        boolean automaticWeekday,
         ScheduleWeekday weekday,
         String startTime,
         String endTime
@@ -35,6 +37,8 @@ public record ScheduleSlotResponse(
                 slot.getCycle(),
                 slot.getShift(),
                 slot.getSubShift(),
+                slot.getAssignmentId(),
+                slot.isAutomaticWeekday(),
                 slot.getWeekday(),
                 slot.getStartTime().toString(),
                 slot.getEndTime().toString());

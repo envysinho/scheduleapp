@@ -21,6 +21,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 
 @Entity
 @Table(name = "schedule_slots")
@@ -68,6 +69,12 @@ public class ScheduleSlot {
 
     @Column(name = "settings_fingerprint", nullable = false, length = 500)
     private String settingsFingerprint;
+
+    @Transient
+    private Long assignmentId;
+
+    @Transient
+    private boolean automaticWeekday;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -159,6 +166,22 @@ public class ScheduleSlot {
 
     public void setEndTime(LocalTime endTime) {
         this.endTime = endTime;
+    }
+
+    public Long getAssignmentId() {
+        return assignmentId;
+    }
+
+    public void setAssignmentId(Long assignmentId) {
+        this.assignmentId = assignmentId;
+    }
+
+    public boolean isAutomaticWeekday() {
+        return automaticWeekday;
+    }
+
+    public void setAutomaticWeekday(boolean automaticWeekday) {
+        this.automaticWeekday = automaticWeekday;
     }
 
     public String getSettingsFingerprint() {

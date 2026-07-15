@@ -191,7 +191,8 @@ public class ScheduleService {
             ScheduleContext context,
             List<PlacedSlot> placed) {
         ShiftWindow window = context.window(task.shift());
-        for (ScheduleWeekday weekday : WEEKDAYS) {
+        List<ScheduleWeekday> candidateDays = task.weekday() == null ? WEEKDAYS : List.of(task.weekday());
+        for (ScheduleWeekday weekday : candidateDays) {
             LocalTime cursor = window.start();
             while (!cursor.plusMinutes(durationMinutes).isAfter(window.end())) {
                 PlacedSlot candidate = new PlacedSlot(
@@ -200,6 +201,8 @@ public class ScheduleService {
                         task.space() == null ? null : task.space().getId(),
                         task.cycle(),
                         task.subShift(),
+                        task.assignmentId(),
+                        task.weekday() == null,
                         weekday,
                         cursor,
                         cursor.plusMinutes(durationMinutes));
@@ -216,6 +219,9 @@ public class ScheduleService {
         if (left.weekday() != right.weekday() || !overlaps(left.start(), left.end(), right.start(), right.end())) {
             return false;
         }
+        if (canShareSubShiftSlot(left, right)) {
+            return false;
+        }
         if (Objects.equals(left.teacherId(), right.teacherId())) {
             return true;
         }
@@ -224,6 +230,14 @@ public class ScheduleService {
         }
         return Objects.equals(left.cycle(), right.cycle())
                 && subShiftConflicts(left.subShift(), right.subShift());
+    }
+
+    private boolean canShareSubShiftSlot(PlacedSlot left, PlacedSlot right) {
+        return Objects.equals(left.courseId(), right.courseId())
+                && Objects.equals(left.cycle(), right.cycle())
+                && left.subShift() != null
+                && right.subShift() != null
+                && left.subShift() != right.subShift();
     }
 
     private boolean subShiftConflicts(SubShift left, SubShift right) {
@@ -257,21 +271,47 @@ public class ScheduleService {
                     warnings.add("Curso sin ambiente asignado: " + course.getCode() + " " + shiftLabel(assignment));
                 }
                 tasks.add(new AssignmentTask(
+                        assignment.getId(),
                         course,
                         assignment.getTeacher(),
                         space,
                         course.getCycle(),
                         assignment.getShift(),
                         assignment.getSubShift(),
+                        assignment.getWeekday(),
                         academicHours * ACADEMIC_MINUTES));
             }
         }
+        addManualDayWarnings(tasks, warnings);
         tasks.sort(Comparator
                 .comparing((AssignmentTask task) -> task.subShift() == null ? 0 : 1)
                 .thenComparing(task -> task.shift().ordinal())
                 .thenComparing(task -> task.course().getCode())
                 .thenComparing(task -> task.subShift() == null ? "" : task.subShift().name()));
         return tasks;
+    }
+
+    private void addManualDayWarnings(List<AssignmentTask> tasks, List<String> warnings) {
+        for (int leftIndex = 0; leftIndex < tasks.size(); leftIndex += 1) {
+            AssignmentTask left = tasks.get(leftIndex);
+            if (left.weekday() == null) {
+                continue;
+            }
+            for (int rightIndex = leftIndex + 1; rightIndex < tasks.size(); rightIndex += 1) {
+                AssignmentTask right = tasks.get(rightIndex);
+                if (right.weekday() == null
+                        || left.weekday() != right.weekday()
+                        || left.shift() != right.shift()
+                        || !Objects.equals(left.cycle(), right.cycle())
+                        || Objects.equals(left.course().getId(), right.course().getId())) {
+                    continue;
+                }
+                warnings.add("Día ocupado: " + left.course().getCode()
+                        + " y " + right.course().getCode()
+                        + " comparten " + left.weekday()
+                        + " en el mismo ciclo y turno. Recomendado: mover uno a otro día.");
+            }
+        }
     }
 
     private Space resolveSpace(
@@ -315,6 +355,8 @@ public class ScheduleService {
         slot.setSpace(task.space());
         slot.setShift(task.shift());
         slot.setSubShift(task.subShift());
+        slot.setAssignmentId(task.assignmentId());
+        slot.setAutomaticWeekday(placedSlot.automaticWeekday());
         slot.setWeekday(placedSlot.weekday());
         slot.setStartTime(placedSlot.start());
         slot.setEndTime(placedSlot.end());
@@ -473,12 +515,14 @@ public class ScheduleService {
     }
 
     private record AssignmentTask(
+            Long assignmentId,
             Course course,
             Teacher teacher,
             Space space,
             Integer cycle,
             TeacherShift shift,
             SubShift subShift,
+            ScheduleWeekday weekday,
             int totalMinutes) {
 
         String shiftLabel() {
@@ -492,6 +536,8 @@ public class ScheduleService {
             Long spaceId,
             Integer cycle,
             SubShift subShift,
+            Long assignmentId,
+            boolean automaticWeekday,
             ScheduleWeekday weekday,
             LocalTime start,
             LocalTime end) {
@@ -503,6 +549,8 @@ public class ScheduleService {
                     slot.getSpace() == null ? null : slot.getSpace().getId(),
                     slot.getCycle(),
                     slot.getSubShift(),
+                    slot.getAssignmentId(),
+                    slot.isAutomaticWeekday(),
                     slot.getWeekday(),
                     slot.getStartTime(),
                     slot.getEndTime());

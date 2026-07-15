@@ -346,3 +346,11 @@ export async function generateSchedule(filters, onUnauthorized) {
     onUnauthorized
   );
 }
+
+export async function updateAssignmentWeekday(id, weekday, onUnauthorized) {
+  return apiFetch(
+    `/api/course-teacher-assignments/${id}/weekday`,
+    { method: "PATCH", body: JSON.stringify({ weekday }) },
+    onUnauthorized
+  );
+}
