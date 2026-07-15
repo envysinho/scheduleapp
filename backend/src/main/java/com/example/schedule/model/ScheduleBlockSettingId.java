@@ -6,12 +6,12 @@ import java.util.Objects;
 public class ScheduleBlockSettingId implements Serializable {
 
     private String semester;
-    private ScheduleBlockId blockId;
+    private String blockId;
 
     public ScheduleBlockSettingId() {
     }
 
-    public ScheduleBlockSettingId(String semester, ScheduleBlockId blockId) {
+    public ScheduleBlockSettingId(String semester, String blockId) {
         this.semester = semester;
         this.blockId = blockId;
     }
@@ -24,11 +24,11 @@ public class ScheduleBlockSettingId implements Serializable {
         this.semester = semester;
     }
 
-    public ScheduleBlockId getBlockId() {
+    public String getBlockId() {
         return blockId;
     }
 
-    public void setBlockId(ScheduleBlockId blockId) {
+    public void setBlockId(String blockId) {
         this.blockId = blockId;
     }
 
@@ -40,7 +40,7 @@ public class ScheduleBlockSettingId implements Serializable {
         if (!(o instanceof ScheduleBlockSettingId that)) {
             return false;
         }
-        return Objects.equals(semester, that.semester) && blockId == that.blockId;
+        return Objects.equals(semester, that.semester) && Objects.equals(blockId, that.blockId);
     }
 
     @Override

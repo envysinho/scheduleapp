@@ -11,6 +11,9 @@ export const BLOCK_STYLES = {
   NOCHE: "bg-violet-500/20 border-violet-500/40 text-violet-950 dark:text-violet-100",
 };
 
+export const DEFAULT_BLOCK_STYLE =
+  "bg-emerald-500/20 border-emerald-500/40 text-emerald-950 dark:text-emerald-100";
+
 export function parseTimeToMinutes(value) {
   if (!value || !/^\d{2}:\d{2}$/.test(value)) {
     return null;
@@ -63,6 +66,9 @@ export function validateScheduleBlocks(blocks) {
     const start = parseTimeToMinutes(block.start);
     const end = parseTimeToMinutes(block.end);
 
+    if (!block.label?.trim()) {
+      return "Cada bloque debe tener un nombre";
+    }
     if (start == null || end == null) {
       return `Hora inválida en ${block.label}`;
     }
@@ -73,10 +79,10 @@ export function validateScheduleBlocks(blocks) {
       return `Duración mínima de 15 minutos en ${block.label}`;
     }
     if (index === 0 && start < 5 * 60) {
-      return "El desayuno no puede empezar antes de las 05:00";
+      return "El primer bloque no puede empezar antes de las 05:00";
     }
     if (index === blocks.length - 1 && end > 23 * 60 + 59) {
-      return "El turno noche no puede terminar después de las 23:59";
+      return "El último bloque no puede terminar después de las 23:59";
     }
     if (index > 0) {
       const previousEnd = parseTimeToMinutes(blocks[index - 1].end);

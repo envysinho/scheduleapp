@@ -9,6 +9,7 @@ import { getSchedule, getScheduleSettings } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
   BLOCK_STYLES,
+  DEFAULT_BLOCK_STYLE,
   buildHourMarks,
   getBlockPosition,
   getDayBounds,
@@ -210,7 +211,7 @@ function ColorScheduleView({ blocks, slotsByDay }) {
                     key={`${day.value}-${block.id}`}
                     className={cn(
                       "absolute inset-x-1 rounded-md border px-1 text-center text-[10px] font-medium leading-tight opacity-60",
-                      BLOCK_STYLES[block.id]
+                      BLOCK_STYLES[block.id] ?? DEFAULT_BLOCK_STYLE
                     )}
                     style={{
                       top: `${position.top}%`,

@@ -4,9 +4,10 @@ import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -18,7 +19,6 @@ import com.example.schedule.dto.ScheduleBlockDto;
 import com.example.schedule.dto.ScheduleSettingsResponse;
 import com.example.schedule.dto.UpdateScheduleSettingsRequest;
 import com.example.schedule.entity.ScheduleBlockSetting;
-import com.example.schedule.model.ScheduleBlockId;
 import com.example.schedule.model.Semester;
 import com.example.schedule.repository.ScheduleBlockSettingRepository;
 
@@ -28,21 +28,13 @@ public class ScheduleSettingsService {
     private static final List<String> WEEKDAYS = List.of(
             "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY");
 
-    private static final List<ScheduleBlockId> BLOCK_ORDER = List.of(
-            ScheduleBlockId.DESAYUNO,
-            ScheduleBlockId.MANANA,
-            ScheduleBlockId.ALMUERZO,
-            ScheduleBlockId.TARDE,
-            ScheduleBlockId.CENA,
-            ScheduleBlockId.NOCHE);
-
-    private static final Map<ScheduleBlockId, String> BLOCK_LABELS = Map.of(
-            ScheduleBlockId.DESAYUNO, "Desayuno",
-            ScheduleBlockId.MANANA, "Turno mañana",
-            ScheduleBlockId.ALMUERZO, "Almuerzo",
-            ScheduleBlockId.TARDE, "Turno tarde",
-            ScheduleBlockId.CENA, "Cena",
-            ScheduleBlockId.NOCHE, "Turno noche");
+    private static final Map<String, String> BLOCK_LABELS = Map.of(
+            "DESAYUNO", "Desayuno",
+            "MANANA", "Turno mañana",
+            "ALMUERZO", "Almuerzo",
+            "TARDE", "Turno tarde",
+            "CENA", "Cena",
+            "NOCHE", "Turno noche");
 
     private static final LocalTime DAY_MIN_START = LocalTime.of(5, 0);
     private static final LocalTime DAY_MAX_END = LocalTime.of(23, 59);
@@ -75,23 +67,30 @@ public class ScheduleSettingsService {
     public ScheduleSettingsResponse updateSettings(String semester, UpdateScheduleSettingsRequest request) {
         String normalizedSemester = Semester.normalize(semester);
         List<ParsedBlock> parsedBlocks = parseAndValidate(request.blocks());
-        Map<ScheduleBlockId, ScheduleBlockSetting> existingById = new EnumMap<>(ScheduleBlockId.class);
+        Map<String, ScheduleBlockSetting> existingById = new java.util.HashMap<>();
         repository.findBySemester(normalizedSemester).forEach(setting -> existingById.put(setting.getBlockId(), setting));
 
         List<ScheduleBlockSetting> saved = new ArrayList<>();
+        Set<String> requestedIds = new HashSet<>();
         for (ParsedBlock parsed : parsedBlocks) {
+            requestedIds.add(parsed.id());
             ScheduleBlockSetting setting = existingById.get(parsed.id());
             if (setting == null) {
                 setting = new ScheduleBlockSetting();
                 setting.setSemester(normalizedSemester);
                 setting.setBlockId(parsed.id());
             }
+            setting.setLabel(parsed.label());
             setting.setStartTime(parsed.start());
             setting.setEndTime(parsed.end());
             saved.add(repository.save(setting));
         }
 
-        saved.sort(Comparator.comparing(setting -> BLOCK_ORDER.indexOf(setting.getBlockId())));
+        existingById.values().stream()
+                .filter(setting -> !requestedIds.contains(setting.getBlockId()))
+                .forEach(repository::delete);
+
+        saved.sort(Comparator.comparing(ScheduleBlockSetting::getStartTime));
         notificationService.record("actualizó las reglas de horario del semestre " + normalizedSemester);
         scheduleService.regenerateExistingSchedulesForSemester(normalizedSemester);
         return toResponse(saved);
@@ -114,17 +113,18 @@ public class ScheduleSettingsService {
         }
 
         List<DefaultBlock> defaults = List.of(
-                new DefaultBlock(ScheduleBlockId.DESAYUNO, "06:30", "08:00"),
-                new DefaultBlock(ScheduleBlockId.MANANA, "08:00", "12:30"),
-                new DefaultBlock(ScheduleBlockId.ALMUERZO, "12:30", "14:00"),
-                new DefaultBlock(ScheduleBlockId.TARDE, "14:00", "17:00"),
-                new DefaultBlock(ScheduleBlockId.CENA, "17:00", "17:15"),
-                new DefaultBlock(ScheduleBlockId.NOCHE, "17:15", "22:30"));
+                new DefaultBlock("DESAYUNO", "Desayuno", "06:30", "08:00"),
+                new DefaultBlock("MANANA", "Turno mañana", "08:00", "12:30"),
+                new DefaultBlock("ALMUERZO", "Almuerzo", "12:30", "14:00"),
+                new DefaultBlock("TARDE", "Turno tarde", "14:00", "17:00"),
+                new DefaultBlock("CENA", "Cena", "17:00", "17:15"),
+                new DefaultBlock("NOCHE", "Turno noche", "17:15", "22:30"));
 
         for (DefaultBlock block : defaults) {
             ScheduleBlockSetting setting = new ScheduleBlockSetting();
             setting.setSemester(normalizedSemester);
             setting.setBlockId(block.id());
+            setting.setLabel(block.label());
             setting.setStartTime(parseTime(block.start()));
             setting.setEndTime(parseTime(block.end()));
             repository.save(setting);
@@ -133,7 +133,7 @@ public class ScheduleSettingsService {
 
     private List<ScheduleBlockSetting> loadOrderedBlocks(String semester) {
         List<ScheduleBlockSetting> blocks = repository.findBySemester(semester);
-        blocks.sort(Comparator.comparing(setting -> BLOCK_ORDER.indexOf(setting.getBlockId())));
+        blocks.sort(Comparator.comparing(ScheduleBlockSetting::getStartTime));
         return blocks;
     }
 
@@ -153,6 +153,25 @@ public class ScheduleSettingsService {
                     ALTER COLUMN semester SET NOT NULL
                     """);
             jdbcTemplate.execute("ALTER TABLE schedule_block_settings DROP CONSTRAINT IF EXISTS schedule_block_settings_pkey");
+            jdbcTemplate.execute("""
+                    ALTER TABLE schedule_block_settings
+                    ADD COLUMN IF NOT EXISTS label VARCHAR(80)
+                    """);
+            BLOCK_LABELS.forEach((id, label) -> jdbcTemplate.update("""
+                    UPDATE schedule_block_settings
+                    SET label = ?
+                    WHERE block_id = ?
+                      AND (label IS NULL OR label = '')
+                    """, label, id));
+            jdbcTemplate.execute("""
+                    UPDATE schedule_block_settings
+                    SET label = block_id
+                    WHERE label IS NULL OR label = ''
+                    """);
+            jdbcTemplate.execute("""
+                    ALTER TABLE schedule_block_settings
+                    ALTER COLUMN label SET NOT NULL
+                    """);
             jdbcTemplate.execute("""
                     ALTER TABLE schedule_block_settings
                     ADD CONSTRAINT schedule_block_settings_pkey
@@ -184,45 +203,45 @@ public class ScheduleSettingsService {
 
     private ScheduleSettingsResponse toResponse(List<ScheduleBlockSetting> blocks) {
         List<ScheduleBlockDto> dtos = blocks.stream()
-                .map(setting -> ScheduleBlockDto.from(setting, BLOCK_LABELS.get(setting.getBlockId())))
+                .map(ScheduleBlockDto::from)
                 .toList();
         return new ScheduleSettingsResponse(dtos, WEEKDAYS);
     }
 
     private List<ParsedBlock> parseAndValidate(List<ScheduleBlockDto> blocks) {
-        if (blocks.size() != BLOCK_ORDER.size()) {
-            throw badRequest("Debe enviar exactamente 6 bloques horarios");
-        }
-
         List<ParsedBlock> parsedBlocks = new ArrayList<>();
+        Set<String> ids = new HashSet<>();
         for (int index = 0; index < blocks.size(); index++) {
             ScheduleBlockDto block = blocks.get(index);
-            ScheduleBlockId expectedId = BLOCK_ORDER.get(index);
-            if (block.id() != expectedId) {
-                throw badRequest("Orden inválido de bloques: se esperaba " + expectedId);
+            if (!ids.add(block.id())) {
+                throw badRequest("ID de bloque repetido: " + block.id());
+            }
+            String label = block.label().trim();
+            if (label.isBlank()) {
+                throw badRequest("Cada bloque debe tener un nombre");
             }
 
             LocalTime start = parseTime(block.start());
             LocalTime end = parseTime(block.end());
             if (!start.isBefore(end)) {
-                throw badRequest("Inicio debe ser anterior al fin en " + BLOCK_LABELS.get(block.id()));
+                throw badRequest("Inicio debe ser anterior al fin en " + label);
             }
 
             int durationMinutes = end.getHour() * 60 + end.getMinute() - (start.getHour() * 60 + start.getMinute());
             if (durationMinutes < MIN_BLOCK_MINUTES) {
-                throw badRequest("Duración mínima de 15 minutos en " + BLOCK_LABELS.get(block.id()));
+                throw badRequest("Duración mínima de 15 minutos en " + label);
             }
 
-            parsedBlocks.add(new ParsedBlock(block.id(), start, end));
+            parsedBlocks.add(new ParsedBlock(block.id(), label, start, end));
         }
 
         if (parsedBlocks.get(0).start().isBefore(DAY_MIN_START)) {
-            throw badRequest("El desayuno no puede empezar antes de las 05:00");
+            throw badRequest("El primer bloque no puede empezar antes de las 05:00");
         }
 
         ParsedBlock lastBlock = parsedBlocks.get(parsedBlocks.size() - 1);
         if (lastBlock.end().isAfter(DAY_MAX_END)) {
-            throw badRequest("El turno noche no puede terminar después de las 23:59");
+            throw badRequest("El último bloque no puede terminar después de las 23:59");
         }
 
         for (int index = 0; index < parsedBlocks.size() - 1; index++) {
@@ -248,9 +267,9 @@ public class ScheduleSettingsService {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
     }
 
-    private record DefaultBlock(ScheduleBlockId id, String start, String end) {
+    private record DefaultBlock(String id, String label, String start, String end) {
     }
 
-    private record ParsedBlock(ScheduleBlockId id, LocalTime start, LocalTime end) {
+    private record ParsedBlock(String id, String label, LocalTime start, LocalTime end) {
     }
 }

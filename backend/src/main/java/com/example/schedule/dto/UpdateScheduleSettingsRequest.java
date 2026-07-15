@@ -7,5 +7,5 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 public record UpdateScheduleSettingsRequest(
-        @NotNull @Size(min = 6, max = 6) @Valid List<ScheduleBlockDto> blocks) {
+        @NotNull @Size(min = 1, max = 20) @Valid List<ScheduleBlockDto> blocks) {
 }

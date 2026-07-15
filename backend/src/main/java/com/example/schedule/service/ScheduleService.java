@@ -4,7 +4,6 @@ import java.time.Duration;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,7 +24,6 @@ import com.example.schedule.entity.ScheduleSlot;
 import com.example.schedule.entity.Space;
 import com.example.schedule.entity.SpaceAssignment;
 import com.example.schedule.entity.Teacher;
-import com.example.schedule.model.ScheduleBlockId;
 import com.example.schedule.model.ScheduleWeekday;
 import com.example.schedule.model.Semester;
 import com.example.schedule.model.SubShift;
@@ -325,16 +323,16 @@ public class ScheduleService {
     }
 
     private ScheduleContext loadContext(String semester) {
-        Map<ScheduleBlockId, ShiftWindow> windows = new EnumMap<>(ScheduleBlockId.class);
+        Map<String, ShiftWindow> windows = new LinkedHashMap<>();
         List<ScheduleBlockSetting> settings = scheduleBlockSettingRepository.findBySemester(semester);
         for (ScheduleBlockSetting setting : settings) {
-            if (setting.getBlockId() == ScheduleBlockId.MANANA
-                    || setting.getBlockId() == ScheduleBlockId.TARDE
-                    || setting.getBlockId() == ScheduleBlockId.NOCHE) {
+            if ("MANANA".equals(setting.getBlockId())
+                    || "TARDE".equals(setting.getBlockId())
+                    || "NOCHE".equals(setting.getBlockId())) {
                 windows.put(setting.getBlockId(), new ShiftWindow(setting.getStartTime(), setting.getEndTime()));
             }
         }
-        for (ScheduleBlockId required : List.of(ScheduleBlockId.MANANA, ScheduleBlockId.TARDE, ScheduleBlockId.NOCHE)) {
+        for (String required : List.of("MANANA", "TARDE", "NOCHE")) {
             if (!windows.containsKey(required)) {
                 throw new ResponseStatusException(
                         HttpStatus.CONFLICT,
@@ -345,20 +343,17 @@ public class ScheduleService {
     }
 
     private String fingerprint(List<ScheduleBlockSetting> settings) {
-        Map<ScheduleBlockId, ScheduleBlockSetting> byId = new EnumMap<>(ScheduleBlockId.class);
-        settings.forEach(setting -> byId.put(setting.getBlockId(), setting));
         StringBuilder builder = new StringBuilder();
-        for (ScheduleBlockId id : ScheduleBlockId.values()) {
-            ScheduleBlockSetting setting = byId.get(id);
-            if (setting != null) {
-                builder.append(id.name())
+        settings.stream()
+                .sorted(Comparator.comparing(ScheduleBlockSetting::getStartTime))
+                .forEach(setting -> builder.append(setting.getBlockId())
                         .append('=')
+                        .append(setting.getLabel())
+                        .append('@')
                         .append(setting.getStartTime())
                         .append('-')
                         .append(setting.getEndTime())
-                        .append(';');
-            }
-        }
+                        .append(';'));
         return builder.toString();
     }
 
@@ -455,7 +450,7 @@ public class ScheduleService {
     }
 
     private record ScheduleContext(
-            Map<ScheduleBlockId, ShiftWindow> windows,
+            Map<String, ShiftWindow> windows,
             String fingerprint,
             List<Space> spaces) {
 
@@ -468,11 +463,11 @@ public class ScheduleService {
             return (int) Duration.between(window.start(), window.end()).toMinutes();
         }
 
-        private ScheduleBlockId blockId(TeacherShift shift) {
+        private String blockId(TeacherShift shift) {
             return switch (shift) {
-                case MANANA -> ScheduleBlockId.MANANA;
-                case TARDE -> ScheduleBlockId.TARDE;
-                case NOCHE -> ScheduleBlockId.NOCHE;
+                case MANANA -> "MANANA";
+                case TARDE -> "TARDE";
+                case NOCHE -> "NOCHE";
             };
         }
     }

@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
   BLOCK_STYLES,
+  DEFAULT_BLOCK_STYLE,
   WEEKDAY_LABELS,
   buildHourMarks,
   formatMinutesToTime,
@@ -66,7 +67,7 @@ function TimelineColumn({ blocks, dayStart, dayEnd, onBoundaryChange }) {
               key={block.id}
               className={cn(
                 "absolute inset-x-1 flex items-center justify-center rounded-md border px-1 text-center text-[11px] font-medium leading-tight",
-                BLOCK_STYLES[block.id]
+                BLOCK_STYLES[block.id] ?? DEFAULT_BLOCK_STYLE
               )}
               style={{
                 top: `${position.top}%`,
@@ -156,7 +157,11 @@ function DayScheduleTimeline({ blocks, onChange }) {
 
       <div className="flex flex-wrap justify-center gap-2">
         {blocks.map((block) => (
-          <Badge key={block.id} variant="secondary" className={cn("font-normal", BLOCK_STYLES[block.id])}>
+          <Badge
+            key={block.id}
+            variant="secondary"
+            className={cn("font-normal", BLOCK_STYLES[block.id] ?? DEFAULT_BLOCK_STYLE)}
+          >
             {block.label}: {block.start} – {block.end}
           </Badge>
         ))}

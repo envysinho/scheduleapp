@@ -97,7 +97,7 @@ function ScheduleSettingsSection() {
         <div>
           <h3 className="text-lg font-semibold">Horarios del día</h3>
           <p className="text-sm text-muted-foreground">
-            Define desayuno, turnos y comidas de lunes a viernes. Los turnos lectivos
+            Define bloques y turnos de lunes a viernes. Los turnos lectivos
             determinan el rango horario de clases.
           </p>
         </div>

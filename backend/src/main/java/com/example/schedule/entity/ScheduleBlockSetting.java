@@ -2,13 +2,10 @@ package com.example.schedule.entity;
 
 import java.time.LocalTime;
 
-import com.example.schedule.model.ScheduleBlockId;
 import com.example.schedule.model.ScheduleBlockSettingId;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
@@ -23,9 +20,11 @@ public class ScheduleBlockSetting {
     private String semester;
 
     @Id
-    @Enumerated(EnumType.STRING)
-    @Column(name = "block_id", nullable = false)
-    private ScheduleBlockId blockId;
+    @Column(name = "block_id", nullable = false, length = 40)
+    private String blockId;
+
+    @Column(nullable = false, length = 80)
+    private String label;
 
     @Column(name = "start_time", nullable = false)
     private LocalTime startTime;
@@ -41,12 +40,20 @@ public class ScheduleBlockSetting {
         this.semester = semester;
     }
 
-    public ScheduleBlockId getBlockId() {
+    public String getBlockId() {
         return blockId;
     }
 
-    public void setBlockId(ScheduleBlockId blockId) {
+    public void setBlockId(String blockId) {
         this.blockId = blockId;
+    }
+
+    public String getLabel() {
+        return label;
+    }
+
+    public void setLabel(String label) {
+        this.label = label;
     }
 
     public LocalTime getStartTime() {
