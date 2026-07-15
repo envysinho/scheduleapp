@@ -318,3 +318,31 @@ export async function updateScheduleSettings(data, filtersOrUnauthorized, maybeO
     onUnauthorized
   );
 }
+
+export async function getSchedule(filters, onUnauthorized) {
+  const params = new URLSearchParams();
+  if (filters?.semester) {
+    params.set("semester", filters.semester);
+  }
+  if (filters?.cycle) {
+    params.set("cycle", String(filters.cycle));
+  }
+  const query = params.toString();
+  return apiFetch(`/api/schedules${query ? `?${query}` : ""}`, {}, onUnauthorized);
+}
+
+export async function generateSchedule(filters, onUnauthorized) {
+  const params = new URLSearchParams();
+  if (filters?.semester) {
+    params.set("semester", filters.semester);
+  }
+  if (filters?.cycle) {
+    params.set("cycle", String(filters.cycle));
+  }
+  const query = params.toString();
+  return apiFetch(
+    `/api/schedules/generate${query ? `?${query}` : ""}`,
+    { method: "POST" },
+    onUnauthorized
+  );
+}

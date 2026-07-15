@@ -29,8 +29,8 @@ Estas franjas aplican **de lunes a viernes**. No hay clases ni bloques lectivos 
 | 2 | Turno mañana | `MANANA` | 08:00 | 12:30 |
 | 3 | Almuerzo | `ALMUERZO` | 12:30 | 14:00 |
 | 4 | Turno tarde | `TARDE` | 14:00 | 17:00 |
-| 5 | Cena | `CENA` | 17:00 | 18:30 |
-| 6 | Turno noche | `NOCHE` | 18:30 | 22:30 |
+| 5 | Cena | `CENA` | 17:00 | 17:15 |
+| 6 | Turno noche | `NOCHE` | 17:15 | 22:30 |
 
 ### Tipos de franja
 
@@ -87,8 +87,8 @@ Autenticado (cualquier rol).
     { "id": "MANANA", "label": "Turno mañana", "start": "08:00", "end": "12:30" },
     { "id": "ALMUERZO", "label": "Almuerzo", "start": "12:30", "end": "14:00" },
     { "id": "TARDE", "label": "Turno tarde", "start": "14:00", "end": "17:00" },
-    { "id": "CENA", "label": "Cena", "start": "17:00", "end": "18:30" },
-    { "id": "NOCHE", "label": "Turno noche", "start": "18:30", "end": "22:30" }
+    { "id": "CENA", "label": "Cena", "start": "17:00", "end": "17:15" },
+    { "id": "NOCHE", "label": "Turno noche", "start": "17:15", "end": "22:30" }
   ],
   "weekdays": ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"]
 }

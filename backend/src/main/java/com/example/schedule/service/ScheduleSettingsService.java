@@ -51,14 +51,17 @@ public class ScheduleSettingsService {
     private final ScheduleBlockSettingRepository repository;
     private final NotificationService notificationService;
     private final JdbcTemplate jdbcTemplate;
+    private final ScheduleService scheduleService;
 
     public ScheduleSettingsService(
             ScheduleBlockSettingRepository repository,
             NotificationService notificationService,
-            JdbcTemplate jdbcTemplate) {
+            JdbcTemplate jdbcTemplate,
+            ScheduleService scheduleService) {
         this.repository = repository;
         this.notificationService = notificationService;
         this.jdbcTemplate = jdbcTemplate;
+        this.scheduleService = scheduleService;
     }
 
     @Transactional
@@ -90,12 +93,14 @@ public class ScheduleSettingsService {
 
         saved.sort(Comparator.comparing(setting -> BLOCK_ORDER.indexOf(setting.getBlockId())));
         notificationService.record("actualizó las reglas de horario del semestre " + normalizedSemester);
+        scheduleService.regenerateExistingSchedulesForSemester(normalizedSemester);
         return toResponse(saved);
     }
 
     @Transactional
     public void seedDefaultsIfEmpty() {
         migrateSemesterColumnIfNeeded();
+        migrateOldDinnerDefaultsIfNeeded();
         seedDefaultsIfEmpty(Semester.CURRENT);
     }
 
@@ -103,6 +108,7 @@ public class ScheduleSettingsService {
     public void seedDefaultsIfEmpty(String semester) {
         String normalizedSemester = Semester.normalize(semester);
         migrateSemesterColumnIfNeeded();
+        migrateOldDinnerDefaultsIfNeeded();
         if (repository.countBySemester(normalizedSemester) > 0) {
             return;
         }
@@ -112,8 +118,8 @@ public class ScheduleSettingsService {
                 new DefaultBlock(ScheduleBlockId.MANANA, "08:00", "12:30"),
                 new DefaultBlock(ScheduleBlockId.ALMUERZO, "12:30", "14:00"),
                 new DefaultBlock(ScheduleBlockId.TARDE, "14:00", "17:00"),
-                new DefaultBlock(ScheduleBlockId.CENA, "17:00", "18:30"),
-                new DefaultBlock(ScheduleBlockId.NOCHE, "18:30", "22:30"));
+                new DefaultBlock(ScheduleBlockId.CENA, "17:00", "17:15"),
+                new DefaultBlock(ScheduleBlockId.NOCHE, "17:15", "22:30"));
 
         for (DefaultBlock block : defaults) {
             ScheduleBlockSetting setting = new ScheduleBlockSetting();
@@ -151,6 +157,26 @@ public class ScheduleSettingsService {
                     ALTER TABLE schedule_block_settings
                     ADD CONSTRAINT schedule_block_settings_pkey
                     PRIMARY KEY (semester, block_id)
+                    """);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void migrateOldDinnerDefaultsIfNeeded() {
+        try {
+            jdbcTemplate.execute("""
+                    UPDATE schedule_block_settings
+                    SET end_time = '17:15'
+                    WHERE block_id = 'CENA'
+                      AND start_time = '17:00'
+                      AND end_time = '18:30'
+                    """);
+            jdbcTemplate.execute("""
+                    UPDATE schedule_block_settings
+                    SET start_time = '17:15'
+                    WHERE block_id = 'NOCHE'
+                      AND start_time = '18:30'
+                      AND end_time = '22:30'
                     """);
         } catch (Exception ignored) {
         }
