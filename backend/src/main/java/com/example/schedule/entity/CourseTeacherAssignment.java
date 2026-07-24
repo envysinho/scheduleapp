@@ -1,6 +1,7 @@
 package com.example.schedule.entity;
 
 import java.time.Instant;
+import java.time.LocalTime;
 
 import org.hibernate.annotations.CreationTimestamp;
 
@@ -61,6 +62,12 @@ public class CourseTeacherAssignment {
     @Column(name = "weekday")
     private ScheduleWeekday weekday;
 
+    @Column(name = "manual_start_time")
+    private LocalTime manualStartTime;
+
+    @Column(name = "manual_end_time")
+    private LocalTime manualEndTime;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -111,6 +118,22 @@ public class CourseTeacherAssignment {
 
     public void setWeekday(ScheduleWeekday weekday) {
         this.weekday = weekday;
+    }
+
+    public LocalTime getManualStartTime() {
+        return manualStartTime;
+    }
+
+    public void setManualStartTime(LocalTime manualStartTime) {
+        this.manualStartTime = manualStartTime;
+    }
+
+    public LocalTime getManualEndTime() {
+        return manualEndTime;
+    }
+
+    public void setManualEndTime(LocalTime manualEndTime) {
+        this.manualEndTime = manualEndTime;
     }
 
     public Instant getCreatedAt() {

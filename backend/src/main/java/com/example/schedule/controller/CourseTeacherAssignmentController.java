@@ -7,7 +7,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.schedule.dto.CourseTeacherAssignmentResponse;
+import com.example.schedule.dto.UpdateAssignmentScheduleRequest;
 import com.example.schedule.dto.UpdateAssignmentWeekdayRequest;
+import com.example.schedule.service.ScheduleService;
 import com.example.schedule.service.TeacherService;
 
 @RestController
@@ -15,9 +17,11 @@ import com.example.schedule.service.TeacherService;
 public class CourseTeacherAssignmentController {
 
     private final TeacherService teacherService;
+    private final ScheduleService scheduleService;
 
-    public CourseTeacherAssignmentController(TeacherService teacherService) {
+    public CourseTeacherAssignmentController(TeacherService teacherService, ScheduleService scheduleService) {
         this.teacherService = teacherService;
+        this.scheduleService = scheduleService;
     }
 
     @PatchMapping("/{id}/weekday")
@@ -26,5 +30,13 @@ public class CourseTeacherAssignmentController {
             @RequestBody UpdateAssignmentWeekdayRequest request) {
         return CourseTeacherAssignmentResponse.from(
                 teacherService.updateAssignmentWeekday(id, request.weekday()));
+    }
+
+    @PatchMapping("/{id}/schedule")
+    public CourseTeacherAssignmentResponse updateSchedule(
+            @PathVariable("id") Long id,
+            @RequestBody UpdateAssignmentScheduleRequest request) {
+        return CourseTeacherAssignmentResponse.from(
+                scheduleService.updateAssignmentSchedule(id, request.weekday(), request.startTime(), request.endTime()));
     }
 }

@@ -29,6 +29,7 @@ import com.example.schedule.model.Semester;
 import com.example.schedule.model.SubShift;
 import com.example.schedule.model.TeacherShift;
 import com.example.schedule.repository.CourseRepository;
+import com.example.schedule.repository.CourseTeacherAssignmentRepository;
 import com.example.schedule.repository.ScheduleBlockSettingRepository;
 import com.example.schedule.repository.ScheduleSlotRepository;
 import com.example.schedule.repository.SpaceRepository;
@@ -49,6 +50,7 @@ public class ScheduleService {
     private final ScheduleSlotRepository scheduleSlotRepository;
     private final ScheduleBlockSettingRepository scheduleBlockSettingRepository;
     private final CourseRepository courseRepository;
+    private final CourseTeacherAssignmentRepository assignmentRepository;
     private final SpaceRepository spaceRepository;
     private final NotificationService notificationService;
 
@@ -56,11 +58,13 @@ public class ScheduleService {
             ScheduleSlotRepository scheduleSlotRepository,
             ScheduleBlockSettingRepository scheduleBlockSettingRepository,
             CourseRepository courseRepository,
+            CourseTeacherAssignmentRepository assignmentRepository,
             SpaceRepository spaceRepository,
             NotificationService notificationService) {
         this.scheduleSlotRepository = scheduleSlotRepository;
         this.scheduleBlockSettingRepository = scheduleBlockSettingRepository;
         this.courseRepository = courseRepository;
+        this.assignmentRepository = assignmentRepository;
         this.spaceRepository = spaceRepository;
         this.notificationService = notificationService;
     }
@@ -109,6 +113,42 @@ public class ScheduleService {
                 // El horario queda marcado como desactualizado por fingerprint y puede regenerarse manualmente.
             }
         }
+    }
+
+    @Transactional
+    public CourseTeacherAssignment updateAssignmentSchedule(
+            Long assignmentId,
+            ScheduleWeekday weekday,
+            String startTime,
+            String endTime) {
+        CourseTeacherAssignment assignment = assignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Asignación no encontrada"));
+
+        if (weekday == null) {
+            assignment.setWeekday(null);
+            assignment.setManualStartTime(null);
+            assignment.setManualEndTime(null);
+            CourseTeacherAssignment saved = assignmentRepository.save(assignment);
+            notificationService.record("liberó el horario manual de " + saved.getCourse().getName());
+            return saved;
+        }
+
+        LocalTime manualStart = parseManualTime(startTime);
+        LocalTime manualEnd = parseManualTime(endTime);
+        if (manualStart == null || manualEnd == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Debes enviar hora de inicio y fin para actualizar el horario manual.");
+        }
+
+        validateManualRange(assignment, weekday, manualStart, manualEnd);
+        assignment.setWeekday(weekday);
+        assignment.setManualStartTime(manualStart);
+        assignment.setManualEndTime(manualEnd);
+        CourseTeacherAssignment saved = assignmentRepository.save(assignment);
+        notificationService.record("actualizó el horario manual de " + saved.getCourse().getName()
+                + " a " + weekday + " " + manualStart + "-" + manualEnd);
+        return saved;
     }
 
     private List<ScheduleSlot> buildSlots(
@@ -190,6 +230,23 @@ public class ScheduleService {
             int durationMinutes,
             ScheduleContext context,
             List<PlacedSlot> placed) {
+        if (task.hasManualSlot()) {
+            PlacedSlot candidate = new PlacedSlot(
+                    task.course().getId(),
+                    task.teacher().getId(),
+                    task.space() == null ? null : task.space().getId(),
+                    task.cycle(),
+                    task.subShift(),
+                    task.assignmentId(),
+                    false,
+                    task.weekday(),
+                    task.manualStart(),
+                    task.manualEnd());
+            return placed.stream().noneMatch(existing -> conflicts(existing, candidate))
+                    ? candidate
+                    : null;
+        }
+
         ShiftWindow window = context.window(task.shift());
         List<ScheduleWeekday> candidateDays = task.weekday() == null ? WEEKDAYS : List.of(task.weekday());
         for (ScheduleWeekday weekday : candidateDays) {
@@ -266,6 +323,8 @@ public class ScheduleService {
                     warnings.add("Asignación sin docente: " + course.getCode());
                     continue;
                 }
+                LocalTime manualStart = assignment.getManualStartTime();
+                LocalTime manualEnd = assignment.getManualEndTime();
                 Space space = resolveSpace(course, assignment, spaces, semester);
                 if (space == null) {
                     warnings.add("Curso sin ambiente asignado: " + course.getCode() + " " + shiftLabel(assignment));
@@ -279,7 +338,11 @@ public class ScheduleService {
                         assignment.getShift(),
                         assignment.getSubShift(),
                         assignment.getWeekday(),
-                        academicHours * ACADEMIC_MINUTES));
+                        manualStart,
+                        manualEnd,
+                        manualStart != null && manualEnd != null
+                                ? (int) Duration.between(manualStart, manualEnd).toMinutes()
+                                : academicHours * ACADEMIC_MINUTES));
             }
         }
         addManualDayWarnings(tasks, warnings);
@@ -305,6 +368,11 @@ public class ScheduleService {
                         || !Objects.equals(left.cycle(), right.cycle())
                         || Objects.equals(left.course().getId(), right.course().getId())) {
                     continue;
+                }
+                if (left.hasManualSlot() && right.hasManualSlot()) {
+                    if (!overlaps(left.manualStart(), left.manualEnd(), right.manualStart(), right.manualEnd())) {
+                        continue;
+                    }
                 }
                 warnings.add("Día ocupado: " + left.course().getCode()
                         + " y " + right.course().getCode()
@@ -419,6 +487,79 @@ public class ScheduleService {
         }
     }
 
+    private void validateManualRange(
+            CourseTeacherAssignment assignment,
+            ScheduleWeekday weekday,
+            LocalTime startTime,
+            LocalTime endTime) {
+        if (!isQuarterHour(startTime) || !isQuarterHour(endTime)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Las horas manuales deben estar en intervalos de 15 minutos.");
+        }
+        if (!startTime.isBefore(endTime)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "La hora de inicio debe ser anterior a la hora de fin.");
+        }
+        if (Duration.between(startTime, endTime).toMinutes() < STEP_MINUTES) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "La duración mínima manual es de 15 minutos.");
+        }
+
+        String semester = assignment.getCourse().getSemester();
+        ScheduleContext context = loadContext(semester);
+        ShiftWindow window = context.window(assignment.getShift());
+        if (startTime.isBefore(window.start()) || endTime.isAfter(window.end())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "El horario manual debe quedar dentro del bloque de " + assignment.getShift() + ".");
+        }
+
+        List<ScheduleSlot> preview = buildPreviewSlots(semester, assignment.getCourse().getCycle(), context, new ArrayList<>());
+        PlacedSlot candidate = new PlacedSlot(
+                assignment.getCourse().getId(),
+                assignment.getTeacher().getId(),
+                resolveSpace(assignment.getCourse(), assignment, context.spaces(), semester) == null
+                        ? null
+                        : resolveSpace(assignment.getCourse(), assignment, context.spaces(), semester).getId(),
+                assignment.getCourse().getCycle(),
+                assignment.getSubShift(),
+                assignment.getId(),
+                false,
+                weekday,
+                startTime,
+                endTime);
+
+        for (ScheduleSlot slot : preview) {
+            if (Objects.equals(slot.getAssignmentId(), assignment.getId())) {
+                continue;
+            }
+            if (conflicts(PlacedSlot.from(slot), candidate)) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Ese horario se cruza con " + slot.getCourse().getCode()
+                                + " (" + slot.getStartTime() + "-" + slot.getEndTime() + ").");
+            }
+        }
+    }
+
+    private LocalTime parseManualTime(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalTime.parse(value);
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Hora inválida: " + value);
+        }
+    }
+
+    private boolean isQuarterHour(LocalTime value) {
+        return value.getMinute() % STEP_MINUTES == 0 && value.getSecond() == 0 && value.getNano() == 0;
+    }
+
     private static final Map<String, Integer> COURSE_HOURS_BY_CODE = buildCourseHours();
 
     private static Map<String, Integer> buildCourseHours() {
@@ -523,10 +664,16 @@ public class ScheduleService {
             TeacherShift shift,
             SubShift subShift,
             ScheduleWeekday weekday,
+            LocalTime manualStart,
+            LocalTime manualEnd,
             int totalMinutes) {
 
         String shiftLabel() {
             return subShift == null ? shift.name() : shift.name() + " " + subShift.name();
+        }
+
+        boolean hasManualSlot() {
+            return weekday != null && manualStart != null && manualEnd != null;
         }
     }
 

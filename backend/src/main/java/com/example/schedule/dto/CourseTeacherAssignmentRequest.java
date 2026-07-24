@@ -10,6 +10,8 @@ public record CourseTeacherAssignmentRequest(
         @NotNull Long courseId,
         @NotNull TeacherShift shift,
         SubShift subShift,
-        ScheduleWeekday weekday
+        ScheduleWeekday weekday,
+        String manualStartTime,
+        String manualEndTime
 ) {
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import PageCard from "@/components/PageCard";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,7 @@ import {
   getSchedule,
   getScheduleSettings,
   listCourses,
+  updateAssignmentSchedule,
   updateAssignmentWeekday,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -37,9 +38,11 @@ import {
   BLOCK_STYLES,
   DEFAULT_BLOCK_STYLE,
   buildHourMarks,
+  formatMinutesToTime,
   getBlockPosition,
   getDayBounds,
   parseTimeToMinutes,
+  snapMinutes,
 } from "@/lib/scheduleTime";
 
 const COURSE_COLOR_STYLES = [
@@ -54,6 +57,8 @@ const COURSE_COLOR_STYLES = [
   "bg-lime-500 text-slate-950 border-lime-600",
   "bg-cyan-600 text-white border-cyan-700",
 ];
+
+const DRAG_STEP_MINUTES = 15;
 
 function formatTimeRange(slot) {
   return `${slot.startTime} - ${slot.endTime}`;
@@ -72,6 +77,10 @@ function getCourseColorStyle(slot) {
     hash = (hash * 31 + key.charCodeAt(index)) >>> 0;
   }
   return COURSE_COLOR_STYLES[hash % COURSE_COLOR_STYLES.length];
+}
+
+function findSlotByAssignmentId(schedule, assignmentId) {
+  return schedule?.slots?.find((slot) => slot.assignmentId === assignmentId) ?? null;
 }
 
 function Horarios({ cycle = 1 }) {
@@ -147,10 +156,12 @@ function Horarios({ cycle = 1 }) {
     [schedule?.warnings, dayConflicts]
   );
 
-  const handleWeekdayChange = async (assignmentId, weekday) => {
+  const handleAssignmentScheduleChange = async (assignmentId, nextSchedule) => {
     setSavingAssignmentId(assignmentId);
     setError(null);
-    const normalizedWeekday = weekday || null;
+    const normalizedWeekday = nextSchedule.weekday || null;
+    const normalizedStartTime = normalizedWeekday ? nextSchedule.startTime ?? null : null;
+    const normalizedEndTime = normalizedWeekday ? nextSchedule.endTime ?? null : null;
     const previousSchedule = schedule;
     const previousCourses = courses;
 
@@ -164,6 +175,8 @@ function Horarios({ cycle = 1 }) {
                     ...slot,
                     weekday: normalizedWeekday,
                     automaticWeekday: normalizedWeekday == null,
+                    startTime: normalizedStartTime ?? slot.startTime,
+                    endTime: normalizedEndTime ?? slot.endTime,
                   }
                 : slot
             ),
@@ -175,22 +188,48 @@ function Horarios({ cycle = 1 }) {
         ...course,
         teacherAssignments: (course.teacherAssignments ?? []).map((assignment) =>
           assignment.id === assignmentId
-            ? { ...assignment, weekday: normalizedWeekday }
+            ? {
+                ...assignment,
+                weekday: normalizedWeekday,
+                manualStartTime: normalizedStartTime,
+                manualEndTime: normalizedEndTime,
+              }
             : assignment
         ),
       }))
     );
 
     try {
-      await updateAssignmentWeekday(assignmentId, normalizedWeekday, logout);
+      if (normalizedWeekday && normalizedStartTime && normalizedEndTime) {
+        await updateAssignmentSchedule(
+          assignmentId,
+          {
+            weekday: normalizedWeekday,
+            startTime: normalizedStartTime,
+            endTime: normalizedEndTime,
+          },
+          logout
+        );
+      } else {
+        await updateAssignmentWeekday(assignmentId, normalizedWeekday, logout);
+      }
       await loadSchedule({ silent: true });
     } catch (err) {
       setSchedule(previousSchedule);
       setCourses(previousCourses);
-      setError(err instanceof Error ? err.message : "Error al actualizar día");
+      setError(err instanceof Error ? err.message : "Error al actualizar horario");
     } finally {
       setSavingAssignmentId(null);
     }
+  };
+
+  const handleWeekdayChange = async (assignmentId, weekday) => {
+    const currentSlot = findSlotByAssignmentId(schedule, assignmentId);
+    await handleAssignmentScheduleChange(assignmentId, {
+      weekday,
+      startTime: weekday ? currentSlot?.startTime ?? null : null,
+      endTime: weekday ? currentSlot?.endTime ?? null : null,
+    });
   };
 
   return (
@@ -244,7 +283,7 @@ function Horarios({ cycle = 1 }) {
             blocks={blocks}
             slotsByDay={slotsByDay}
             savingAssignmentId={savingAssignmentId}
-            onMoveSlot={handleWeekdayChange}
+            onUpdateSlot={handleAssignmentScheduleChange}
           />
         ) : (
           <MatrixScheduleView slotsByDay={slotsByDay} />
@@ -427,6 +466,20 @@ function findManualDayConflicts(assignments) {
       ) {
         continue;
       }
+      if (
+        left.manualStartTime &&
+        left.manualEndTime &&
+        right.manualStartTime &&
+        right.manualEndTime
+      ) {
+        const leftStart = parseTimeToMinutes(left.manualStartTime.slice(0, 5));
+        const leftEnd = parseTimeToMinutes(left.manualEndTime.slice(0, 5));
+        const rightStart = parseTimeToMinutes(right.manualStartTime.slice(0, 5));
+        const rightEnd = parseTimeToMinutes(right.manualEndTime.slice(0, 5));
+        if (leftStart >= rightEnd || rightStart >= leftEnd) {
+          continue;
+        }
+      }
       conflicts.push(
         `${getWeekdayLabel(left.weekday, true)} ocupado: ${left.courseCode} y ${right.courseCode} comparten ciclo y turno.`
       );
@@ -435,104 +488,178 @@ function findManualDayConflicts(assignments) {
   return conflicts;
 }
 
-function ColorScheduleView({ blocks, slotsByDay, savingAssignmentId, onMoveSlot }) {
+function ColorScheduleView({ blocks, slotsByDay, savingAssignmentId, onUpdateSlot }) {
   const bounds = getDayBounds(blocks);
   const hourMarks = buildHourMarks(bounds.start, bounds.end);
-  const [draggedAssignmentId, setDraggedAssignmentId] = useState(null);
-  const [dragOverDay, setDragOverDay] = useState(null);
-  const [dragPreview, setDragPreview] = useState(null);
+  const dayRefs = useRef(new Map());
+  const [interaction, setInteraction] = useState(null);
 
-  const updateDragPreviewPosition = (event) => {
-    setDragPreview((current) =>
-      current
-        ? {
+  const setDayRef = (weekday, node) => {
+    if (node) {
+      dayRefs.current.set(weekday, node);
+      return;
+    }
+    dayRefs.current.delete(weekday);
+  };
+
+  useEffect(() => {
+    if (!interaction) {
+      return undefined;
+    }
+
+    const handlePointerMove = (event) => {
+      event.preventDefault();
+      setInteraction((current) => {
+        if (!current) {
+          return current;
+        }
+
+        const nextWeekday =
+          current.type === "resize"
+            ? current.previewWeekday
+            : pickWeekdayFromPointer(dayRefs.current, event.clientX, current.previewWeekday);
+
+        const shiftBounds = getShiftBounds(blocks, current.slot.shift, bounds);
+        if (!shiftBounds) {
+          return { ...current, x: event.clientX, y: event.clientY };
+        }
+
+        if (current.type === "move") {
+          const pointerMinutes = minutesFromPointer(dayRefs.current, nextWeekday, event.clientY, bounds);
+          const nextDuration = current.durationMinutes;
+          const rawStart = snapMinutes(pointerMinutes - current.pointerOffsetMinutes, DRAG_STEP_MINUTES);
+          const startMinutes = clampMinutes(
+            rawStart,
+            shiftBounds.start,
+            shiftBounds.end - nextDuration
+          );
+
+          return {
             ...current,
             x: event.clientX,
             y: event.clientY,
-          }
-        : current
-    );
-  };
+            previewWeekday: nextWeekday,
+            previewStartTime: formatMinutesToTime(startMinutes),
+            previewEndTime: formatMinutesToTime(startMinutes + nextDuration),
+          };
+        }
 
-  const handleDragStart = (event, slot) => {
+        const pointerMinutes = minutesFromPointer(
+          dayRefs.current,
+          current.previewWeekday,
+          event.clientY,
+          bounds
+        );
+        const endMinutes = clampMinutes(
+          snapMinutes(pointerMinutes, DRAG_STEP_MINUTES),
+          current.startMinutes + DRAG_STEP_MINUTES,
+          shiftBounds.end
+        );
+
+        return {
+          ...current,
+          x: event.clientX,
+          y: event.clientY,
+          previewEndTime: formatMinutesToTime(endMinutes),
+        };
+      });
+    };
+
+    const handlePointerUp = async () => {
+      const current = interaction;
+      setInteraction(null);
+      if (!current || savingAssignmentId != null) {
+        return;
+      }
+
+      const changed =
+        current.previewWeekday !== current.slot.weekday ||
+        current.previewStartTime !== current.slot.startTime ||
+        current.previewEndTime !== current.slot.endTime;
+
+      if (!changed) {
+        return;
+      }
+
+      await onUpdateSlot(current.assignmentId, {
+        weekday: current.previewWeekday,
+        startTime: current.previewStartTime,
+        endTime: current.previewEndTime,
+      });
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [interaction, bounds, blocks, onUpdateSlot, savingAssignmentId]);
+
+  const startMoveInteraction = (event, slot) => {
     if (!slot.assignmentId || savingAssignmentId != null) {
-      event.preventDefault();
       return;
     }
-    const payload = {
+    event.preventDefault();
+
+    const pointerMinutes = minutesFromPointer(dayRefs.current, slot.weekday, event.clientY, bounds);
+    const startMinutes = parseTimeToMinutes(slot.startTime);
+    const endMinutes = parseTimeToMinutes(slot.endTime);
+    if (pointerMinutes == null || startMinutes == null || endMinutes == null) {
+      return;
+    }
+
+    setInteraction({
+      type: "move",
       assignmentId: slot.assignmentId,
-      weekday: slot.weekday ?? null,
-    };
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("application/json", JSON.stringify(payload));
-    const dragPreview = event.currentTarget.cloneNode(true);
-    dragPreview.style.position = "absolute";
-    dragPreview.style.top = "-9999px";
-    dragPreview.style.left = "-9999px";
-    dragPreview.style.width = `${event.currentTarget.offsetWidth}px`;
-    dragPreview.style.transform = "rotate(-2deg) scale(1.03)";
-    dragPreview.style.boxShadow = "0 18px 40px rgba(0,0,0,0.28)";
-    dragPreview.style.opacity = "0.96";
-    dragPreview.style.pointerEvents = "none";
-    document.body.appendChild(dragPreview);
-    event.dataTransfer.setDragImage(dragPreview, dragPreview.offsetWidth / 2, 24);
-    requestAnimationFrame(() => {
-      dragPreview.remove();
-    });
-    setDraggedAssignmentId(slot.assignmentId);
-    setDragPreview({
-      assignmentId: slot.assignmentId,
-      courseCode: slot.courseCode,
-      courseName: slot.courseName,
-      subtitle: slotSubtitle(slot),
-      colorClassName: getCourseColorStyle(slot),
+      slot,
       x: event.clientX,
       y: event.clientY,
+      durationMinutes: endMinutes - startMinutes,
+      pointerOffsetMinutes: pointerMinutes - startMinutes,
+      previewWeekday: slot.weekday,
+      previewStartTime: slot.startTime,
+      previewEndTime: slot.endTime,
     });
   };
 
-  const handleDragEnd = () => {
-    setDraggedAssignmentId(null);
-    setDragOverDay(null);
-    setDragPreview(null);
-  };
-
-  const handleDrop = async (event, weekday) => {
-    event.preventDefault();
-    setDragOverDay(null);
-
-    try {
-      const rawData = event.dataTransfer.getData("application/json");
-      if (!rawData) {
-        return;
-      }
-
-      const data = JSON.parse(rawData);
-      const assignmentId = Number(data.assignmentId);
-      const currentWeekday = data.weekday ?? null;
-
-      if (!assignmentId || currentWeekday === weekday || savingAssignmentId != null) {
-        return;
-      }
-
-      await onMoveSlot(assignmentId, weekday);
-    } finally {
-      setDraggedAssignmentId(null);
-      setDragPreview(null);
+  const startResizeInteraction = (event, slot) => {
+    if (!slot.assignmentId || savingAssignmentId != null) {
+      return;
     }
+    event.preventDefault();
+    event.stopPropagation();
+
+    const startMinutes = parseTimeToMinutes(slot.startTime);
+    if (startMinutes == null) {
+      return;
+    }
+
+    setInteraction({
+      type: "resize",
+      assignmentId: slot.assignmentId,
+      slot,
+      x: event.clientX,
+      y: event.clientY,
+      startMinutes,
+      previewWeekday: slot.weekday,
+      previewStartTime: slot.startTime,
+      previewEndTime: slot.endTime,
+    });
   };
 
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[2.75rem_repeat(5,minmax(0,1fr))]">
-      <div className="hidden xl:flex xl:w-11 xl:flex-col xl:gap-2">
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[3.5rem_repeat(5,minmax(0,1fr))]">
+      <div className="hidden xl:flex xl:w-14 xl:flex-col xl:gap-3">
         <div className="text-center text-xs font-medium text-muted-foreground opacity-0 select-none">
           Hora
         </div>
-        <div className="relative min-h-[548px] py-1.5">
+        <div className="relative min-h-[560px] py-3">
           {hourMarks.map((mark) => (
             <span
               key={`${mark.label}-${mark.top}`}
-              className="absolute right-0 w-full -translate-y-1/2 text-right font-mono text-[10px] tabular-nums leading-none text-muted-foreground"
+              className="absolute right-0 w-full -translate-y-1/2 pr-2 text-right font-mono text-[10px] tabular-nums leading-none text-muted-foreground/80"
               style={{ top: `${mark.top}%` }}
             >
               {mark.label}
@@ -545,49 +672,46 @@ function ColorScheduleView({ blocks, slotsByDay, savingAssignmentId, onMoveSlot 
         <section
           key={day.value}
           className={cn(
-            "flex min-w-0 flex-col gap-2 rounded-lg transition-colors",
-            dragOverDay === day.value && "bg-primary/5"
+            "flex min-w-0 flex-col gap-2 rounded-2xl transition-colors",
+            interaction?.previewWeekday === day.value && "bg-primary/5"
           )}
-          onDragOver={(event) => {
-            event.preventDefault();
-            event.dataTransfer.dropEffect = "move";
-            updateDragPreviewPosition(event);
-            if (dragOverDay !== day.value) {
-              setDragOverDay(day.value);
-            }
-          }}
-          onDragLeave={(event) => {
-            if (!event.currentTarget.contains(event.relatedTarget)) {
-              setDragOverDay((current) => (current === day.value ? null : current));
-            }
-          }}
-          onDrop={(event) => handleDrop(event, day.value)}
         >
-          <div className="text-center text-xs font-medium text-muted-foreground">{day.label}</div>
+          <div className="px-1 text-center text-xs font-semibold tracking-[0.08em] text-muted-foreground uppercase">
+            {day.label}
+          </div>
           <div
             className={cn(
-              "relative min-h-[420px] rounded-lg border bg-muted/20 py-1.5 pl-9 xl:min-h-[548px] xl:pl-0",
-              dragOverDay === day.value && "border-primary/60 ring-2 ring-primary/20"
+              "relative min-h-[440px] rounded-2xl border border-border/70 bg-gradient-to-b from-background to-muted/20 py-3 pl-10 shadow-sm xl:min-h-[560px] xl:pl-0",
+              interaction?.previewWeekday === day.value &&
+                "border-primary/70 bg-primary/5 ring-2 ring-primary/20 shadow-lg"
             )}
           >
             {hourMarks.map((mark) => (
-              <span
-                key={`${day.value}-${mark.label}-${mark.top}`}
-                className="absolute left-1 w-7 -translate-y-1/2 text-left font-mono text-[9px] tabular-nums leading-none text-muted-foreground xl:hidden"
-                style={{ top: `${mark.top}%` }}
-              >
-                {mark.label}
-              </span>
+              <div key={`${day.value}-${mark.label}-${mark.top}`}>
+                <span
+                  className="absolute left-1 w-8 -translate-y-1/2 text-left font-mono text-[9px] tabular-nums leading-none text-muted-foreground/80 xl:hidden"
+                  style={{ top: `${mark.top}%` }}
+                >
+                  {mark.label}
+                </span>
+                <div
+                  className="absolute left-9 right-2 border-t border-border/40 xl:left-2"
+                  style={{ top: `${mark.top}%` }}
+                />
+              </div>
             ))}
 
-            <div className="absolute inset-y-1.5 left-9 right-1 xl:left-1">
+            <div
+              ref={(node) => setDayRef(day.value, node)}
+              className="absolute inset-y-3 left-9 right-2 xl:left-2"
+            >
               {blocks.map((block) => {
                 const position = getBlockPosition(block, bounds.start, bounds.end);
                 return (
                   <div
                     key={`${day.value}-${block.id}`}
                     className={cn(
-                      "absolute inset-x-0 rounded-md border px-1 text-center text-[10px] font-medium leading-tight opacity-60",
+                      "absolute inset-x-0 rounded-xl border px-1.5 text-center text-[10px] font-medium leading-tight opacity-40",
                       BLOCK_STYLES[block.id] ?? DEFAULT_BLOCK_STYLE
                     )}
                     style={{
@@ -600,47 +724,61 @@ function ColorScheduleView({ blocks, slotsByDay, savingAssignmentId, onMoveSlot 
                 );
               })}
 
+              {interaction?.previewWeekday === day.value && (
+                <DropPreviewSlot
+                  slot={{
+                    ...interaction.slot,
+                    weekday: interaction.previewWeekday,
+                    startTime: interaction.previewStartTime,
+                    endTime: interaction.previewEndTime,
+                  }}
+                  bounds={bounds}
+                  isResize={interaction.type === "resize"}
+                />
+              )}
+
               {layoutOverlappingSlots(slotsByDay[day.value]).map(({ slot, column, columns }, index) => {
                 const top = positionForTime(slot.startTime, bounds);
                 const bottom = positionForTime(slot.endTime, bounds);
-                const totalGapPx = Math.max(columns - 1, 0) * 4;
+                const totalGapPx = Math.max(columns - 1, 0) * 8;
                 const columnWidth = `calc((100% - ${totalGapPx}px) / ${columns})`;
-                const columnLeft = `calc(${column} * (${columnWidth} + 4px))`;
+                const columnLeft = `calc(${column} * (${columnWidth} + 8px))`;
 
                 return (
                   <article
                     key={slot.id ?? `${slot.weekday}-${slot.startTime}-${slot.courseId}-${index}`}
                     className={cn(
-                      "absolute z-10 box-border overflow-hidden rounded-md border px-2 py-1 text-[11px] leading-tight shadow-sm transition-transform duration-150",
+                      "absolute z-10 box-border overflow-hidden rounded-xl border px-2.5 py-2 text-[11px] leading-tight shadow-md transition-all duration-150",
                       getCourseColorStyle(slot),
                       slot.automaticWeekday && "border-dashed opacity-60",
-                      slot.assignmentId && savingAssignmentId == null && "cursor-grab",
-                      slot.assignmentId && savingAssignmentId == null && "active:cursor-grabbing",
-                      draggedAssignmentId === slot.assignmentId &&
-                        "scale-[1.02] -rotate-1 opacity-30 ring-2 ring-white/70 shadow-2xl"
+                      slot.assignmentId && savingAssignmentId == null && "cursor-grab hover:-translate-y-0.5 hover:shadow-lg",
+                      slot.assignmentId && savingAssignmentId == null && "active:cursor-grabbing touch-none",
+                      interaction?.assignmentId === slot.assignmentId &&
+                        "scale-[1.02] -rotate-1 opacity-25 ring-2 ring-white/85 shadow-2xl"
                     )}
-                    draggable={Boolean(slot.assignmentId) && savingAssignmentId == null}
-                    onDragStart={(event) => handleDragStart(event, slot)}
-                    onDrag={(event) => {
-                      if (event.clientX || event.clientY) {
-                        updateDragPreviewPosition(event);
-                      }
-                    }}
-                    onDragEnd={handleDragEnd}
+                    onPointerDown={(event) => startMoveInteraction(event, slot)}
                     style={{
                       top: `${top}%`,
                       height: `${Math.max(bottom - top, 5)}%`,
                       left: columnLeft,
                       width: columnWidth,
                     }}
-                    title={`Arrastra para mover a otro día. ${slot.courseCode} · ${slot.courseName}`}
+                    title={`Arrastra para mover en pasos de 15 minutos. ${slot.courseCode} · ${slot.courseName}`}
                   >
-                    {draggedAssignmentId === slot.assignmentId && (
-                      <div className="absolute inset-0 rounded-md border-2 border-dashed border-white/90 bg-white/10" />
+                    {interaction?.assignmentId === slot.assignmentId && (
+                      <div className="absolute inset-0 rounded-xl border-2 border-dashed border-white/90 bg-white/10" />
                     )}
                     <div className="font-semibold">{slot.startTime} {slot.courseCode}</div>
-                    <div className="truncate">{slot.courseName}</div>
-                    <div className="truncate opacity-85">{slotSubtitle(slot)}</div>
+                    <div className="truncate font-medium opacity-95">{slot.courseName}</div>
+                    <div className="mt-0.5 truncate text-[10px] opacity-80">{slotSubtitle(slot)}</div>
+                    {slot.assignmentId && savingAssignmentId == null && (
+                      <button
+                        type="button"
+                        className="absolute bottom-0 left-2 right-2 h-2 cursor-ns-resize rounded-full bg-white/70 opacity-75 transition-opacity hover:opacity-100"
+                        onPointerDown={(event) => startResizeInteraction(event, slot)}
+                        aria-label={`Extender ${slot.courseCode}`}
+                      />
+                    )}
                   </article>
                 );
               })}
@@ -649,27 +787,95 @@ function ColorScheduleView({ blocks, slotsByDay, savingAssignmentId, onMoveSlot 
         </section>
       ))}
 
-      {dragPreview && (
+      {interaction && (
         <div
           className="pointer-events-none fixed left-0 top-0 z-50"
           style={{
-            transform: `translate(${dragPreview.x + 18}px, ${dragPreview.y + 18}px) rotate(-2deg)`,
+            transform: `translate(${interaction.x + 18}px, ${interaction.y + 18}px) rotate(-2deg)`,
           }}
         >
           <article
             className={cn(
-              "w-48 overflow-hidden rounded-md border px-2 py-1 text-[11px] leading-tight shadow-2xl ring-1 ring-black/10 backdrop-blur-sm",
-              dragPreview.colorClassName
+              "w-56 overflow-hidden rounded-xl border px-3 py-2 text-[11px] leading-tight shadow-2xl ring-1 ring-black/10 backdrop-blur-sm",
+              getCourseColorStyle(interaction.slot)
             )}
           >
-            <div className="font-semibold">{dragPreview.courseCode}</div>
-            <div className="truncate">{dragPreview.courseName}</div>
-            <div className="truncate opacity-85">{dragPreview.subtitle}</div>
+            <div className="text-[10px] font-medium opacity-80">
+              {interaction.previewStartTime} - {interaction.previewEndTime}
+            </div>
+            <div className="font-semibold">{interaction.slot.courseCode}</div>
+            <div className="truncate font-medium opacity-95">{interaction.slot.courseName}</div>
+            <div className="truncate opacity-85">{slotSubtitle(interaction.slot)}</div>
+            {interaction.previewWeekday && (
+              <div className="mt-1 text-[10px] font-medium opacity-90">
+                {interaction.type === "resize" ? "Extender en " : "Mover a "}
+                {getWeekdayLabel(interaction.previewWeekday, true)}
+              </div>
+            )}
           </article>
         </div>
       )}
     </div>
   );
+}
+
+function DropPreviewSlot({ slot, bounds, isResize = false }) {
+  const top = positionForTime(slot.startTime, bounds);
+  const bottom = positionForTime(slot.endTime, bounds);
+
+  return (
+    <article
+      className="absolute inset-x-0 z-20 overflow-hidden rounded-xl border-2 border-dashed border-primary/70 bg-primary/10 px-2.5 py-2 text-[11px] leading-tight shadow-sm"
+      style={{
+        top: `${top}%`,
+        height: `${Math.max(bottom - top, 5)}%`,
+      }}
+    >
+      <div className="text-[10px] font-medium text-primary/80">{formatTimeRange(slot)}</div>
+      <div className="font-semibold text-primary">{slot.courseCode}</div>
+      <div className="truncate font-medium text-primary/90">{slot.courseName}</div>
+      <div className="truncate text-[10px] text-primary/75">{slotSubtitle(slot)}</div>
+      {isResize && <div className="mt-1 text-[10px] font-medium text-primary/80">Duracion manual</div>}
+    </article>
+  );
+}
+
+function clampMinutes(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function getShiftBounds(blocks, shift, bounds) {
+  const blockId =
+    shift === "MANANA" ? "MANANA" : shift === "TARDE" ? "TARDE" : "NOCHE";
+  const block = blocks.find((item) => item.id === blockId);
+  if (!block) {
+    return bounds;
+  }
+  return {
+    start: parseTimeToMinutes(block.start),
+    end: parseTimeToMinutes(block.end),
+  };
+}
+
+function pickWeekdayFromPointer(dayRefs, clientX, fallbackWeekday) {
+  for (const [weekday, node] of dayRefs.entries()) {
+    const rect = node.getBoundingClientRect();
+    if (clientX >= rect.left && clientX <= rect.right) {
+      return weekday;
+    }
+  }
+  return fallbackWeekday;
+}
+
+function minutesFromPointer(dayRefs, weekday, clientY, bounds) {
+  const node = dayRefs.get(weekday);
+  if (!node) {
+    return bounds.start;
+  }
+  const rect = node.getBoundingClientRect();
+  const ratio = clampMinutes((clientY - rect.top) / rect.height, 0, 1);
+  const minutes = bounds.start + (bounds.end - bounds.start) * ratio;
+  return snapMinutes(minutes, DRAG_STEP_MINUTES);
 }
 
 function layoutOverlappingSlots(slots) {

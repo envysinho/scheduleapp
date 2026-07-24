@@ -1,6 +1,7 @@
 package com.example.schedule.service;
 
 import java.util.ArrayList;
+import java.time.LocalTime;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
@@ -228,7 +229,13 @@ public class TeacherService {
             Long courseId = resolveCourseIdByCode(course.courseCode());
             Course resolved = courseRepository.findById(courseId).orElse(null);
             for (TeacherShift shift : shiftsFor(course.modality())) {
-                requests.add(new CourseTeacherAssignmentRequest(courseId, shift, seedSubShift(resolved, shift), null));
+                requests.add(new CourseTeacherAssignmentRequest(
+                        courseId,
+                        shift,
+                        seedSubShift(resolved, shift),
+                        null,
+                        null,
+                        null));
             }
         }
         return requests;
@@ -372,6 +379,24 @@ public class TeacherService {
         migrateSubShiftCheckConstraint("space_assignments");
     }
 
+    @Transactional
+    public void migrateAssignmentScheduleIfNeeded() {
+        try {
+            jdbcTemplate.execute("""
+                    ALTER TABLE course_teacher_assignments
+                    ADD COLUMN IF NOT EXISTS manual_start_time TIME
+                    """);
+        } catch (Exception ignored) {
+        }
+        try {
+            jdbcTemplate.execute("""
+                    ALTER TABLE course_teacher_assignments
+                    ADD COLUMN IF NOT EXISTS manual_end_time TIME
+                    """);
+        } catch (Exception ignored) {
+        }
+    }
+
     private void migrateSubShiftCheckConstraint(String table) {
         try {
             jdbcTemplate.execute("ALTER TABLE " + table + " DROP CONSTRAINT IF EXISTS " + table + "_sub_shift_check");
@@ -443,6 +468,7 @@ public class TeacherService {
                         "El curso " + course.getCode() + " es de ciclo diurno (I–VIII), solo turnos MAÑANA o TARDE");
             }
             validateSubShift(course, req);
+            validateManualSchedule(course, req);
             validateCourseSlotAvailability(course, req, teacherId);
         }
         if (categories.size() > 1 || (!categories.isEmpty() && !categories.contains(expectedCategory))) {
@@ -529,6 +555,8 @@ public class TeacherService {
         assignment.setShift(request.shift());
         assignment.setSubShift(resolveSubShift(course, request));
         assignment.setWeekday(request.weekday());
+        assignment.setManualStartTime(parseManualTime(request.manualStartTime()));
+        assignment.setManualEndTime(parseManualTime(request.manualEndTime()));
         return assignment;
     }
 
@@ -590,6 +618,54 @@ public class TeacherService {
                     "Sub-turno inválido para el curso " + course.getCode()
                             + ": " + req.subShift() + ". Válidos: " + allowed);
         }
+    }
+
+    private void validateManualSchedule(Course course, CourseTeacherAssignmentRequest request) {
+        LocalTime startTime = parseManualTime(request.manualStartTime());
+        LocalTime endTime = parseManualTime(request.manualEndTime());
+        if (startTime == null && endTime == null) {
+            return;
+        }
+        if (request.weekday() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Para guardar una hora manual debes asignar también un día.");
+        }
+        if (startTime == null || endTime == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Debes enviar hora de inicio y fin para una asignación manual.");
+        }
+        if (!isQuarterHour(startTime) || !isQuarterHour(endTime)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Las horas manuales deben estar en intervalos de 15 minutos.");
+        }
+        if (!startTime.isBefore(endTime)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "La hora de inicio debe ser anterior a la hora de fin.");
+        }
+        if (java.time.Duration.between(startTime, endTime).toMinutes() < 15) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "La duración mínima manual es de 15 minutos.");
+        }
+    }
+
+    private LocalTime parseManualTime(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalTime.parse(value);
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Hora inválida: " + value);
+        }
+    }
+
+    private boolean isQuarterHour(LocalTime value) {
+        return value.getMinute() % 15 == 0 && value.getSecond() == 0 && value.getNano() == 0;
     }
 
     private SubShift resolveSubShift(Course course, CourseTeacherAssignmentRequest req) {

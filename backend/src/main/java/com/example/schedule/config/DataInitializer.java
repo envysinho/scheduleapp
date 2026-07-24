@@ -43,6 +43,7 @@ public class DataInitializer implements ApplicationRunner {
         teacherService.migrateEmploymentTypesIfNeeded();
         teacherService.migrateLegacyShiftsIfNeeded();
         teacherService.migrateSubShiftConstraintIfNeeded();
+        teacherService.migrateAssignmentScheduleIfNeeded();
         practiceHeadService.migrateSemestersIfNeeded();
         spaceService.migrateAssignmentSemestersIfNeeded();
         spaceService.seedDemoIfEmpty();

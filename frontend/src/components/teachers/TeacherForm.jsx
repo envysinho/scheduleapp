@@ -58,6 +58,8 @@ function teacherToForm(teacher) {
             shift: assignment.shift ?? getFirstAllowedShift(assignment.cycle),
             subShift: assignment.subShift ?? null,
             weekday: assignment.weekday ?? null,
+            manualStartTime: assignment.manualStartTime ?? null,
+            manualEndTime: assignment.manualEndTime ?? null,
           }))
         : [],
   };
@@ -105,7 +107,14 @@ function TeacherForm({ teacher, onSubmit, onCancel, isSubmitting, error, onUnaut
       ...current,
       courseAssignments: [
         ...current.courseAssignments,
-        { courseId: null, shift: "MANANA", subShift: null },
+        {
+          courseId: null,
+          shift: "MANANA",
+          subShift: null,
+          weekday: null,
+          manualStartTime: null,
+          manualEndTime: null,
+        },
       ],
     }));
   };
@@ -173,6 +182,8 @@ function TeacherForm({ teacher, onSubmit, onCancel, isSubmitting, error, onUnaut
           courseId: Number(assignment.courseId),
           shift: assignment.shift,
           weekday: assignment.weekday ?? null,
+          manualStartTime: assignment.manualStartTime ?? null,
+          manualEndTime: assignment.manualEndTime ?? null,
           ...(subShift ? { subShift } : {}),
         };
       });

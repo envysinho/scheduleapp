@@ -17,7 +17,9 @@ public record CourseTeacherAssignmentResponse(
         Integer cycle,
         TeacherShift shift,
         SubShift subShift,
-        ScheduleWeekday weekday
+        ScheduleWeekday weekday,
+        String manualStartTime,
+        String manualEndTime
 ) {
 
     public static CourseTeacherAssignmentResponse from(CourseTeacherAssignment assignment) {
@@ -36,6 +38,8 @@ public record CourseTeacherAssignmentResponse(
                 course.getCycle(),
                 assignment.getShift(),
                 assignment.getSubShift(),
-                assignment.getWeekday());
+                assignment.getWeekday(),
+                assignment.getManualStartTime() == null ? null : assignment.getManualStartTime().toString(),
+                assignment.getManualEndTime() == null ? null : assignment.getManualEndTime().toString());
     }
 }
