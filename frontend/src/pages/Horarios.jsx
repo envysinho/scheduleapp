@@ -87,8 +87,10 @@ function Horarios({ cycle = 1 }) {
   const cycleLabel =
     CYCLES.find((item) => item.id === cycle)?.label ?? `Ciclo ${cycle}`;
 
-  const loadSchedule = useCallback(async () => {
-    setLoading(true);
+  const loadSchedule = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const settings = await getScheduleSettings({ semester }, logout);
@@ -100,7 +102,9 @@ function Horarios({ cycle = 1 }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar horario");
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [cycle, logout, semester]);
 
@@ -146,10 +150,43 @@ function Horarios({ cycle = 1 }) {
   const handleWeekdayChange = async (assignmentId, weekday) => {
     setSavingAssignmentId(assignmentId);
     setError(null);
+    const normalizedWeekday = weekday || null;
+    const previousSchedule = schedule;
+    const previousCourses = courses;
+
+    setSchedule((current) =>
+      current
+        ? {
+            ...current,
+            slots: (current.slots ?? []).map((slot) =>
+              slot.assignmentId === assignmentId
+                ? {
+                    ...slot,
+                    weekday: normalizedWeekday,
+                    automaticWeekday: normalizedWeekday == null,
+                  }
+                : slot
+            ),
+          }
+        : current
+    );
+    setCourses((current) =>
+      current.map((course) => ({
+        ...course,
+        teacherAssignments: (course.teacherAssignments ?? []).map((assignment) =>
+          assignment.id === assignmentId
+            ? { ...assignment, weekday: normalizedWeekday }
+            : assignment
+        ),
+      }))
+    );
+
     try {
-      await updateAssignmentWeekday(assignmentId, weekday || null, logout);
-      await loadSchedule();
+      await updateAssignmentWeekday(assignmentId, normalizedWeekday, logout);
+      await loadSchedule({ silent: true });
     } catch (err) {
+      setSchedule(previousSchedule);
+      setCourses(previousCourses);
       setError(err instanceof Error ? err.message : "Error al actualizar día");
     } finally {
       setSavingAssignmentId(null);
@@ -203,7 +240,12 @@ function Horarios({ cycle = 1 }) {
         {loading ? (
           <p className="text-sm text-muted-foreground">Cargando horario...</p>
         ) : viewMode === "color" ? (
-          <ColorScheduleView blocks={blocks} slotsByDay={slotsByDay} />
+          <ColorScheduleView
+            blocks={blocks}
+            slotsByDay={slotsByDay}
+            savingAssignmentId={savingAssignmentId}
+            onMoveSlot={handleWeekdayChange}
+          />
         ) : (
           <MatrixScheduleView slotsByDay={slotsByDay} />
         )}
@@ -393,9 +435,68 @@ function findManualDayConflicts(assignments) {
   return conflicts;
 }
 
-function ColorScheduleView({ blocks, slotsByDay }) {
+function ColorScheduleView({ blocks, slotsByDay, savingAssignmentId, onMoveSlot }) {
   const bounds = getDayBounds(blocks);
   const hourMarks = buildHourMarks(bounds.start, bounds.end);
+  const [draggedAssignmentId, setDraggedAssignmentId] = useState(null);
+  const [dragOverDay, setDragOverDay] = useState(null);
+
+  const handleDragStart = (event, slot) => {
+    if (!slot.assignmentId || savingAssignmentId != null) {
+      event.preventDefault();
+      return;
+    }
+    const payload = {
+      assignmentId: slot.assignmentId,
+      weekday: slot.weekday ?? null,
+    };
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("application/json", JSON.stringify(payload));
+    const dragPreview = event.currentTarget.cloneNode(true);
+    dragPreview.style.position = "absolute";
+    dragPreview.style.top = "-9999px";
+    dragPreview.style.left = "-9999px";
+    dragPreview.style.width = `${event.currentTarget.offsetWidth}px`;
+    dragPreview.style.transform = "rotate(-2deg) scale(1.03)";
+    dragPreview.style.boxShadow = "0 18px 40px rgba(0,0,0,0.28)";
+    dragPreview.style.opacity = "0.96";
+    dragPreview.style.pointerEvents = "none";
+    document.body.appendChild(dragPreview);
+    event.dataTransfer.setDragImage(dragPreview, dragPreview.offsetWidth / 2, 24);
+    requestAnimationFrame(() => {
+      dragPreview.remove();
+    });
+    setDraggedAssignmentId(slot.assignmentId);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedAssignmentId(null);
+    setDragOverDay(null);
+  };
+
+  const handleDrop = async (event, weekday) => {
+    event.preventDefault();
+    setDragOverDay(null);
+
+    try {
+      const rawData = event.dataTransfer.getData("application/json");
+      if (!rawData) {
+        return;
+      }
+
+      const data = JSON.parse(rawData);
+      const assignmentId = Number(data.assignmentId);
+      const currentWeekday = data.weekday ?? null;
+
+      if (!assignmentId || currentWeekday === weekday || savingAssignmentId != null) {
+        return;
+      }
+
+      await onMoveSlot(assignmentId, weekday);
+    } finally {
+      setDraggedAssignmentId(null);
+    }
+  };
 
   return (
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[2.75rem_repeat(5,minmax(0,1fr))]">
@@ -417,9 +518,33 @@ function ColorScheduleView({ blocks, slotsByDay }) {
       </div>
 
       {WEEKDAYS.map((day) => (
-        <section key={day.value} className="flex min-w-0 flex-col gap-2">
+        <section
+          key={day.value}
+          className={cn(
+            "flex min-w-0 flex-col gap-2 rounded-lg transition-colors",
+            dragOverDay === day.value && "bg-primary/5"
+          )}
+          onDragOver={(event) => {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+            if (dragOverDay !== day.value) {
+              setDragOverDay(day.value);
+            }
+          }}
+          onDragLeave={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget)) {
+              setDragOverDay((current) => (current === day.value ? null : current));
+            }
+          }}
+          onDrop={(event) => handleDrop(event, day.value)}
+        >
           <div className="text-center text-xs font-medium text-muted-foreground">{day.label}</div>
-          <div className="relative min-h-[420px] rounded-lg border bg-muted/20 py-1.5 pl-9 xl:min-h-[548px] xl:pl-0">
+          <div
+            className={cn(
+              "relative min-h-[420px] rounded-lg border bg-muted/20 py-1.5 pl-9 xl:min-h-[548px] xl:pl-0",
+              dragOverDay === day.value && "border-primary/60 ring-2 ring-primary/20"
+            )}
+          >
             {hourMarks.map((mark) => (
               <span
                 key={`${day.value}-${mark.label}-${mark.top}`}
@@ -461,16 +586,24 @@ function ColorScheduleView({ blocks, slotsByDay }) {
                   <article
                     key={slot.id ?? `${slot.weekday}-${slot.startTime}-${slot.courseId}-${index}`}
                     className={cn(
-                      "absolute z-10 box-border overflow-hidden rounded-md border px-2 py-1 text-[11px] leading-tight shadow-sm",
+                      "absolute z-10 box-border overflow-hidden rounded-md border px-2 py-1 text-[11px] leading-tight shadow-sm transition-transform duration-150",
                       getCourseColorStyle(slot),
-                      slot.automaticWeekday && "border-dashed opacity-60"
+                      slot.automaticWeekday && "border-dashed opacity-60",
+                      slot.assignmentId && savingAssignmentId == null && "cursor-grab",
+                      slot.assignmentId && savingAssignmentId == null && "active:cursor-grabbing",
+                      draggedAssignmentId === slot.assignmentId &&
+                        "scale-[1.02] -rotate-1 opacity-30 ring-2 ring-white/70 shadow-2xl"
                     )}
+                    draggable={Boolean(slot.assignmentId) && savingAssignmentId == null}
+                    onDragStart={(event) => handleDragStart(event, slot)}
+                    onDragEnd={handleDragEnd}
                     style={{
                       top: `${top}%`,
                       height: `${Math.max(bottom - top, 5)}%`,
                       left: columnLeft,
                       width: columnWidth,
                     }}
+                    title={`Arrastra para mover a otro día. ${slot.courseCode} · ${slot.courseName}`}
                   >
                     <div className="font-semibold">{slot.startTime} {slot.courseCode}</div>
                     <div className="truncate">{slot.courseName}</div>

@@ -3,6 +3,7 @@ package com.example.schedule.service;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -73,7 +74,7 @@ public class TeacherService {
 
     @Transactional
     public TeacherResponse create(CreateTeacherRequest request) {
-        validateAssignments(Semester.normalize(request.semester()), request.employmentType(), request.courseAssignments());
+        validateAssignments(null, Semester.normalize(request.semester()), request.employmentType(), request.courseAssignments());
         Teacher teacher = new Teacher();
         applyTeacherFields(teacher, request.firstName(), request.lastName(),
                 request.semester(), request.email(), request.phone(), request.employmentType());
@@ -87,7 +88,7 @@ public class TeacherService {
 
     @Transactional
     public TeacherResponse update(Long id, UpdateTeacherRequest request) {
-        validateAssignments(Semester.normalize(request.semester()), request.employmentType(), request.courseAssignments());
+        validateAssignments(id, Semester.normalize(request.semester()), request.employmentType(), request.courseAssignments());
         Teacher teacher = getTeacherOrThrow(id);
         Set<AssignmentLog> previousAssignments = assignmentLogs(teacher);
         Set<Long> previousCourseIds = teacher.getCourseAssignments().stream()
@@ -390,7 +391,8 @@ public class TeacherService {
         }
     }
 
-    private void validateAssignments(String semester,
+    private void validateAssignments(Long teacherId,
+                                     String semester,
                                      EmploymentType employmentType,
                                      List<CourseTeacherAssignmentRequest> assignments) {
         assignments = assignments == null ? List.of() : assignments;
@@ -441,12 +443,41 @@ public class TeacherService {
                         "El curso " + course.getCode() + " es de ciclo diurno (I–VIII), solo turnos MAÑANA o TARDE");
             }
             validateSubShift(course, req);
+            validateCourseSlotAvailability(course, req, teacherId);
         }
         if (categories.size() > 1 || (!categories.isEmpty() && !categories.contains(expectedCategory))) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Las asignaciones no coinciden con el tipo de docente seleccionado");
         }
+    }
+
+    private void validateCourseSlotAvailability(
+            Course course,
+            CourseTeacherAssignmentRequest request,
+            Long teacherId) {
+        SubShift requestedSubShift = resolveSubShift(course, request);
+        for (CourseTeacherAssignment current : assignmentRepository.findByCourseId(course.getId())) {
+            if (teacherId != null && Objects.equals(current.getTeacher().getId(), teacherId)) {
+                continue;
+            }
+            if (current.getShift() != request.shift()) {
+                continue;
+            }
+            if (!sameSlot(current.getSubShift(), requestedSubShift)) {
+                continue;
+            }
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "El curso " + course.getCode()
+                            + " ya tiene docente asignado en "
+                            + shiftLabel(request.shift(), requestedSubShift == null ? null : requestedSubShift.name())
+                            + ". Libera ese slot antes de asignar otro docente.");
+        }
+    }
+
+    private boolean sameSlot(SubShift existing, SubShift requested) {
+        return Objects.equals(existing, requested) || existing == null || requested == null;
     }
 
     private CourseCategory categoryFor(CourseType type) {

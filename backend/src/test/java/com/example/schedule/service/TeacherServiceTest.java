@@ -2,6 +2,7 @@ package com.example.schedule.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -22,8 +23,12 @@ import com.example.schedule.repository.TeacherRepository;
 import com.example.schedule.model.CourseType;
 import com.example.schedule.model.ScheduleWeekday;
 import com.example.schedule.model.SpaceType;
+import com.example.schedule.model.EmploymentType;
+import com.example.schedule.model.SubShift;
 import com.example.schedule.model.TeacherShift;
 import com.example.schedule.entity.Teacher;
+import com.example.schedule.dto.CourseTeacherAssignmentRequest;
+import com.example.schedule.dto.CreateTeacherRequest;
 
 @ExtendWith(MockitoExtension.class)
 class TeacherServiceTest {
@@ -93,6 +98,87 @@ class TeacherServiceTest {
 
         assertEquals(ScheduleWeekday.TUESDAY, saved.getWeekday());
         verify(assignmentRepository).save(target);
+    }
+
+    @Test
+    void createRechazaSlotTomadoPorOtroDocenteEnMismoTurno() {
+        Course course = course(1L, "ISEG240104", "Algoritmos", 1);
+        Teacher occupiedTeacher = teacher(2L);
+        CourseTeacherAssignment occupied = assignment(12L, course, occupiedTeacher, TeacherShift.MANANA);
+
+        when(courseRepository.findById(1L)).thenReturn(java.util.Optional.of(course));
+        when(assignmentRepository.findByCourseId(1L)).thenReturn(List.of(occupied));
+
+        CreateTeacherRequest request = new CreateTeacherRequest(
+                "Nuevo",
+                "Docente",
+                "26-II",
+                null,
+                null,
+                EmploymentType.CONTRATADO,
+                List.of(new CourseTeacherAssignmentRequest(1L, TeacherShift.MANANA, null, null)));
+
+        ResponseStatusException error = assertThrows(
+                ResponseStatusException.class,
+                () -> teacherService.create(request));
+
+        assertEquals(409, error.getStatusCode().value());
+        assertEquals(
+                "El curso ISEG240104 ya tiene docente asignado en MANANA. Libera ese slot antes de asignar otro docente.",
+                error.getReason());
+    }
+
+    @Test
+    void createRechazaSlotTomadoPorOtroDocenteEnMismoSubTurno() {
+        Course course = course(1L, "ISEG240104", "Algoritmos", 1);
+        course.setRequiredSpaceType(SpaceType.LABORATORIO);
+        Teacher occupiedTeacher = teacher(2L);
+        CourseTeacherAssignment occupied = assignment(12L, course, occupiedTeacher, TeacherShift.MANANA);
+        occupied.setSubShift(SubShift.A1);
+
+        when(courseRepository.findById(1L)).thenReturn(java.util.Optional.of(course));
+        when(assignmentRepository.findByCourseId(1L)).thenReturn(List.of(occupied));
+
+        CreateTeacherRequest request = new CreateTeacherRequest(
+                "Nuevo",
+                "Docente",
+                "26-II",
+                null,
+                null,
+                EmploymentType.CONTRATADO,
+                List.of(new CourseTeacherAssignmentRequest(1L, TeacherShift.MANANA, SubShift.A1, null)));
+
+        ResponseStatusException error = assertThrows(
+                ResponseStatusException.class,
+                () -> teacherService.create(request));
+
+        assertEquals(409, error.getStatusCode().value());
+        assertEquals(
+                "El curso ISEG240104 ya tiene docente asignado en MANANA A1. Libera ese slot antes de asignar otro docente.",
+                error.getReason());
+    }
+
+    @Test
+    void updatePermiteMantenerSlotDelMismoDocente() {
+        Course course = course(1L, "ISEG240104", "Algoritmos", 1);
+        Teacher teacher = teacher(1L);
+        CourseTeacherAssignment current = assignment(11L, course, teacher, TeacherShift.MANANA);
+        teacher.setCourseAssignments(new java.util.ArrayList<>(List.of(current)));
+
+        when(courseRepository.findById(1L)).thenReturn(java.util.Optional.of(course));
+        when(assignmentRepository.findByCourseId(1L)).thenReturn(List.of(current));
+        when(teacherRepository.findById(1L)).thenReturn(java.util.Optional.of(teacher));
+        when(teacherRepository.save(any(Teacher.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(courseRepository.save(any(Course.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        teacherService.update(1L, new com.example.schedule.dto.UpdateTeacherRequest(
+                "Doc",
+                "Test",
+                "26-II",
+                null,
+                null,
+                EmploymentType.CONTRATADO,
+                List.of(new CourseTeacherAssignmentRequest(1L, TeacherShift.MANANA, null, null))));
     }
 
     private static Course course(Long id, String code, String name, int cycle) {
