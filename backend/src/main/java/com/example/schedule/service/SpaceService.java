@@ -1,5 +1,8 @@
 package com.example.schedule.service;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -18,12 +21,14 @@ import com.example.schedule.dto.UpdateSpaceRequest;
 import com.example.schedule.entity.Space;
 import com.example.schedule.entity.SpaceAssignment;
 import com.example.schedule.model.CourseCycleRules;
+import com.example.schedule.model.ScheduleWeekday;
 import com.example.schedule.model.Semester;
 import com.example.schedule.model.SpaceAvailability;
 import com.example.schedule.model.SpaceType;
 import com.example.schedule.model.SubShift;
 import com.example.schedule.model.TeacherShift;
 import com.example.schedule.repository.CourseRepository;
+import com.example.schedule.repository.ScheduleSlotRepository;
 import com.example.schedule.repository.SpaceRepository;
 import com.example.schedule.security.CurrentUserService;
 
@@ -32,6 +37,7 @@ public class SpaceService {
 
     private final SpaceRepository spaceRepository;
     private final CourseRepository courseRepository;
+    private final ScheduleSlotRepository scheduleSlotRepository;
     private final NotificationService notificationService;
     private final JdbcTemplate jdbcTemplate;
     private final CurrentUserService currentUserService;
@@ -39,11 +45,13 @@ public class SpaceService {
     public SpaceService(
             SpaceRepository spaceRepository,
             CourseRepository courseRepository,
+            ScheduleSlotRepository scheduleSlotRepository,
             NotificationService notificationService,
             JdbcTemplate jdbcTemplate,
             CurrentUserService currentUserService) {
         this.spaceRepository = spaceRepository;
         this.courseRepository = courseRepository;
+        this.scheduleSlotRepository = scheduleSlotRepository;
         this.notificationService = notificationService;
         this.jdbcTemplate = jdbcTemplate;
         this.currentUserService = currentUserService;
@@ -61,8 +69,10 @@ public class SpaceService {
             effectiveCycle = cycle;
         }
         Integer responseCycle = effectiveCycle;
-        return spaceRepository.findByFilters(normalizedSemester, spaceType, availability, effectiveCycle).stream()
-                .map(space -> SpaceResponse.from(space, normalizedSemester, responseCycle))
+        Set<Long> occupiedSpaceIds = findOccupiedSpaceIds(normalizedSemester);
+        return spaceRepository.findByFilters(normalizedSemester, spaceType, effectiveCycle).stream()
+                .map(space -> toResponse(space, normalizedSemester, responseCycle, occupiedSpaceIds))
+                .filter(space -> availability == null || space.availability() == availability)
                 .toList();
     }
 
@@ -71,7 +81,11 @@ public class SpaceService {
         String normalizedSemester = Semester.normalize(semester);
         Space space = getSpaceOrThrow(id);
         Integer studentCycle = currentUserService.requireAssignedCycleForStudent();
-        SpaceResponse response = SpaceResponse.from(space, normalizedSemester, studentCycle);
+        SpaceResponse response = toResponse(
+                space,
+                normalizedSemester,
+                studentCycle,
+                findOccupiedSpaceIds(normalizedSemester));
         if (studentCycle != null && response.assignments().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Ambiente no encontrado");
         }
@@ -88,7 +102,8 @@ public class SpaceService {
         Space saved = spaceRepository.save(space);
         notificationService.record("agregó el ambiente " + saved.getName());
         logAssignmentChanges(saved, Set.of(), assignmentLogs(saved, request.semester()));
-        return SpaceResponse.from(saved, Semester.normalize(request.semester()));
+        String normalizedSemester = Semester.normalize(request.semester());
+        return toResponse(saved, normalizedSemester, null, findOccupiedSpaceIds(normalizedSemester));
     }
 
     @Transactional
@@ -102,7 +117,8 @@ public class SpaceService {
         Space saved = spaceRepository.save(space);
         notificationService.record("actualizó el ambiente " + saved.getName());
         logAssignmentChanges(saved, previousAssignments, assignmentLogs(saved, request.semester()));
-        return SpaceResponse.from(saved, Semester.normalize(request.semester()));
+        String normalizedSemester = Semester.normalize(request.semester());
+        return toResponse(saved, normalizedSemester, null, findOccupiedSpaceIds(normalizedSemester));
     }
 
     @Transactional
@@ -235,6 +251,44 @@ public class SpaceService {
         space.setAvailability(availability);
         space.setManagerName(blankToEmpty(managerName));
         space.setManagerPhone(blankToNull(managerPhone));
+    }
+
+    private SpaceResponse toResponse(
+            Space space,
+            String semester,
+            Integer cycle,
+            Set<Long> occupiedSpaceIds) {
+        return SpaceResponse.from(space, semester, cycle, computeAvailability(space, occupiedSpaceIds));
+    }
+
+    private SpaceAvailability computeAvailability(Space space, Set<Long> occupiedSpaceIds) {
+        if (space.getAvailability() == SpaceAvailability.EN_MANTENIMIENTO) {
+            return SpaceAvailability.EN_MANTENIMIENTO;
+        }
+        if (space.getId() != null && occupiedSpaceIds.contains(space.getId())) {
+            return SpaceAvailability.OCUPADO;
+        }
+        return SpaceAvailability.DISPONIBLE;
+    }
+
+    private Set<Long> findOccupiedSpaceIds(String semester) {
+        ScheduleWeekday weekday = currentWeekday();
+        if (weekday == null) {
+            return Set.of();
+        }
+        return scheduleSlotRepository.findOccupiedSpaceIds(semester, weekday, LocalTime.now());
+    }
+
+    private ScheduleWeekday currentWeekday() {
+        DayOfWeek dayOfWeek = LocalDate.now().getDayOfWeek();
+        return switch (dayOfWeek) {
+            case MONDAY -> ScheduleWeekday.MONDAY;
+            case TUESDAY -> ScheduleWeekday.TUESDAY;
+            case WEDNESDAY -> ScheduleWeekday.WEDNESDAY;
+            case THURSDAY -> ScheduleWeekday.THURSDAY;
+            case FRIDAY -> ScheduleWeekday.FRIDAY;
+            default -> null;
+        };
     }
 
     private List<SpaceAssignment> toAssignments(List<SpaceAssignmentRequest> requests, String semester) {

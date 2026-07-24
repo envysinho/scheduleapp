@@ -25,11 +25,19 @@ public record SpaceResponse(
     }
 
     public static SpaceResponse from(Space space, String semester, Integer cycle) {
+        return from(space, semester, cycle, space.getAvailability());
+    }
+
+    public static SpaceResponse from(
+            Space space,
+            String semester,
+            Integer cycle,
+            SpaceAvailability availability) {
         return new SpaceResponse(
                 space.getId(),
                 space.getName(),
                 space.getSpaceType(),
-                space.getAvailability(),
+                availability,
                 space.getManagerName(),
                 space.getManagerPhone(),
                 space.getAssignments().stream()

@@ -174,6 +174,11 @@ export const AVAILABILITY_STATUSES = [
   { value: "EN_MANTENIMIENTO", label: "En mantenimiento" },
 ];
 
+export const SPACE_MANUAL_AVAILABILITY_STATUSES = [
+  { value: "DISPONIBLE", label: "Operativo" },
+  { value: "EN_MANTENIMIENTO", label: "En mantenimiento" },
+];
+
 export const AVAILABILITY_FILTERS = [
   { value: null, label: "Todos" },
   ...AVAILABILITY_STATUSES,

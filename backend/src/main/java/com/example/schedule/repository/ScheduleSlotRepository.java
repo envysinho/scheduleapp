@@ -1,12 +1,15 @@
 package com.example.schedule.repository;
 
+import java.time.LocalTime;
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.example.schedule.entity.ScheduleSlot;
+import com.example.schedule.model.ScheduleWeekday;
 
 public interface ScheduleSlotRepository extends JpaRepository<ScheduleSlot, Long> {
 
@@ -39,6 +42,19 @@ public interface ScheduleSlotRepository extends JpaRepository<ScheduleSlot, Long
             ORDER BY s.cycle ASC
             """)
     List<Integer> findDistinctCyclesBySemester(@Param("semester") String semester);
+
+    @Query("""
+            SELECT DISTINCT s.space.id FROM ScheduleSlot s
+            WHERE s.semester = :semester
+              AND s.weekday = :weekday
+              AND s.space IS NOT NULL
+              AND s.startTime <= :currentTime
+              AND s.endTime > :currentTime
+            """)
+    Set<Long> findOccupiedSpaceIds(
+            @Param("semester") String semester,
+            @Param("weekday") ScheduleWeekday weekday,
+            @Param("currentTime") LocalTime currentTime);
 
     void deleteBySemesterAndCycle(String semester, Integer cycle);
 }

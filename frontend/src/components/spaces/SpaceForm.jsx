@@ -20,10 +20,9 @@ import { normalizeSearchText } from "@/lib/search";
 import {
   allowedShiftsForCycle,
   allowedSubShiftsForCycle,
-  AVAILABILITY_STATUSES,
-  getAvailabilityLabel,
   getCycleLabel,
   getSpaceTypeLabel,
+  SPACE_MANUAL_AVAILABILITY_STATUSES,
   getSubShiftLabel,
   getTeacherShiftLabel,
   requiresSubShift,
@@ -57,7 +56,8 @@ function spaceToForm(space) {
   return {
     name: space.name ?? "",
     spaceType: space.spaceType ?? "AULA",
-    availability: space.availability ?? "DISPONIBLE",
+    availability:
+      space.availability === "EN_MANTENIMIENTO" ? "EN_MANTENIMIENTO" : "DISPONIBLE",
     managerName: space.managerName ?? "",
     managerPhone: space.managerPhone ?? "",
     assignments:
@@ -297,10 +297,16 @@ function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
             <Label htmlFor="space-availability">Disponibilidad</Label>
             <div ref={availabilityAnchor} className="w-full">
               <Combobox
-                items={AVAILABILITY_STATUSES.map((item) => item.label)}
-                value={getAvailabilityLabel(form.availability)}
+                items={SPACE_MANUAL_AVAILABILITY_STATUSES.map((item) => item.label)}
+                value={
+                  SPACE_MANUAL_AVAILABILITY_STATUSES.find(
+                    (item) => item.value === form.availability
+                  )?.label ?? "Operativo"
+                }
                 onValueChange={(label) => {
-                  const item = AVAILABILITY_STATUSES.find((option) => option.label === label);
+                  const item = SPACE_MANUAL_AVAILABILITY_STATUSES.find(
+                    (option) => option.label === label
+                  );
                   setForm((current) => ({
                     ...current,
                     availability: item?.value ?? "DISPONIBLE",
@@ -310,7 +316,7 @@ function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
               >
                 <ComboboxInput
                   id="space-availability"
-                  placeholder="Seleccionar disponibilidad"
+                  placeholder="Seleccionar estado manual"
                   readOnly
                 />
                 <ComboboxContent anchor={availabilityAnchor}>
@@ -325,6 +331,9 @@ function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
                 </ComboboxContent>
               </Combobox>
             </div>
+            <p className="text-xs text-muted-foreground">
+              El sistema calcula automáticamente si el ambiente está ocupado o disponible.
+            </p>
           </div>
         </div>
 
