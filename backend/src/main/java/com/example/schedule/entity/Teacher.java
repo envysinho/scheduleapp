@@ -17,11 +17,19 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "teachers")
+@Table(
+        name = "teachers",
+        indexes = {
+                @Index(name = "idx_teachers_semester_employment", columnList = "semester, employment_type"),
+                @Index(name = "idx_teachers_last_name", columnList = "last_name"),
+                @Index(name = "idx_teachers_email", columnList = "email")
+        }
+)
 public class Teacher {
 
     @Id

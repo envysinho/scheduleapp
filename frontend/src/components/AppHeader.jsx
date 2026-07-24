@@ -150,16 +150,18 @@ function AppHeader({ isDark, onToggleTheme, onSearchSelect }) {
   };
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-      <SidebarTrigger className="-ml-1" />
-      <span className="font-semibold shrink-0">Gestor de Horarios</span>
+    <header className="flex flex-wrap items-center gap-2 border-b px-3 py-2 md:flex-nowrap md:px-4">
+      <div className="flex min-w-0 shrink-0 items-center gap-2">
+        <SidebarTrigger className="-ml-1" />
+        <span className="truncate font-semibold">Gestor de Horarios</span>
+      </div>
 
-      <div className="flex flex-1 items-center justify-center px-2 md:px-4">
+      <div className="order-3 flex w-full items-center justify-center md:order-none md:w-auto md:flex-1 md:px-4">
         <GlobalSearch onSelect={onSearchSelect} />
       </div>
 
-      <div className="ml-auto flex items-center gap-2">
-        <div ref={semesterAnchor} className="w-[170px]">
+      <div className="ml-auto flex min-w-0 shrink-0 items-center gap-2 self-start md:self-auto">
+        <div ref={semesterAnchor} className="w-[8.5rem] sm:w-[10.5rem]">
           <Combobox
             items={SEMESTER_OPTIONS}
             value={semester}
@@ -207,7 +209,7 @@ function AppHeader({ isDark, onToggleTheme, onSearchSelect }) {
             <div
               role="dialog"
               aria-label="Notificaciones"
-              className="absolute right-0 top-10 z-50 w-[360px] overflow-hidden rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10"
+              className="absolute right-0 top-10 z-50 w-[min(22rem,calc(100vw-1rem))] overflow-hidden rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 sm:w-[22rem]"
             >
               <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
                 <p className="text-sm font-medium">Notificaciones</p>

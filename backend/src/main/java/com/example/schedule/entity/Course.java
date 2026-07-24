@@ -24,10 +24,23 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 @Entity
-@Table(name = "courses")
+@Table(
+        name = "courses",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_courses_semester_code",
+                columnNames = {"semester", "code"}
+        ),
+        indexes = {
+                @Index(name = "idx_courses_semester_cycle", columnList = "semester, cycle"),
+                @Index(name = "idx_courses_semester_type", columnList = "semester, type"),
+                @Index(name = "idx_courses_name", columnList = "name")
+        }
+)
 public class Course {
 
     @Id

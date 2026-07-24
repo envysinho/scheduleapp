@@ -16,6 +16,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -27,7 +28,12 @@ import jakarta.persistence.UniqueConstraint;
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_course_teacher_shift",
                 columnNames = {"teacher_id", "course_id", "shift", "sub_shift"}
-        )
+        ),
+        indexes = {
+                @Index(name = "idx_course_teacher_assignments_teacher", columnList = "teacher_id"),
+                @Index(name = "idx_course_teacher_assignments_course", columnList = "course_id"),
+                @Index(name = "idx_course_teacher_assignments_weekday", columnList = "weekday")
+        }
 )
 public class CourseTeacherAssignment {
 

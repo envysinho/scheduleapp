@@ -22,9 +22,9 @@ Documento de referencia del proyecto. Define **qué hacer ahora** (desarrollo) y
 | Backend | `POST /api/auth/login` valida contra PostgreSQL; devuelve JWT real |
 | Backend | `GET/POST/PUT/DELETE /api/users` — CRUD protegido (solo ADMIN) |
 | Backend | Spring Security + JPA + BCrypt + PostgreSQL (Java 21) |
-| Frontend | Login guarda `{ user, token }` en `sessionStorage` (login al reabrir la app) |
+| Frontend | Login guarda `{ user, token }` en `sessionStorage` durante la ventana abierta |
 | Frontend | `api.js` envía `Authorization: Bearer` en peticiones protegidas |
-| Frontend | Pantalla **Usuarios** para CRUD admin; docentes/cursos/horarios siguen como placeholders |
+| Frontend | Existen pantallas funcionales para usuarios, docentes, cursos, horarios, espacios y reglas |
 
 Archivos clave:
 
@@ -43,7 +43,7 @@ Archivos clave:
 ```text
 1. docker compose up -d          ← levanta PostgreSQL (puerto 5433)
 2. cd backend && mvn spring-boot:run
-3. cd frontend && npm run dev
+3. cd frontend && pnpm dev
 4. cd desktop && pnpm start      ← opcional
 5. Login: admin / admin123
 6. Sidebar → Usuarios → formulario "Nuevo usuario"

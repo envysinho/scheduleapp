@@ -18,13 +18,22 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
 
 @Entity
-@Table(name = "schedule_slots")
+@Table(
+        name = "schedule_slots",
+        indexes = {
+                @Index(name = "idx_schedule_slots_semester_cycle_weekday_start", columnList = "semester, cycle, weekday, start_time"),
+                @Index(name = "idx_schedule_slots_course", columnList = "course_id"),
+                @Index(name = "idx_schedule_slots_teacher", columnList = "teacher_id"),
+                @Index(name = "idx_schedule_slots_space", columnList = "space_id")
+        }
+)
 public class ScheduleSlot {
 
     @Id

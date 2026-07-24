@@ -18,11 +18,18 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "spaces")
+@Table(
+        name = "spaces",
+        indexes = {
+                @Index(name = "idx_spaces_type_availability", columnList = "space_type, availability"),
+                @Index(name = "idx_spaces_name", columnList = "name")
+        }
+)
 public class Space {
 
     @Id

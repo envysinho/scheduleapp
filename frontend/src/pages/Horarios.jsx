@@ -206,7 +206,7 @@ function Horarios({ cycle = 1 }) {
 
 function MatrixScheduleView({ slotsByDay }) {
   return (
-    <div className="grid gap-3 lg:grid-cols-5">
+    <div className="grid gap-3 xl:grid-cols-5">
       {WEEKDAYS.map((day) => (
         <section key={day.value} className="min-w-0 rounded-md border">
           <div className="border-b px-3 py-2 text-sm font-semibold">{day.label}</div>
@@ -222,18 +222,27 @@ function MatrixScheduleView({ slotsByDay }) {
                     <article
                       key={slot.id ?? `${slot.weekday}-${slot.startTime}-${slot.courseId}-${index}`}
                       className={cn(
-                        "rounded-md bg-muted/50 p-2 text-sm",
+                        "min-w-0 rounded-md bg-muted/50 p-2 text-sm",
                         group.slots.length > 1 && "ring-1 ring-primary/30"
                       )}
                     >
                       <div className="font-medium">{formatTimeRange(slot)}</div>
-                      <div className="mt-1 leading-snug">{slot.courseCode} · {slot.courseName}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">
+                      <div
+                        className="mt-1 truncate leading-snug"
+                        title={`${slot.courseCode} · ${slot.courseName}`}
+                      >
+                        {slot.courseCode} · {slot.courseName}
+                      </div>
+                      <div className="mt-1 truncate text-xs text-muted-foreground" title={slot.teacherName}>
                         {slot.teacherName}
                       </div>
                       <div className="mt-1 flex flex-wrap gap-1 text-xs text-muted-foreground">
                         <span>{slotSubtitle(slot)}</span>
-                        {slot.spaceName && <span>· {slot.spaceName}</span>}
+                        {slot.spaceName && (
+                          <span className="truncate" title={slot.spaceName}>
+                            · {slot.spaceName}
+                          </span>
+                        )}
                       </div>
                     </article>
                   ))}
@@ -373,36 +382,46 @@ function ColorScheduleView({ blocks, slotsByDay }) {
   const hourMarks = buildHourMarks(bounds.start, bounds.end);
 
   return (
-    <div className="overflow-x-auto overflow-y-hidden">
-      <div className="flex min-w-[820px] gap-3 pb-2">
-        <div className="flex w-11 shrink-0 flex-col gap-2">
-          <div className="text-center text-xs font-medium text-muted-foreground opacity-0 select-none">
-            Hora
-          </div>
-          <div className="relative min-h-[548px] py-1.5">
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[2.75rem_repeat(5,minmax(0,1fr))]">
+      <div className="hidden xl:flex xl:w-11 xl:flex-col xl:gap-2">
+        <div className="text-center text-xs font-medium text-muted-foreground opacity-0 select-none">
+          Hora
+        </div>
+        <div className="relative min-h-[548px] py-1.5">
+          {hourMarks.map((mark) => (
+            <span
+              key={`${mark.label}-${mark.top}`}
+              className="absolute right-0 w-full -translate-y-1/2 text-right font-mono text-[10px] tabular-nums leading-none text-muted-foreground"
+              style={{ top: `${mark.top}%` }}
+            >
+              {mark.label}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {WEEKDAYS.map((day) => (
+        <section key={day.value} className="flex min-w-0 flex-col gap-2">
+          <div className="text-center text-xs font-medium text-muted-foreground">{day.label}</div>
+          <div className="relative min-h-[420px] rounded-lg border bg-muted/20 py-1.5 pl-9 xl:min-h-[548px] xl:pl-0">
             {hourMarks.map((mark) => (
               <span
-                key={`${mark.label}-${mark.top}`}
-                className="absolute right-0 w-full -translate-y-1/2 text-right font-mono text-[10px] tabular-nums leading-none text-muted-foreground"
+                key={`${day.value}-${mark.label}-${mark.top}`}
+                className="absolute left-1 w-7 -translate-y-1/2 text-left font-mono text-[9px] tabular-nums leading-none text-muted-foreground xl:hidden"
                 style={{ top: `${mark.top}%` }}
               >
                 {mark.label}
               </span>
             ))}
-          </div>
-        </div>
 
-        {WEEKDAYS.map((day) => (
-          <section key={day.value} className="flex min-w-0 flex-1 flex-col gap-2">
-            <div className="text-center text-xs font-medium text-muted-foreground">{day.label}</div>
-            <div className="relative min-h-[548px] rounded-lg border bg-muted/20 py-1.5">
+            <div className="absolute inset-y-1.5 left-9 right-1 xl:left-1">
               {blocks.map((block) => {
                 const position = getBlockPosition(block, bounds.start, bounds.end);
                 return (
                   <div
                     key={`${day.value}-${block.id}`}
                     className={cn(
-                      "absolute inset-x-1 rounded-md border px-1 text-center text-[10px] font-medium leading-tight opacity-60",
+                      "absolute inset-x-0 rounded-md border px-1 text-center text-[10px] font-medium leading-tight opacity-60",
                       BLOCK_STYLES[block.id] ?? DEFAULT_BLOCK_STYLE
                     )}
                     style={{
@@ -418,12 +437,10 @@ function ColorScheduleView({ blocks, slotsByDay }) {
               {layoutOverlappingSlots(slotsByDay[day.value]).map(({ slot, column, columns }, index) => {
                 const top = positionForTime(slot.startTime, bounds);
                 const bottom = positionForTime(slot.endTime, bounds);
-                const columnGap = 4 * (columns - 1);
-                const columnWidthPercent = 100 / columns;
-                const columnWidthRem = 1 / columns;
-                const columnWidthPx = columnGap / columns;
-                const columnLeft = `calc(0.5rem + ${column * columnWidthPercent}% - ${column * columnWidthRem}rem + ${column * (4 - columnWidthPx)}px)`;
-                const columnWidth = `calc(${columnWidthPercent}% - ${columnWidthRem}rem - ${columnWidthPx}px)`;
+                const totalGapPx = Math.max(columns - 1, 0) * 4;
+                const columnWidth = `calc((100% - ${totalGapPx}px) / ${columns})`;
+                const columnLeft = `calc(${column} * (${columnWidth} + 4px))`;
+
                 return (
                   <article
                     key={slot.id ?? `${slot.weekday}-${slot.startTime}-${slot.courseId}-${index}`}
@@ -446,9 +463,9 @@ function ColorScheduleView({ blocks, slotsByDay }) {
                 );
               })}
             </div>
-          </section>
-        ))}
-      </div>
+          </div>
+        </section>
+      ))}
     </div>
   );
 }
