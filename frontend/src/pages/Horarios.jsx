@@ -440,6 +440,19 @@ function ColorScheduleView({ blocks, slotsByDay, savingAssignmentId, onMoveSlot 
   const hourMarks = buildHourMarks(bounds.start, bounds.end);
   const [draggedAssignmentId, setDraggedAssignmentId] = useState(null);
   const [dragOverDay, setDragOverDay] = useState(null);
+  const [dragPreview, setDragPreview] = useState(null);
+
+  const updateDragPreviewPosition = (event) => {
+    setDragPreview((current) =>
+      current
+        ? {
+            ...current,
+            x: event.clientX,
+            y: event.clientY,
+          }
+        : current
+    );
+  };
 
   const handleDragStart = (event, slot) => {
     if (!slot.assignmentId || savingAssignmentId != null) {
@@ -467,11 +480,21 @@ function ColorScheduleView({ blocks, slotsByDay, savingAssignmentId, onMoveSlot 
       dragPreview.remove();
     });
     setDraggedAssignmentId(slot.assignmentId);
+    setDragPreview({
+      assignmentId: slot.assignmentId,
+      courseCode: slot.courseCode,
+      courseName: slot.courseName,
+      subtitle: slotSubtitle(slot),
+      colorClassName: getCourseColorStyle(slot),
+      x: event.clientX,
+      y: event.clientY,
+    });
   };
 
   const handleDragEnd = () => {
     setDraggedAssignmentId(null);
     setDragOverDay(null);
+    setDragPreview(null);
   };
 
   const handleDrop = async (event, weekday) => {
@@ -495,6 +518,7 @@ function ColorScheduleView({ blocks, slotsByDay, savingAssignmentId, onMoveSlot 
       await onMoveSlot(assignmentId, weekday);
     } finally {
       setDraggedAssignmentId(null);
+      setDragPreview(null);
     }
   };
 
@@ -527,6 +551,7 @@ function ColorScheduleView({ blocks, slotsByDay, savingAssignmentId, onMoveSlot 
           onDragOver={(event) => {
             event.preventDefault();
             event.dataTransfer.dropEffect = "move";
+            updateDragPreviewPosition(event);
             if (dragOverDay !== day.value) {
               setDragOverDay(day.value);
             }
@@ -596,6 +621,11 @@ function ColorScheduleView({ blocks, slotsByDay, savingAssignmentId, onMoveSlot 
                     )}
                     draggable={Boolean(slot.assignmentId) && savingAssignmentId == null}
                     onDragStart={(event) => handleDragStart(event, slot)}
+                    onDrag={(event) => {
+                      if (event.clientX || event.clientY) {
+                        updateDragPreviewPosition(event);
+                      }
+                    }}
                     onDragEnd={handleDragEnd}
                     style={{
                       top: `${top}%`,
@@ -605,6 +635,9 @@ function ColorScheduleView({ blocks, slotsByDay, savingAssignmentId, onMoveSlot 
                     }}
                     title={`Arrastra para mover a otro día. ${slot.courseCode} · ${slot.courseName}`}
                   >
+                    {draggedAssignmentId === slot.assignmentId && (
+                      <div className="absolute inset-0 rounded-md border-2 border-dashed border-white/90 bg-white/10" />
+                    )}
                     <div className="font-semibold">{slot.startTime} {slot.courseCode}</div>
                     <div className="truncate">{slot.courseName}</div>
                     <div className="truncate opacity-85">{slotSubtitle(slot)}</div>
@@ -615,6 +648,26 @@ function ColorScheduleView({ blocks, slotsByDay, savingAssignmentId, onMoveSlot 
           </div>
         </section>
       ))}
+
+      {dragPreview && (
+        <div
+          className="pointer-events-none fixed left-0 top-0 z-50"
+          style={{
+            transform: `translate(${dragPreview.x + 18}px, ${dragPreview.y + 18}px) rotate(-2deg)`,
+          }}
+        >
+          <article
+            className={cn(
+              "w-48 overflow-hidden rounded-md border px-2 py-1 text-[11px] leading-tight shadow-2xl ring-1 ring-black/10 backdrop-blur-sm",
+              dragPreview.colorClassName
+            )}
+          >
+            <div className="font-semibold">{dragPreview.courseCode}</div>
+            <div className="truncate">{dragPreview.courseName}</div>
+            <div className="truncate opacity-85">{dragPreview.subtitle}</div>
+          </article>
+        </div>
+      )}
     </div>
   );
 }
