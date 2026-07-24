@@ -30,12 +30,14 @@ import {
   listCourses,
   updateCourse,
 } from "@/lib/api";
+import { canManageAcademic, isStudent } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
 function Courses({ searchFilter, onClearSearchFilter }) {
   const { logout, user } = useAuth();
   const { semester } = useSemester();
-  const isAdmin = user?.role === "ADMIN";
+  const isAdmin = canManageAcademic(user);
+  const forcedCycle = isStudent(user) ? user?.assignedCycle ?? null : null;
 
   const [courses, setCourses] = useState([]);
   const [viewMode, setViewMode] = useState("grid");
@@ -72,7 +74,7 @@ function Courses({ searchFilter, onClearSearchFilter }) {
       }
 
       const data = await listCourses(
-        { semester, type, availability, shift, cycle },
+        { semester, type, availability, shift, cycle: forcedCycle ?? cycle },
         handleUnauthorized
       );
       setCourses(data);
@@ -89,6 +91,7 @@ function Courses({ searchFilter, onClearSearchFilter }) {
     availability,
     shift,
     cycle,
+    forcedCycle,
     semester,
     isSearchActive,
     searchFilter?.id,
@@ -112,6 +115,12 @@ function Courses({ searchFilter, onClearSearchFilter }) {
   }, [loadCourses, pageView]);
 
   useEffect(() => {
+    if (forcedCycle != null) {
+      setCycle(forcedCycle);
+    }
+  }, [forcedCycle]);
+
+  useEffect(() => {
     if (searchFilter?.type !== "course" || !searchFilter.id) {
       return;
     }
@@ -122,8 +131,8 @@ function Courses({ searchFilter, onClearSearchFilter }) {
     setType(null);
     setAvailability(null);
     setShift(null);
-    setCycle(null);
-  }, [searchFilter]);
+    setCycle(forcedCycle);
+  }, [searchFilter, forcedCycle]);
 
   const closeForm = () => {
     setPageView("list");

@@ -16,6 +16,12 @@ import PracticeHeads from "@/pages/PracticeHeads";
 import Users from "@/pages/Users";
 import Rules from "@/pages/Rules";
 import Semesters from "@/pages/Semesters";
+import {
+  canManageUsers,
+  canViewPracticeHeads,
+  isOwner,
+  isStudent,
+} from "@/lib/permissions";
 
 const PAGE_BY_SEARCH_TYPE = {
   teacher: "teachers",
@@ -30,18 +36,32 @@ function AppContent() {
   const { isDark, toggleTheme } = useTheme();
   const { isAuthenticated, user } = useAuth();
   const { semester } = useSemester();
-  const isAdmin = user?.role === "ADMIN";
+  const owner = isOwner(user);
+  const canOpenUsers = canManageUsers(user);
+  const studentCyclePage = isStudent(user) && user?.assignedCycle
+    ? `cycle${user.assignedCycle}`
+    : null;
 
   useEffect(() => {
     if (
-      (currentPage === "users" ||
-        currentPage === "rules" ||
-        currentPage === "semesters") &&
-      !isAdmin
+      currentPage === "rules" &&
+      !owner
     ) {
       setCurrentPage("dashboard");
     }
-  }, [currentPage, isAdmin]);
+    if (currentPage === "semesters" && !owner) {
+      setCurrentPage("dashboard");
+    }
+    if (currentPage === "users" && !canOpenUsers) {
+      setCurrentPage("dashboard");
+    }
+    if (currentPage === "practiceHeads" && !canViewPracticeHeads(user)) {
+      setCurrentPage("dashboard");
+    }
+    if (studentCyclePage && currentPage.startsWith("cycle") && currentPage !== studentCyclePage) {
+      setCurrentPage(studentCyclePage);
+    }
+  }, [currentPage, owner, canOpenUsers, user, studentCyclePage]);
 
   useEffect(() => {
     setSearchFilter(null);
@@ -88,18 +108,18 @@ function AppContent() {
           />
         );
       case "practiceHeads":
-        return (
+        return canViewPracticeHeads(user) ? (
           <PracticeHeads
             searchFilter={searchFilter}
             onClearSearchFilter={() => setSearchFilter(null)}
           />
-        );
+        ) : <Dashboard />;
       case "rules":
-        return isAdmin ? <Rules /> : <Dashboard />;
+        return owner ? <Rules /> : <Dashboard />;
       case "semesters":
-        return isAdmin ? <Semesters /> : <Dashboard />;
+        return owner ? <Semesters /> : <Dashboard />;
       case "users":
-        return isAdmin ? <Users /> : <Dashboard />;
+        return canOpenUsers ? <Users /> : <Dashboard />;
       default: {
         if (currentPage.startsWith("cycle")) {
           const cycle = Number.parseInt(currentPage.replace("cycle", ""), 10);

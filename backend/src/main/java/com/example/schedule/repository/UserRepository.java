@@ -8,6 +8,8 @@ import com.example.schedule.entity.User;
 
 import com.example.schedule.model.Role;
 
+import java.util.Collection;
+
 public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByUsername(String username);
@@ -17,4 +19,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByUsernameAndIdNot(String username, Long id);
 
     long countByRole(Role role);
+
+    long countByRoleIn(Collection<Role> roles);
 }

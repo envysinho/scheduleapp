@@ -32,6 +32,7 @@ import com.example.schedule.repository.CourseRepository;
 import com.example.schedule.repository.CourseTeacherAssignmentRepository;
 import com.example.schedule.repository.SpaceRepository;
 import com.example.schedule.repository.TeacherRepository;
+import com.example.schedule.security.CurrentUserService;
 
 @Service
 public class CourseService {
@@ -42,6 +43,7 @@ public class CourseService {
     private final CourseTeacherAssignmentRepository assignmentRepository;
     private final TeacherService teacherService;
     private final JdbcTemplate jdbcTemplate;
+    private final CurrentUserService currentUserService;
     private final NotificationService notificationService;
 
     public CourseService(
@@ -51,6 +53,7 @@ public class CourseService {
             CourseTeacherAssignmentRepository assignmentRepository,
             TeacherService teacherService,
             JdbcTemplate jdbcTemplate,
+            CurrentUserService currentUserService,
             NotificationService notificationService) {
         this.courseRepository = courseRepository;
         this.teacherRepository = teacherRepository;
@@ -58,6 +61,7 @@ public class CourseService {
         this.assignmentRepository = assignmentRepository;
         this.teacherService = teacherService;
         this.jdbcTemplate = jdbcTemplate;
+        this.currentUserService = currentUserService;
         this.notificationService = notificationService;
     }
 
@@ -68,7 +72,11 @@ public class CourseService {
             CourseAvailability availability,
             TeacherShift shift,
             Integer cycle) {
-        return courseRepository.findByFilters(Semester.normalize(semester), type, cycle).stream()
+        Integer effectiveCycle = currentUserService.requireAssignedCycleForStudent();
+        if (effectiveCycle == null) {
+            effectiveCycle = cycle;
+        }
+        return courseRepository.findByFilters(Semester.normalize(semester), type, effectiveCycle).stream()
                 .filter(course -> matchesShift(course, shift))
                 .filter(course -> matchesAvailability(course, availability))
                 .map(CourseResponse::from)
@@ -96,7 +104,12 @@ public class CourseService {
 
     @Transactional(readOnly = true)
     public CourseResponse findById(Long id) {
-        return CourseResponse.from(getCourseOrThrow(id));
+        Course course = getCourseOrThrow(id);
+        Integer studentCycle = currentUserService.requireAssignedCycleForStudent();
+        if (studentCycle != null && !studentCycle.equals(course.getCycle())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Curso no encontrado");
+        }
+        return CourseResponse.from(course);
     }
 
     @Transactional

@@ -30,6 +30,7 @@ import {
   listSpaces,
   updateSpace,
 } from "@/lib/api";
+import { canManageAcademic, canViewPracticeHeads, isStudent } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
 function buildPracticeHeadBySpaceId(practiceHeads) {
@@ -63,7 +64,9 @@ function withAssignedPracticeHeads(spaces, practiceHeads) {
 function Spaces({ searchFilter, onClearSearchFilter }) {
   const { logout, user } = useAuth();
   const { semester } = useSemester();
-  const isAdmin = user?.role === "ADMIN";
+  const isAdmin = canManageAcademic(user);
+  const canLoadPracticeHeads = canViewPracticeHeads(user);
+  const forcedCycle = isStudent(user) ? user?.assignedCycle ?? null : null;
 
   const [spaces, setSpaces] = useState([]);
   const [viewMode, setViewMode] = useState("grid");
@@ -94,15 +97,22 @@ function Spaces({ searchFilter, onClearSearchFilter }) {
       if (isSearchActive) {
         const [data, practiceHeads] = await Promise.all([
           getSpace(searchFilter.id, { semester }, handleUnauthorized),
-          listPracticeHeads({ semester }, handleUnauthorized),
+          canLoadPracticeHeads
+            ? listPracticeHeads({ semester }, handleUnauthorized)
+            : Promise.resolve([]),
         ]);
         setSpaces(withAssignedPracticeHeads([data], practiceHeads));
         return;
       }
 
       const [data, practiceHeads] = await Promise.all([
-        listSpaces({ semester, spaceType, availability, cycle }, handleUnauthorized),
-        listPracticeHeads({ semester }, handleUnauthorized),
+        listSpaces(
+          { semester, spaceType, availability, cycle: forcedCycle ?? cycle },
+          handleUnauthorized
+        ),
+        canLoadPracticeHeads
+          ? listPracticeHeads({ semester }, handleUnauthorized)
+          : Promise.resolve([]),
       ]);
       setSpaces(withAssignedPracticeHeads(data, practiceHeads));
     } catch (err) {
@@ -117,6 +127,8 @@ function Spaces({ searchFilter, onClearSearchFilter }) {
     spaceType,
     availability,
     cycle,
+    forcedCycle,
+    canLoadPracticeHeads,
     semester,
     isSearchActive,
     searchFilter?.id,
@@ -130,6 +142,12 @@ function Spaces({ searchFilter, onClearSearchFilter }) {
   }, [loadSpaces, pageView]);
 
   useEffect(() => {
+    if (forcedCycle != null) {
+      setCycle(forcedCycle);
+    }
+  }, [forcedCycle]);
+
+  useEffect(() => {
     if (searchFilter?.type !== "space" || !searchFilter.id) {
       return;
     }
@@ -139,8 +157,8 @@ function Spaces({ searchFilter, onClearSearchFilter }) {
     setFormError(null);
     setSpaceType(null);
     setAvailability(null);
-    setCycle(null);
-  }, [searchFilter]);
+    setCycle(forcedCycle);
+  }, [searchFilter, forcedCycle]);
 
   const closeForm = () => {
     setPageView("list");

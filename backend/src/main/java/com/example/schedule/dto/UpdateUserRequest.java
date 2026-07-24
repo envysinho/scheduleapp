@@ -10,6 +10,7 @@ public record UpdateUserRequest(
         @Size(max = 60) String lastName,
         @Size(min = 6, max = 100) String password,
         Role role,
+        Integer assignedCycle,
         Boolean enabled
 ) {
 }

@@ -25,6 +25,7 @@ import com.example.schedule.model.SubShift;
 import com.example.schedule.model.TeacherShift;
 import com.example.schedule.repository.CourseRepository;
 import com.example.schedule.repository.SpaceRepository;
+import com.example.schedule.security.CurrentUserService;
 
 @Service
 public class SpaceService {
@@ -33,16 +34,19 @@ public class SpaceService {
     private final CourseRepository courseRepository;
     private final NotificationService notificationService;
     private final JdbcTemplate jdbcTemplate;
+    private final CurrentUserService currentUserService;
 
     public SpaceService(
             SpaceRepository spaceRepository,
             CourseRepository courseRepository,
             NotificationService notificationService,
-            JdbcTemplate jdbcTemplate) {
+            JdbcTemplate jdbcTemplate,
+            CurrentUserService currentUserService) {
         this.spaceRepository = spaceRepository;
         this.courseRepository = courseRepository;
         this.notificationService = notificationService;
         this.jdbcTemplate = jdbcTemplate;
+        this.currentUserService = currentUserService;
     }
 
     @Transactional(readOnly = true)
@@ -52,14 +56,26 @@ public class SpaceService {
             SpaceAvailability availability,
             Integer cycle) {
         String normalizedSemester = Semester.normalize(semester);
-        return spaceRepository.findByFilters(normalizedSemester, spaceType, availability, cycle).stream()
-                .map(space -> SpaceResponse.from(space, normalizedSemester))
+        Integer effectiveCycle = currentUserService.requireAssignedCycleForStudent();
+        if (effectiveCycle == null) {
+            effectiveCycle = cycle;
+        }
+        Integer responseCycle = effectiveCycle;
+        return spaceRepository.findByFilters(normalizedSemester, spaceType, availability, effectiveCycle).stream()
+                .map(space -> SpaceResponse.from(space, normalizedSemester, responseCycle))
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public SpaceResponse findById(Long id, String semester) {
-        return SpaceResponse.from(getSpaceOrThrow(id), Semester.normalize(semester));
+        String normalizedSemester = Semester.normalize(semester);
+        Space space = getSpaceOrThrow(id);
+        Integer studentCycle = currentUserService.requireAssignedCycleForStudent();
+        SpaceResponse response = SpaceResponse.from(space, normalizedSemester, studentCycle);
+        if (studentCycle != null && response.assignments().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Ambiente no encontrado");
+        }
+        return response;
     }
 
     @Transactional

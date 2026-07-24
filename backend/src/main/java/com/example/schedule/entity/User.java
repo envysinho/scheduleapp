@@ -38,7 +38,10 @@ public class User {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Role role = Role.USER;
+    private Role role = Role.DOCENTE;
+
+    @Column(name = "assigned_cycle")
+    private Integer assignedCycle;
 
     @Column(nullable = false)
     private boolean enabled = true;
@@ -97,6 +100,14 @@ public class User {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public Integer getAssignedCycle() {
+        return assignedCycle;
+    }
+
+    public void setAssignedCycle(Integer assignedCycle) {
+        this.assignedCycle = assignedCycle;
     }
 
     public boolean isEnabled() {

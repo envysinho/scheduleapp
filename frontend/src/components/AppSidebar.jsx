@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/collapsible";
 import { CYCLES } from "@/lib/constants";
 import { useAuth } from "@/contexts/AuthContext";
+import { canManageUsers, canViewPracticeHeads, isOwner, isStudent } from "@/lib/permissions";
 
 const NAV_ITEMS = [
   { id: "dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -50,7 +51,14 @@ function AppSidebar({ currentPage, onNavigate }) {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const { isMobile, setOpenMobile } = useSidebar();
   const { logout, user } = useAuth();
-  const isAdmin = user?.role === "ADMIN";
+  const canOpenUsers = canManageUsers(user);
+  const owner = isOwner(user);
+  const visibleNavItems = NAV_ITEMS.filter(
+    (item) => item.id !== "practiceHeads" || canViewPracticeHeads(user)
+  );
+  const visibleCycles = isStudent(user) && user?.assignedCycle
+    ? CYCLES.filter((item) => item.id === user.assignedCycle)
+    : CYCLES;
 
   const handleNavigation = (page) => {
     onNavigate(page);
@@ -86,7 +94,7 @@ function AppSidebar({ currentPage, onNavigate }) {
         <SidebarGroup className="gap-2">
           <SidebarGroupContent>
             <SidebarMenu className="gap-y-0.5">
-              {NAV_ITEMS.map(({ id, icon: Icon, label }) => (
+              {visibleNavItems.map(({ id, icon: Icon, label }) => (
                 <SidebarMenuItem key={id}>
                   <SidebarMenuButton
                     isActive={currentPage === id}
@@ -119,7 +127,7 @@ function AppSidebar({ currentPage, onNavigate }) {
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <SidebarMenuSub>
-                      {CYCLES.map(({ id, label }) => (
+                      {visibleCycles.map(({ id, label }) => (
                         <SidebarMenuSubItem key={id}>
                           <SidebarMenuSubButton
                             render={<button type="button" />}
@@ -140,29 +148,33 @@ function AppSidebar({ currentPage, onNavigate }) {
       </SidebarContent>
 
       <SidebarFooter>
-        {isAdmin && (
+        {canOpenUsers && (
           <>
             <SidebarMenu className="gap-y-0.5">
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={currentPage === "rules"}
-                  tooltip="Reglas"
-                  onClick={() => handleNavigation("rules")}
-                >
-                  <ScrollText />
-                  <span>Reglas</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={currentPage === "semesters"}
-                  tooltip="Semestres"
-                  onClick={() => handleNavigation("semesters")}
-                >
-                  <CalendarRange />
-                  <span>Semestres</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {owner && (
+                <>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={currentPage === "rules"}
+                      tooltip="Reglas"
+                      onClick={() => handleNavigation("rules")}
+                    >
+                      <ScrollText />
+                      <span>Reglas</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={currentPage === "semesters"}
+                      tooltip="Semestres"
+                      onClick={() => handleNavigation("semesters")}
+                    >
+                      <CalendarRange />
+                      <span>Semestres</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </>
+              )}
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={currentPage === "users"}

@@ -36,6 +36,7 @@ import com.example.schedule.model.ScheduleWeekday;
 import com.example.schedule.repository.CourseRepository;
 import com.example.schedule.repository.CourseTeacherAssignmentRepository;
 import com.example.schedule.repository.TeacherRepository;
+import com.example.schedule.security.CurrentUserService;
 
 @Service
 public class TeacherService {
@@ -46,6 +47,7 @@ public class TeacherService {
     private final CourseRepository courseRepository;
     private final CourseTeacherAssignmentRepository assignmentRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final CurrentUserService currentUserService;
     private final NotificationService notificationService;
 
     public TeacherService(
@@ -53,24 +55,37 @@ public class TeacherService {
             CourseRepository courseRepository,
             CourseTeacherAssignmentRepository assignmentRepository,
             JdbcTemplate jdbcTemplate,
+            CurrentUserService currentUserService,
             NotificationService notificationService) {
         this.teacherRepository = teacherRepository;
         this.courseRepository = courseRepository;
         this.assignmentRepository = assignmentRepository;
         this.jdbcTemplate = jdbcTemplate;
+        this.currentUserService = currentUserService;
         this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
     public List<TeacherResponse> findAll(String semester, EmploymentType employmentType, Integer cycle) {
-        return teacherRepository.findByFilters(Semester.normalize(semester), employmentType, cycle).stream()
-                .map(TeacherResponse::from)
+        Integer effectiveCycle = currentUserService.requireAssignedCycleForStudent();
+        if (effectiveCycle == null) {
+            effectiveCycle = cycle;
+        }
+        Integer responseCycle = effectiveCycle;
+        return teacherRepository.findByFilters(Semester.normalize(semester), employmentType, effectiveCycle).stream()
+                .map(teacher -> TeacherResponse.from(teacher, responseCycle))
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public TeacherResponse findById(Long id) {
-        return TeacherResponse.from(getTeacherOrThrow(id));
+        Teacher teacher = getTeacherOrThrow(id);
+        Integer studentCycle = currentUserService.requireAssignedCycleForStudent();
+        if (studentCycle != null && teacher.getCourseAssignments().stream()
+                .noneMatch(assignment -> studentCycle.equals(assignment.getCourse().getCycle()))) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Docente no encontrado");
+        }
+        return TeacherResponse.from(teacher, studentCycle);
     }
 
     @Transactional

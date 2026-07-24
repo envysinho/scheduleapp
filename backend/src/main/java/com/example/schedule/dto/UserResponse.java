@@ -9,6 +9,7 @@ public record UserResponse(
         String firstName,
         String lastName,
         Role role,
+        Integer assignedCycle,
         boolean enabled
 ) {
 
@@ -19,6 +20,7 @@ public record UserResponse(
                 user.getFirstName(),
                 user.getLastName(),
                 user.getRole(),
+                user.getAssignedCycle(),
                 user.isEnabled());
     }
 }

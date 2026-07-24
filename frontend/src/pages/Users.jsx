@@ -14,6 +14,8 @@ import {
   useComboboxAnchor,
 } from "@/components/ui/combobox";
 import { useAuth } from "@/contexts/AuthContext";
+import { CYCLES } from "@/lib/constants";
+import { canManageUsers, isOwner, ROLE_LABELS } from "@/lib/permissions";
 import {
   createUser,
   deleteUser,
@@ -22,14 +24,16 @@ import {
   updateUser,
 } from "@/lib/api";
 
-const ROLE_OPTIONS = ["USER", "ADMIN"];
+const OWNER_ROLE_OPTIONS = ["OWNER", "ADMIN", "DOCENTE", "ESTUDIANTE"];
+const ADMIN_ROLE_OPTIONS = ["DOCENTE", "ESTUDIANTE"];
 
 const EMPTY_FORM = {
   username: "",
   firstName: "",
   lastName: "",
   password: "",
-  role: "USER",
+  role: "DOCENTE",
+  assignedCycle: null,
   enabled: true,
 };
 
@@ -38,7 +42,7 @@ function getFullName(user) {
 }
 
 function Users() {
-  const { logout } = useAuth();
+  const { logout, user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState(null);
@@ -47,6 +51,9 @@ function Users() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const roleAnchor = useComboboxAnchor();
+  const cycleAnchor = useComboboxAnchor();
+  const roleOptions = isOwner(currentUser) ? OWNER_ROLE_OPTIONS : ADMIN_ROLE_OPTIONS;
+  const canOpenUsers = canManageUsers(currentUser);
 
   const handleUnauthorized = useCallback(() => {
     logout();
@@ -66,8 +73,11 @@ function Users() {
   }, [handleUnauthorized]);
 
   useEffect(() => {
+    if (!canOpenUsers) {
+      return;
+    }
     loadUsers();
-  }, [loadUsers]);
+  }, [loadUsers, canOpenUsers]);
 
   const resetForm = () => {
     setForm(EMPTY_FORM);
@@ -94,6 +104,7 @@ function Users() {
           firstName: form.firstName.trim(),
           lastName: form.lastName.trim(),
           role: form.role,
+          assignedCycle: form.role === "ESTUDIANTE" ? form.assignedCycle : null,
           enabled: form.enabled,
         };
         if (form.password.trim()) {
@@ -108,6 +119,7 @@ function Users() {
             lastName: form.lastName.trim(),
             password: form.password,
             role: form.role,
+            assignedCycle: form.role === "ESTUDIANTE" ? form.assignedCycle : null,
           },
           handleUnauthorized
         );
@@ -132,6 +144,7 @@ function Users() {
       lastName: user.lastName ?? "",
       password: "",
       role: user.role,
+      assignedCycle: user.assignedCycle ?? null,
       enabled: user.enabled,
     });
   };
@@ -175,6 +188,14 @@ function Users() {
     }
   };
 
+  if (!canOpenUsers) {
+    return (
+      <PageCard title="Usuarios" description="Administración de cuentas de acceso al sistema.">
+        <p className="text-sm text-muted-foreground">No tienes permisos para gestionar usuarios.</p>
+      </PageCard>
+    );
+  }
+
   return (
     <PageCard
       title="Usuarios"
@@ -210,7 +231,10 @@ function Users() {
                   <tr key={user.id} className="border-b last:border-b-0">
                     <td className="px-4 py-3">{user.username}</td>
                     <td className="px-4 py-3">{getFullName(user)}</td>
-                    <td className="px-4 py-3">{user.role}</td>
+                    <td className="px-4 py-3">
+                      {ROLE_LABELS[user.role] ?? user.role}
+                      {user.role === "ESTUDIANTE" && user.assignedCycle ? ` · Ciclo ${user.assignedCycle}` : ""}
+                    </td>
                     <td className="px-4 py-3">
                       {user.enabled ? "Activo" : "Inactivo"}
                     </td>
@@ -330,10 +354,14 @@ function Users() {
             <Label htmlFor="user-role">Rol</Label>
             <div ref={roleAnchor} className="w-full">
               <Combobox
-                items={ROLE_OPTIONS}
+                items={roleOptions}
                 value={form.role}
                 onValueChange={(value) =>
-                  setForm((current) => ({ ...current, role: value }))
+                  setForm((current) => ({
+                    ...current,
+                    role: value,
+                    assignedCycle: value === "ESTUDIANTE" ? current.assignedCycle : null,
+                  }))
                 }
                 disabled={isSubmitting}
               >
@@ -343,7 +371,7 @@ function Users() {
                   <ComboboxList>
                     {(item) => (
                       <ComboboxItem key={item} value={item}>
-                        {item}
+                        {ROLE_LABELS[item] ?? item}
                       </ComboboxItem>
                     )}
                   </ComboboxList>
@@ -351,6 +379,35 @@ function Users() {
               </Combobox>
             </div>
           </div>
+
+          {form.role === "ESTUDIANTE" && (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="user-cycle">Ciclo del estudiante</Label>
+              <div ref={cycleAnchor} className="w-full">
+                <Combobox
+                  items={CYCLES.map((item) => item.label)}
+                  value={CYCLES.find((item) => item.id === form.assignedCycle)?.label ?? ""}
+                  onValueChange={(label) => {
+                    const item = CYCLES.find((option) => option.label === label);
+                    setForm((current) => ({ ...current, assignedCycle: item?.id ?? null }));
+                  }}
+                  disabled={isSubmitting}
+                >
+                  <ComboboxInput id="user-cycle" placeholder="Seleccionar ciclo" readOnly />
+                  <ComboboxContent anchor={cycleAnchor}>
+                    <ComboboxEmpty>Sin opciones.</ComboboxEmpty>
+                    <ComboboxList>
+                      {(label) => (
+                        <ComboboxItem key={label} value={label}>
+                          {label}
+                        </ComboboxItem>
+                      )}
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
+              </div>
+            </div>
+          )}
 
           {editingId && (
             <label className="flex items-center gap-2 text-sm">

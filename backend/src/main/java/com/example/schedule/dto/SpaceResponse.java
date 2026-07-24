@@ -17,10 +17,14 @@ public record SpaceResponse(
 ) {
 
     public static SpaceResponse from(Space space) {
-        return from(space, null);
+        return from(space, null, null);
     }
 
     public static SpaceResponse from(Space space, String semester) {
+        return from(space, semester, null);
+    }
+
+    public static SpaceResponse from(Space space, String semester, Integer cycle) {
         return new SpaceResponse(
                 space.getId(),
                 space.getName(),
@@ -30,6 +34,7 @@ public record SpaceResponse(
                 space.getManagerPhone(),
                 space.getAssignments().stream()
                         .filter(assignment -> semester == null || semester.equals(assignment.getSemester()))
+                        .filter(assignment -> cycle == null || cycle.equals(assignment.getCycle()))
                         .map(SpaceAssignmentResponse::from)
                         .toList());
     }

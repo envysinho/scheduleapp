@@ -14,12 +14,13 @@ import {
   listPracticeHeads,
   updatePracticeHead,
 } from "@/lib/api";
+import { canManageAcademic } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
 function PracticeHeads({ searchFilter, onClearSearchFilter }) {
   const { logout, user } = useAuth();
   const { semester } = useSemester();
-  const isAdmin = user?.role === "ADMIN";
+  const isAdmin = canManageAcademic(user);
 
   const [practiceHeads, setPracticeHeads] = useState([]);
   const [viewMode, setViewMode] = useState("grid");

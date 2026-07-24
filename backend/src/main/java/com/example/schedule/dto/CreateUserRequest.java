@@ -10,6 +10,7 @@ public record CreateUserRequest(
         @NotBlank @Size(max = 60) String firstName,
         @NotBlank @Size(max = 60) String lastName,
         @NotBlank @Size(min = 6, max = 100) String password,
-        Role role
+        Role role,
+        Integer assignedCycle
 ) {
 }

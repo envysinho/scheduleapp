@@ -15,6 +15,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useSemester } from "@/contexts/SemesterContext";
 import { listCourses, listPracticeHeads, listSpaces, listTeachers } from "@/lib/api";
+import { canViewPracticeHeads } from "@/lib/permissions";
 import { filterSearchItems } from "@/lib/search";
 
 const SEARCH_GROUPS = ["Docentes", "Jefes de Práctica", "Ambientes", "Cursos"];
@@ -58,7 +59,7 @@ function buildSearchItems(teachers, practiceHeads, spaces, courses) {
 }
 
 function GlobalSearch({ onSelect }) {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const { semester } = useSemester();
   const anchor = useComboboxAnchor();
   const cacheRef = useRef(null);
@@ -84,8 +85,10 @@ function GlobalSearch({ onSelect }) {
     try {
       const [teachers, practiceHeads, spaces, courses] = await Promise.all([
         listTeachers({ semester }, handleUnauthorized),
-        listPracticeHeads({ semester }, handleUnauthorized),
-        listSpaces({}, handleUnauthorized),
+        canViewPracticeHeads(user)
+          ? listPracticeHeads({ semester }, handleUnauthorized)
+          : Promise.resolve([]),
+        listSpaces({ semester }, handleUnauthorized),
         listCourses({ semester }, handleUnauthorized),
       ]);
       const built = buildSearchItems(teachers, practiceHeads, spaces, courses);
@@ -96,7 +99,7 @@ function GlobalSearch({ onSelect }) {
     } finally {
       setIsLoading(false);
     }
-  }, [semester, handleUnauthorized]);
+  }, [semester, handleUnauthorized, user]);
 
   useEffect(() => {
     cacheRef.current = null;

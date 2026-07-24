@@ -18,6 +18,10 @@ public record TeacherResponse(
 ) {
 
     public static TeacherResponse from(Teacher teacher) {
+        return from(teacher, null);
+    }
+
+    public static TeacherResponse from(Teacher teacher, Integer cycle) {
         return new TeacherResponse(
                 teacher.getId(),
                 teacher.getFirstName(),
@@ -28,6 +32,7 @@ public record TeacherResponse(
                 teacher.getPhone(),
                 teacher.getEmploymentType(),
                 teacher.getCourseAssignments().stream()
+                        .filter(assignment -> cycle == null || cycle.equals(assignment.getCourse().getCycle()))
                         .map(CourseTeacherAssignmentResponse::from)
                         .toList());
     }

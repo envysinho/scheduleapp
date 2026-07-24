@@ -28,12 +28,14 @@ import {
   listTeachers,
   updateTeacher,
 } from "@/lib/api";
+import { canManageAcademic, isStudent } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
 function Teachers({ searchFilter, onClearSearchFilter }) {
   const { logout, user } = useAuth();
   const { semester } = useSemester();
-  const isAdmin = user?.role === "ADMIN";
+  const isAdmin = canManageAcademic(user);
+  const forcedCycle = isStudent(user) ? user?.assignedCycle ?? null : null;
 
   const [teachers, setTeachers] = useState([]);
   const [viewMode, setViewMode] = useState("grid");
@@ -68,7 +70,7 @@ function Teachers({ searchFilter, onClearSearchFilter }) {
       }
 
       const data = await listTeachers(
-        { semester, employmentType, cycle },
+        { semester, employmentType, cycle: forcedCycle ?? cycle },
         handleUnauthorized
       );
       setTeachers(data);
@@ -83,6 +85,7 @@ function Teachers({ searchFilter, onClearSearchFilter }) {
   }, [
     employmentType,
     cycle,
+    forcedCycle,
     semester,
     isSearchActive,
     searchFilter?.id,
@@ -106,6 +109,12 @@ function Teachers({ searchFilter, onClearSearchFilter }) {
   }, [loadTeachers, pageView]);
 
   useEffect(() => {
+    if (forcedCycle != null) {
+      setCycle(forcedCycle);
+    }
+  }, [forcedCycle]);
+
+  useEffect(() => {
     if (searchFilter?.type !== "teacher" || !searchFilter.id) {
       return;
     }
@@ -114,8 +123,8 @@ function Teachers({ searchFilter, onClearSearchFilter }) {
     setEditingTeacher(null);
     setFormError(null);
     setEmploymentType(null);
-    setCycle(null);
-  }, [searchFilter]);
+    setCycle(forcedCycle);
+  }, [searchFilter, forcedCycle]);
 
   const closeForm = () => {
     setPageView("list");

@@ -6,11 +6,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-
-const ROLE_LABELS = {
-  ADMIN: "Administrador",
-  USER: "Usuario",
-};
+import { ROLE_LABELS } from "@/lib/permissions";
 
 function getInitials(username) {
   return username.slice(0, 2).toUpperCase();

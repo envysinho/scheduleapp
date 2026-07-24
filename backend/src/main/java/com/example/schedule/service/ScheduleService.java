@@ -33,6 +33,7 @@ import com.example.schedule.repository.CourseTeacherAssignmentRepository;
 import com.example.schedule.repository.ScheduleBlockSettingRepository;
 import com.example.schedule.repository.ScheduleSlotRepository;
 import com.example.schedule.repository.SpaceRepository;
+import com.example.schedule.security.CurrentUserService;
 
 @Service
 public class ScheduleService {
@@ -52,6 +53,7 @@ public class ScheduleService {
     private final CourseRepository courseRepository;
     private final CourseTeacherAssignmentRepository assignmentRepository;
     private final SpaceRepository spaceRepository;
+    private final CurrentUserService currentUserService;
     private final NotificationService notificationService;
 
     public ScheduleService(
@@ -60,25 +62,28 @@ public class ScheduleService {
             CourseRepository courseRepository,
             CourseTeacherAssignmentRepository assignmentRepository,
             SpaceRepository spaceRepository,
+            CurrentUserService currentUserService,
             NotificationService notificationService) {
         this.scheduleSlotRepository = scheduleSlotRepository;
         this.scheduleBlockSettingRepository = scheduleBlockSettingRepository;
         this.courseRepository = courseRepository;
         this.assignmentRepository = assignmentRepository;
         this.spaceRepository = spaceRepository;
+        this.currentUserService = currentUserService;
         this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
     public ScheduleResponse getSchedule(String semester, Integer cycle) {
         String normalizedSemester = Semester.normalize(semester);
-        validateCycle(cycle);
+        Integer effectiveCycle = enforceCycleAccess(cycle);
+        validateCycle(effectiveCycle);
         ScheduleContext context = loadContext(normalizedSemester);
         List<String> warnings = new ArrayList<>();
-        List<ScheduleSlot> slots = buildPreviewSlots(normalizedSemester, cycle, context, warnings);
+        List<ScheduleSlot> slots = buildPreviewSlots(normalizedSemester, effectiveCycle, context, warnings);
         return new ScheduleResponse(
                 normalizedSemester,
-                cycle,
+                effectiveCycle,
                 !slots.isEmpty(),
                 false,
                 warnings,
@@ -88,18 +93,19 @@ public class ScheduleService {
     @Transactional
     public ScheduleResponse generate(String semester, Integer cycle) {
         String normalizedSemester = Semester.normalize(semester);
-        validateCycle(cycle);
+        Integer effectiveCycle = enforceCycleAccess(cycle);
+        validateCycle(effectiveCycle);
         ScheduleContext context = loadContext(normalizedSemester);
         List<ScheduleSlot> lockedSlots = scheduleSlotRepository.findBySemester(normalizedSemester).stream()
-                .filter(slot -> !Objects.equals(slot.getCycle(), cycle))
+                .filter(slot -> !Objects.equals(slot.getCycle(), effectiveCycle))
                 .toList();
-        List<ScheduleSlot> generated = buildSlots(normalizedSemester, cycle, context, lockedSlots);
+        List<ScheduleSlot> generated = buildSlots(normalizedSemester, effectiveCycle, context, lockedSlots);
 
-        scheduleSlotRepository.deleteBySemesterAndCycle(normalizedSemester, cycle);
+        scheduleSlotRepository.deleteBySemesterAndCycle(normalizedSemester, effectiveCycle);
         scheduleSlotRepository.flush();
         scheduleSlotRepository.saveAll(generated);
-        notificationService.record("generó el horario del ciclo " + cycle + " para el semestre " + normalizedSemester);
-        return getSchedule(normalizedSemester, cycle);
+        notificationService.record("generó el horario del ciclo " + effectiveCycle + " para el semestre " + normalizedSemester);
+        return getSchedule(normalizedSemester, effectiveCycle);
     }
 
     @Transactional
@@ -485,6 +491,19 @@ public class ScheduleService {
         if (cycle == null || cycle < 1 || cycle > 10) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ciclo inválido");
         }
+    }
+
+    private Integer enforceCycleAccess(Integer requestedCycle) {
+        Integer studentCycle = currentUserService.requireAssignedCycleForStudent();
+        if (studentCycle == null) {
+            return requestedCycle;
+        }
+        if (requestedCycle != null && !studentCycle.equals(requestedCycle)) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Solo puedes consultar el horario de tu ciclo asignado.");
+        }
+        return studentCycle;
     }
 
     private void validateManualRange(
