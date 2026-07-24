@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import PageCard from "@/components/PageCard";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Collapsible,
   CollapsibleContent,
@@ -89,7 +88,6 @@ function Horarios({ cycle = 1 }) {
   const [schedule, setSchedule] = useState(null);
   const [blocks, setBlocks] = useState([]);
   const [courses, setCourses] = useState([]);
-  const [viewMode, setViewMode] = useState("matrix");
   const [loading, setLoading] = useState(true);
   const [savingAssignmentId, setSavingAssignmentId] = useState(null);
   const [error, setError] = useState(null);
@@ -249,25 +247,6 @@ function Horarios({ cycle = 1 }) {
               <Badge variant="outline">{allWarnings.length} advertencias</Badge>
             ) : null}
           </div>
-
-          <div className="flex rounded-md border p-0.5">
-            <Button
-              type="button"
-              variant={viewMode === "matrix" ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("matrix")}
-            >
-              Matriz
-            </Button>
-            <Button
-              type="button"
-              variant={viewMode === "color" ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("color")}
-            >
-              Color
-            </Button>
-          </div>
         </div>
 
         {error && (
@@ -278,15 +257,13 @@ function Horarios({ cycle = 1 }) {
 
         {loading ? (
           <p className="text-sm text-muted-foreground">Cargando horario...</p>
-        ) : viewMode === "color" ? (
+        ) : (
           <ColorScheduleView
             blocks={blocks}
             slotsByDay={slotsByDay}
             savingAssignmentId={savingAssignmentId}
             onUpdateSlot={handleAssignmentScheduleChange}
           />
-        ) : (
-          <MatrixScheduleView slotsByDay={slotsByDay} />
         )}
 
         <AssignmentDayPlanner
@@ -298,60 +275,6 @@ function Horarios({ cycle = 1 }) {
         <WarningsPanel warnings={allWarnings} />
       </div>
     </PageCard>
-  );
-}
-
-function MatrixScheduleView({ slotsByDay }) {
-  return (
-    <div className="grid gap-3 xl:grid-cols-5">
-      {WEEKDAYS.map((day) => (
-        <section key={day.value} className="min-w-0 rounded-md border">
-          <div className="border-b px-3 py-2 text-sm font-semibold">{day.label}</div>
-          <div className="flex flex-col gap-2 p-2">
-            {slotsByDay[day.value].length ? (
-              groupMatrixSlots(slotsByDay[day.value]).map((group) => (
-                <div
-                  key={group.key}
-                  className="grid gap-1"
-                  style={{ gridTemplateColumns: `repeat(${group.slots.length}, minmax(0, 1fr))` }}
-                >
-                  {group.slots.map((slot, index) => (
-                    <article
-                      key={slot.id ?? `${slot.weekday}-${slot.startTime}-${slot.courseId}-${index}`}
-                      className={cn(
-                        "min-w-0 rounded-md bg-muted/50 p-2 text-sm",
-                        group.slots.length > 1 && "ring-1 ring-primary/30"
-                      )}
-                    >
-                      <div className="font-medium">{formatTimeRange(slot)}</div>
-                      <div
-                        className="mt-1 truncate leading-snug"
-                        title={`${slot.courseCode} · ${slot.courseName}`}
-                      >
-                        {slot.courseCode} · {slot.courseName}
-                      </div>
-                      <div className="mt-1 truncate text-xs text-muted-foreground" title={slot.teacherName}>
-                        {slot.teacherName}
-                      </div>
-                      <div className="mt-1 flex flex-wrap gap-1 text-xs text-muted-foreground">
-                        <span>{slotSubtitle(slot)}</span>
-                        {slot.spaceName && (
-                          <span className="truncate" title={slot.spaceName}>
-                            · {slot.spaceName}
-                          </span>
-                        )}
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              ))
-            ) : (
-              <p className="px-1 py-2 text-sm text-muted-foreground">Sin clases.</p>
-            )}
-          </div>
-        </section>
-      ))}
-    </div>
   );
 }
 
@@ -916,40 +839,6 @@ function layoutOverlappingSlots(slots) {
   }
 
   return layouts.map(({ slot, column, columns }) => ({ slot, column, columns }));
-}
-
-function groupMatrixSlots(slots) {
-  const groups = new Map();
-  for (const slot of slots) {
-    const key = [
-      slot.weekday,
-      slot.startTime,
-      slot.endTime,
-      slot.courseId,
-      slot.shift,
-    ].join("-");
-    if (!groups.has(key)) {
-      groups.set(key, []);
-    }
-    groups.get(key).push(slot);
-  }
-
-  return [...groups.entries()]
-    .map(([key, groupSlots]) => ({
-      key,
-      slots: groupSlots.sort((left, right) =>
-        (left.subShift ?? "").localeCompare(right.subShift ?? "")
-      ),
-    }))
-    .sort((left, right) => {
-      const leftSlot = left.slots[0];
-      const rightSlot = right.slots[0];
-      const startDiff = parseTimeToMinutes(leftSlot.startTime) - parseTimeToMinutes(rightSlot.startTime);
-      if (startDiff !== 0) {
-        return startDiff;
-      }
-      return leftSlot.courseCode.localeCompare(rightSlot.courseCode);
-    });
 }
 
 function positionForTime(value, bounds) {
