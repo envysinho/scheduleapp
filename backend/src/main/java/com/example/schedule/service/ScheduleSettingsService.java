@@ -33,7 +33,6 @@ public class ScheduleSettingsService {
             "MANANA", "Turno mañana",
             "ALMUERZO", "Almuerzo",
             "TARDE", "Turno tarde",
-            "CENA", "Cena",
             "NOCHE", "Turno noche");
 
     private static final LocalTime DAY_MIN_START = LocalTime.of(5, 0);
@@ -99,7 +98,7 @@ public class ScheduleSettingsService {
     @Transactional
     public void seedDefaultsIfEmpty() {
         migrateSemesterColumnIfNeeded();
-        migrateOldDinnerDefaultsIfNeeded();
+        migrateLegacyDinnerBlockIfNeeded();
         seedDefaultsIfEmpty(Semester.CURRENT);
     }
 
@@ -107,7 +106,7 @@ public class ScheduleSettingsService {
     public void seedDefaultsIfEmpty(String semester) {
         String normalizedSemester = Semester.normalize(semester);
         migrateSemesterColumnIfNeeded();
-        migrateOldDinnerDefaultsIfNeeded();
+        migrateLegacyDinnerBlockIfNeeded();
         if (repository.countBySemester(normalizedSemester) > 0) {
             return;
         }
@@ -116,8 +115,7 @@ public class ScheduleSettingsService {
                 new DefaultBlock("DESAYUNO", "Desayuno", "06:30", "08:00"),
                 new DefaultBlock("MANANA", "Turno mañana", "08:00", "12:30"),
                 new DefaultBlock("ALMUERZO", "Almuerzo", "12:30", "14:00"),
-                new DefaultBlock("TARDE", "Turno tarde", "14:00", "17:00"),
-                new DefaultBlock("CENA", "Cena", "17:00", "17:15"),
+                new DefaultBlock("TARDE", "Turno tarde", "14:00", "17:15"),
                 new DefaultBlock("NOCHE", "Turno noche", "17:15", "22:30"));
 
         for (DefaultBlock block : defaults) {
@@ -181,21 +179,27 @@ public class ScheduleSettingsService {
         }
     }
 
-    private void migrateOldDinnerDefaultsIfNeeded() {
+    private void migrateLegacyDinnerBlockIfNeeded() {
         try {
             jdbcTemplate.execute("""
                     UPDATE schedule_block_settings
-                    SET end_time = '17:15'
-                    WHERE block_id = 'CENA'
-                      AND start_time = '17:00'
-                      AND end_time = '18:30'
+                    SET end_time = cena.end_time
+                    FROM schedule_block_settings cena
+                    WHERE schedule_block_settings.semester = cena.semester
+                      AND schedule_block_settings.block_id = 'TARDE'
+                      AND cena.block_id = 'CENA'
                     """);
             jdbcTemplate.execute("""
                     UPDATE schedule_block_settings
-                    SET start_time = '17:15'
-                    WHERE block_id = 'NOCHE'
-                      AND start_time = '18:30'
-                      AND end_time = '22:30'
+                    SET start_time = cena.end_time
+                    FROM schedule_block_settings cena
+                    WHERE schedule_block_settings.semester = cena.semester
+                      AND schedule_block_settings.block_id = 'NOCHE'
+                      AND cena.block_id = 'CENA'
+                    """);
+            jdbcTemplate.execute("""
+                    DELETE FROM schedule_block_settings
+                    WHERE block_id = 'CENA'
                     """);
         } catch (Exception ignored) {
         }

@@ -42,11 +42,18 @@ import {
   parseTimeToMinutes,
 } from "@/lib/scheduleTime";
 
-const SLOT_STYLES = {
-  MANANA: "bg-sky-600 text-white border-sky-700",
-  TARDE: "bg-indigo-600 text-white border-indigo-700",
-  NOCHE: "bg-violet-600 text-white border-violet-700",
-};
+const COURSE_COLOR_STYLES = [
+  "bg-sky-600 text-white border-sky-700",
+  "bg-emerald-600 text-white border-emerald-700",
+  "bg-amber-500 text-slate-950 border-amber-600",
+  "bg-rose-600 text-white border-rose-700",
+  "bg-indigo-600 text-white border-indigo-700",
+  "bg-teal-600 text-white border-teal-700",
+  "bg-orange-600 text-white border-orange-700",
+  "bg-fuchsia-600 text-white border-fuchsia-700",
+  "bg-lime-500 text-slate-950 border-lime-600",
+  "bg-cyan-600 text-white border-cyan-700",
+];
 
 function formatTimeRange(slot) {
   return `${slot.startTime} - ${slot.endTime}`;
@@ -56,6 +63,15 @@ function slotSubtitle(slot) {
   const shift = getTeacherShiftLabel(slot.shift);
   const subShift = slot.subShift ? ` ${getSubShiftLabel(slot.subShift)}` : "";
   return `${shift}${subShift}`;
+}
+
+function getCourseColorStyle(slot) {
+  const key = String(slot.courseId ?? slot.courseCode ?? "");
+  let hash = 0;
+  for (let index = 0; index < key.length; index += 1) {
+    hash = (hash * 31 + key.charCodeAt(index)) >>> 0;
+  }
+  return COURSE_COLOR_STYLES[hash % COURSE_COLOR_STYLES.length];
 }
 
 function Horarios({ cycle = 1 }) {
@@ -446,7 +462,7 @@ function ColorScheduleView({ blocks, slotsByDay }) {
                     key={slot.id ?? `${slot.weekday}-${slot.startTime}-${slot.courseId}-${index}`}
                     className={cn(
                       "absolute z-10 box-border overflow-hidden rounded-md border px-2 py-1 text-[11px] leading-tight shadow-sm",
-                      SLOT_STYLES[slot.shift],
+                      getCourseColorStyle(slot),
                       slot.automaticWeekday && "border-dashed opacity-60"
                     )}
                     style={{

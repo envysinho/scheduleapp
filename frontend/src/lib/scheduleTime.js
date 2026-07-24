@@ -1,13 +1,12 @@
 export const WEEKDAY_LABELS = ["Lun", "Mar", "Mié", "Jue", "Vie"];
 
-export const MEAL_BLOCK_IDS = new Set(["DESAYUNO", "ALMUERZO", "CENA"]);
+export const MEAL_BLOCK_IDS = new Set(["DESAYUNO", "ALMUERZO"]);
 
 export const BLOCK_STYLES = {
   DESAYUNO: "bg-amber-500/20 border-amber-500/40 text-amber-950 dark:text-amber-100",
   MANANA: "bg-sky-500/20 border-sky-500/40 text-sky-950 dark:text-sky-100",
   ALMUERZO: "bg-orange-500/20 border-orange-500/40 text-orange-950 dark:text-orange-100",
   TARDE: "bg-indigo-500/20 border-indigo-500/40 text-indigo-950 dark:text-indigo-100",
-  CENA: "bg-rose-500/20 border-rose-500/40 text-rose-950 dark:text-rose-100",
   NOCHE: "bg-violet-500/20 border-violet-500/40 text-violet-950 dark:text-violet-100",
 };
 

@@ -55,18 +55,31 @@ function TimelineColumn({ blocks, dayStart, dayEnd, onBoundaryChange }) {
   );
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-2">
-      <div
-        ref={columnRef}
-        className={cn(TIMELINE_TRACK_CLASS, "rounded-lg border border-border bg-muted/20")}
-      >
+    <div
+      ref={columnRef}
+      className={cn(
+        TIMELINE_TRACK_CLASS,
+        "rounded-lg border border-border bg-muted/20 pl-9 xl:min-h-[548px] xl:pl-0"
+      )}
+    >
+      {buildHourMarks(dayStart, dayEnd).map((mark) => (
+        <span
+          key={mark.label}
+          className="absolute left-1 w-7 -translate-y-1/2 text-left font-mono text-[9px] tabular-nums leading-none text-muted-foreground xl:hidden"
+          style={{ top: `${mark.top}%` }}
+        >
+          {mark.label}
+        </span>
+      ))}
+
+      <div className="absolute inset-y-1.5 left-9 right-1 xl:left-1">
         {blocks.map((block) => {
           const position = getBlockPosition(block, dayStart, dayEnd);
           return (
             <div
               key={block.id}
               className={cn(
-                "absolute inset-x-1 flex items-center justify-center rounded-md border px-1 text-center text-[11px] font-medium leading-tight",
+                "absolute inset-x-0 flex items-center justify-center rounded-md border px-1 text-center text-[11px] font-medium leading-tight",
                 BLOCK_STYLES[block.id] ?? DEFAULT_BLOCK_STYLE
               )}
               style={{
@@ -102,6 +115,7 @@ function TimelineColumn({ blocks, dayStart, dayEnd, onBoundaryChange }) {
 function DayScheduleTimeline({ blocks, onChange }) {
   const { start: dayStart, end: dayEnd } = getDayBounds(blocks);
   const hourMarks = buildHourMarks(dayStart, dayEnd);
+  const mobileWeekdayLabels = WEEKDAY_LABELS.slice(0, 1);
 
   const handleBoundaryChange = useCallback(
     (boundaryIndex, newMinutes) => {
@@ -119,40 +133,52 @@ function DayScheduleTimeline({ blocks, onChange }) {
         </span>
       </div>
 
-      <div className="overflow-x-auto overflow-y-hidden">
-        <div className="flex min-w-[720px] gap-3 pb-2">
-          <div className="flex w-11 shrink-0 flex-col gap-2">
-            <div
-              aria-hidden
-              className="text-center text-xs font-medium text-muted-foreground opacity-0 select-none"
-            >
-              Hora
-            </div>
-            <div className={TIMELINE_TRACK_CLASS}>
-              {hourMarks.map((mark) => (
-                <span
-                  key={`${mark.label}-${mark.top}`}
-                  className="absolute right-0 w-full -translate-y-1/2 text-right font-mono text-[10px] tabular-nums leading-none text-muted-foreground"
-                  style={{ top: `${mark.top}%` }}
-                >
-                  {mark.label}
-                </span>
-              ))}
-            </div>
+      <div className="grid gap-3 xl:grid-cols-[2.75rem_repeat(5,minmax(0,1fr))]">
+        <div className="hidden xl:flex xl:w-11 xl:flex-col xl:gap-2">
+          <div
+            aria-hidden
+            className="text-center text-xs font-medium text-muted-foreground opacity-0 select-none"
+          >
+            Hora
           </div>
-
-          {WEEKDAY_LABELS.map((label) => (
-            <div key={label} className="flex min-w-0 flex-1 flex-col gap-2">
-              <div className="text-center text-xs font-medium text-muted-foreground">{label}</div>
-              <TimelineColumn
-                blocks={blocks}
-                dayStart={dayStart}
-                dayEnd={dayEnd}
-                onBoundaryChange={handleBoundaryChange}
-              />
-            </div>
-          ))}
+          <div className={cn(TIMELINE_TRACK_CLASS, "min-h-[548px]")}>
+            {hourMarks.map((mark) => (
+              <span
+                key={`${mark.label}-${mark.top}`}
+                className="absolute right-0 w-full -translate-y-1/2 text-right font-mono text-[10px] tabular-nums leading-none text-muted-foreground"
+                style={{ top: `${mark.top}%` }}
+              >
+                {mark.label}
+              </span>
+            ))}
+          </div>
         </div>
+
+        {mobileWeekdayLabels.map((label) => (
+          <div key={label} className="flex min-w-0 flex-col gap-2 xl:hidden">
+            <div className="text-center text-xs font-medium text-muted-foreground">
+              {label} (aplica a lunes a viernes)
+            </div>
+            <TimelineColumn
+              blocks={blocks}
+              dayStart={dayStart}
+              dayEnd={dayEnd}
+              onBoundaryChange={handleBoundaryChange}
+            />
+          </div>
+        ))}
+
+        {WEEKDAY_LABELS.map((label) => (
+          <div key={label} className="hidden min-w-0 flex-col gap-2 xl:flex">
+            <div className="text-center text-xs font-medium text-muted-foreground">{label}</div>
+            <TimelineColumn
+              blocks={blocks}
+              dayStart={dayStart}
+              dayEnd={dayEnd}
+              onBoundaryChange={handleBoundaryChange}
+            />
+          </div>
+        ))}
       </div>
 
       <div className="flex flex-wrap justify-center gap-2">
