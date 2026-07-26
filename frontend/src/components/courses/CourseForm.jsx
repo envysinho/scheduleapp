@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,11 +24,6 @@ import {
   getTeacherShiftLabel,
   isNightOnlyCycle,
 } from "@/lib/constants";
-import { listSpaces } from "@/lib/api";
-
-const EMPTY_SPACE_ASSIGNMENT = {
-  spaceId: null,
-};
 
 const EMPTY_FORM = {
   name: "",
@@ -37,21 +32,7 @@ const EMPTY_FORM = {
   lectivo: false,
   cycle: 1,
   requiredSpaceType: "AULA",
-  spaceAssignments: [],
 };
-
-const UNASSIGNED_LABEL = "Sin asignar";
-
-function withUnassignedOption(labels) {
-  return [UNASSIGNED_LABEL, ...labels];
-}
-
-function resolveSpaceSelection(label, spaces) {
-  if (label === UNASSIGNED_LABEL) {
-    return null;
-  }
-  return spaces.find((space) => space.name === label)?.id ?? null;
-}
 
 function courseToForm(course) {
   if (!course) {
@@ -67,37 +48,19 @@ function courseToForm(course) {
     lectivo: course.lectivo ?? isLegacyLectivo,
     cycle: course.cycle ?? 1,
     requiredSpaceType: course.requiredSpaceType ?? "AULA",
-    spaceAssignments:
-      course.spaceAssignments?.length > 0
-        ? course.spaceAssignments.map((assignment) => ({
-            spaceId: assignment.spaceId,
-          }))
-        : [],
   };
 }
 
-function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnauthorized }) {
+function CourseForm({ course, onSubmit, onCancel, isSubmitting, error }) {
   const [form, setForm] = useState(EMPTY_FORM);
-  const [spaces, setSpaces] = useState([]);
 
   const typeAnchor = useComboboxAnchor();
   const cycleAnchor = useComboboxAnchor();
   const requiredSpaceTypeAnchor = useComboboxAnchor();
 
-  const loadOptions = useCallback(async () => {
-    const spacesData = await listSpaces({}, onUnauthorized);
-    setSpaces(spacesData);
-  }, [onUnauthorized]);
-
   useEffect(() => {
     setForm(courseToForm(course));
   }, [course]);
-
-  useEffect(() => {
-    loadOptions().catch(() => {});
-  }, [loadOptions]);
-
-  const spaceLabels = spaces.map((space) => space.name);
   const nightOnly = isNightOnlyCycle(form.cycle);
   const requiredSpaceType = form.requiredSpaceType;
 
@@ -117,43 +80,6 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
   })();
   const hasLabSubShifts = labSubShifts.length > 0;
 
-  const spaceMismatch = form.spaceAssignments
-    .map((assignment, index) => {
-      if (assignment.spaceId == null) {
-        return null;
-      }
-      const space = spaces.find((item) => item.id === assignment.spaceId);
-      if (!space || space.spaceType === requiredSpaceType) {
-        return null;
-      }
-      return { index, spaceName: space.name, spaceType: space.spaceType };
-    })
-    .filter(Boolean);
-  const hasSpaceMismatch = spaceMismatch.length > 0;
-
-  const handleSpaceAssignmentChange = (index, spaceId) => {
-    setForm((current) => ({
-      ...current,
-      spaceAssignments: current.spaceAssignments.map((assignment, itemIndex) =>
-        itemIndex === index ? { spaceId } : assignment
-      ),
-    }));
-  };
-
-  const addSpaceAssignment = () => {
-    setForm((current) => ({
-      ...current,
-      spaceAssignments: [...current.spaceAssignments, { ...EMPTY_SPACE_ASSIGNMENT }],
-    }));
-  };
-
-  const removeSpaceAssignment = (index) => {
-    setForm((current) => ({
-      ...current,
-      spaceAssignments: current.spaceAssignments.filter((_, itemIndex) => itemIndex !== index),
-    }));
-  };
-
   const handleSubmit = async (event) => {
     event.preventDefault();
 
@@ -164,9 +90,6 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
       lectivo: form.lectivo,
       cycle: Number(form.cycle),
       requiredSpaceType: form.requiredSpaceType,
-      spaceAssignments: form.spaceAssignments
-        .filter((assignment) => assignment.spaceId)
-        .map((assignment) => ({ spaceId: assignment.spaceId })),
     };
 
     await onSubmit(payload);
@@ -369,54 +292,17 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
           </div>
         )}
 
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <Label>Ambientes actualmente vinculados</Label>
-              <p className="text-xs text-muted-foreground">
-                Estas asignaciones deben coincidir con el tipo de ambiente requerido.
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={addSpaceAssignment}
-              disabled={isSubmitting}
-            >
-              <Plus className="size-4" />
-              Añadir ambiente
-            </Button>
-          </div>
-
-          {form.spaceAssignments.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin ambientes asignados.</p>
-          ) : (
-            form.spaceAssignments.map((assignment, index) => (
-              <SpaceAssignmentRow
-                key={`space-${index}`}
-                assignment={assignment}
-                index={index}
-                spaceLabels={spaceLabels}
-                spaces={spaces}
-                requiredSpaceType={requiredSpaceType}
-                disabled={isSubmitting}
-                onChange={handleSpaceAssignmentChange}
-                onRemove={removeSpaceAssignment}
-              />
-            ))
-          )}
+        <div className="rounded-md border p-3">
+          <Label>Asignación de ambientes</Label>
+          <p className="mt-1 text-sm text-muted-foreground">
+            La asignación concreta de aulas y laboratorios se gestiona desde la sección
+            `Ambientes`.
+          </p>
         </div>
 
         {error && (
           <p className="text-sm text-destructive" role="alert">
             {error}
-          </p>
-        )}
-        {hasSpaceMismatch && (
-          <p className="text-sm text-destructive" role="alert">
-            Corrige los ambientes que no coinciden con el tipo requerido antes de
-            guardar.
           </p>
         )}
       </div>
@@ -425,87 +311,11 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
         <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
           Cancelar
         </Button>
-        <Button type="submit" disabled={isSubmitting || hasSpaceMismatch}>
+        <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? "Guardando..." : isEditing ? "Actualizar" : "Crear"}
         </Button>
       </div>
     </form>
-  );
-}
-
-function SpaceAssignmentRow({
-  assignment,
-  index,
-  spaceLabels,
-  spaces,
-  requiredSpaceType,
-  disabled,
-  onChange,
-  onRemove,
-}) {
-  const spaceAnchor = useComboboxAnchor();
-  const selectedSpace =
-    assignment.spaceId == null
-      ? null
-      : (spaces.find((space) => space.id === assignment.spaceId) ?? null);
-  const selectedLabel = selectedSpace?.name ?? UNASSIGNED_LABEL;
-  const mismatch =
-    selectedSpace != null && selectedSpace.spaceType !== requiredSpaceType;
-
-  return (
-    <div className="rounded-md border p-3">
-      <div className="mb-3 flex items-center justify-between">
-        <span className="text-sm font-medium">Ambiente {index + 1}</span>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => onRemove(index)}
-          disabled={disabled}
-          aria-label={`Quitar ambiente ${index + 1}`}
-        >
-          <Trash2 className="size-4" />
-        </Button>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label htmlFor={`space-assignment-${index}`}>Ambiente</Label>
-        <div ref={spaceAnchor} className="w-full">
-          <Combobox
-            items={withUnassignedOption(spaceLabels)}
-            value={selectedLabel}
-            onValueChange={(label) => {
-              onChange(index, resolveSpaceSelection(label, spaces));
-            }}
-            disabled={disabled}
-          >
-            <ComboboxInput
-              id={`space-assignment-${index}`}
-              placeholder="Sin asignar"
-              readOnly
-            />
-            <ComboboxContent anchor={spaceAnchor}>
-              <ComboboxEmpty>Sin ambientes.</ComboboxEmpty>
-              <ComboboxList>
-                {(label) => (
-                  <ComboboxItem key={label} value={label}>
-                    {label}
-                  </ComboboxItem>
-                )}
-              </ComboboxList>
-            </ComboboxContent>
-          </Combobox>
-        </div>
-        {mismatch && (
-          <p className="text-sm text-destructive" role="alert">
-            Este curso requiere un ambiente de tipo{" "}
-            {getSpaceTypeLabel(requiredSpaceType).toLowerCase()}, pero
-            &quot;{selectedSpace.name}&quot; es{" "}
-            {getSpaceTypeLabel(selectedSpace.spaceType).toLowerCase()}.
-          </p>
-        )}
-      </div>
-    </div>
   );
 }
 

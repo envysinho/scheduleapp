@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { BookOpen, Building2, Pencil, Trash2, User } from "lucide-react";
+import { BookOpen, Pencil, Trash2, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -175,57 +175,13 @@ function CourseTeachers({ course, compact = false }) {
   );
 }
 
-function CourseSpaces({ spaceAssignments, compact = false }) {
-  if (!spaceAssignments?.length) {
-    return null;
-  }
-
-  if (compact) {
-    return (
-      <p className="truncate text-xs text-muted-foreground">
-        {spaceAssignments.map((assignment) => assignment.spaceName).join(" · ")}
-      </p>
-    );
-  }
-
-  return (
-    <div className="min-h-0 flex-1">
-      <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto">
-        {spaceAssignments.map((assignment) => (
-          <li
-            key={assignment.id ?? assignment.spaceId}
-            className="flex items-center gap-2 rounded-md bg-muted/50 px-2 py-1 text-xs"
-          >
-            <Building2 className="size-3 shrink-0 text-muted-foreground" />
-            <span className="font-medium">{assignment.spaceName}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 function CourseTitle({ course, compact = false }) {
-  const primarySpace = course.spaceAssignments?.[0]?.spaceName;
-
   return (
     <div className={cn("min-w-0", compact && "flex items-center gap-2")}>
       {compact ? (
-        <p className="truncate font-medium">
-          {course.name}
-          {primarySpace ? (
-            <span className="ml-2 text-sm font-normal text-muted-foreground">
-              • {primarySpace}
-            </span>
-          ) : null}
-        </p>
+        <p className="truncate font-medium">{course.name}</p>
       ) : (
-        <>
-          <CardTitle className="truncate">{course.name}</CardTitle>
-          {primarySpace ? (
-            <p className="mt-0.5 truncate text-sm text-muted-foreground">{primarySpace}</p>
-          ) : null}
-        </>
+        <CardTitle className="truncate">{course.name}</CardTitle>
       )}
     </div>
   );
@@ -246,7 +202,6 @@ function CourseCardGrid({ course, isAdmin, onEdit, onDelete }) {
 
       <CardContent className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden text-sm">
         <CourseTeachers course={course} />
-        <CourseSpaces spaceAssignments={course.spaceAssignments} />
       </CardContent>
 
       {isAdmin && (
