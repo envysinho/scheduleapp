@@ -208,6 +208,32 @@ function CourseSpaces({ spaceAssignments, compact = false }) {
   );
 }
 
+function CourseTitle({ course, compact = false }) {
+  const primarySpace = course.spaceAssignments?.[0]?.spaceName;
+
+  return (
+    <div className={cn("min-w-0", compact && "flex items-center gap-2")}>
+      {compact ? (
+        <p className="truncate font-medium">
+          {course.name}
+          {primarySpace ? (
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
+              • {primarySpace}
+            </span>
+          ) : null}
+        </p>
+      ) : (
+        <>
+          <CardTitle className="truncate">{course.name}</CardTitle>
+          {primarySpace ? (
+            <p className="mt-0.5 truncate text-sm text-muted-foreground">{primarySpace}</p>
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+}
+
 function CourseCardGrid({ course, isAdmin, onEdit, onDelete }) {
   return (
     <Card className="flex h-72 flex-col overflow-hidden">
@@ -216,7 +242,7 @@ function CourseCardGrid({ course, isAdmin, onEdit, onDelete }) {
           <BookOpen className="size-5 text-muted-foreground" />
         </div>
         <div className="min-w-0">
-          <CardTitle className="truncate">{course.name}</CardTitle>
+          <CourseTitle course={course} />
           <CourseBadges course={course} />
         </div>
       </CardHeader>
@@ -250,11 +276,8 @@ function CourseCardList({ course, isAdmin, onEdit, onDelete }) {
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {course.code}
             </p>
-            <p className="truncate font-medium">{course.name}</p>
+            <CourseTitle course={course} compact />
             <CourseBadges course={course} compact />
-            <div className="mt-1">
-              <CourseSpaces spaceAssignments={course.spaceAssignments} compact />
-            </div>
           </div>
         </div>
 
