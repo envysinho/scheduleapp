@@ -27,6 +27,7 @@ import {
 import {
   createSpace,
   deleteSpace,
+  listCourses,
   getSchedule,
   getScheduleSettings,
   getSpace,
@@ -36,6 +37,7 @@ import {
   updateSpace,
 } from "@/lib/api";
 import { canManageAcademic, canViewPracticeHeads, isStudent } from "@/lib/permissions";
+import { normalizeSearchText } from "@/lib/search";
 import { cn } from "@/lib/utils";
 
 function buildPracticeHeadBySpaceId(practiceHeads) {
@@ -65,6 +67,25 @@ function withAssignedPracticeHeads(spaces, practiceHeads) {
       practiceHeadPhone: practiceHead?.phone ?? null,
     };
   });
+}
+
+function withAssignmentCourseCodes(spaces, courses) {
+  const courseCodeByName = new Map(
+    (courses ?? [])
+      .filter((course) => course?.name)
+      .map((course) => [normalizeSearchText(course.name), course.code ?? null])
+  );
+
+  return spaces.map((space) => ({
+    ...space,
+    assignments: (space.assignments ?? []).map((assignment) => ({
+      ...assignment,
+      courseCode:
+        assignment.courseCode
+        ?? courseCodeByName.get(normalizeSearchText(assignment.courseName))
+        ?? null,
+    })),
+  }));
 }
 
 function Spaces({ searchFilter, onClearSearchFilter }) {
@@ -129,7 +150,7 @@ function Spaces({ searchFilter, onClearSearchFilter }) {
     setIsLoading(true);
     try {
       if (isSearchActive) {
-        const [data, practiceHeads, slots, settings] = await Promise.all([
+        const [data, practiceHeads, slots, settings, courses] = await Promise.all([
           getSpace(searchFilter.id, { semester }, handleUnauthorized),
           canLoadPracticeHeads
             ? listPracticeHeads({ semester }, handleUnauthorized)
@@ -138,15 +159,17 @@ function Spaces({ searchFilter, onClearSearchFilter }) {
           viewMode === "calendar"
             ? getScheduleSettings({ semester }, handleUnauthorized)
             : Promise.resolve({ blocks: [] }),
+          listCourses({ semester }, handleUnauthorized),
         ]);
+        const spacesWithCodes = withAssignmentCourseCodes([data], courses);
         setPracticeHeads(practiceHeads);
-        setSpaces(withAssignedPracticeHeads([data], practiceHeads));
+        setSpaces(withAssignedPracticeHeads(spacesWithCodes, practiceHeads));
         setScheduleSlots(slots);
         setScheduleBlocks(settings?.blocks ?? []);
         return;
       }
 
-      const [data, practiceHeads, slots, settings] = await Promise.all([
+      const [data, practiceHeads, slots, settings, courses] = await Promise.all([
         listSpaces(
           { semester, spaceType, availability, cycle: forcedCycle ?? cycle },
           handleUnauthorized
@@ -158,9 +181,11 @@ function Spaces({ searchFilter, onClearSearchFilter }) {
         viewMode === "calendar"
           ? getScheduleSettings({ semester }, handleUnauthorized)
           : Promise.resolve({ blocks: [] }),
+        listCourses({ semester }, handleUnauthorized),
       ]);
+      const spacesWithCodes = withAssignmentCourseCodes(data, courses);
       setPracticeHeads(practiceHeads);
-      setSpaces(withAssignedPracticeHeads(data, practiceHeads));
+      setSpaces(withAssignedPracticeHeads(spacesWithCodes, practiceHeads));
       setScheduleSlots(slots);
       setScheduleBlocks(settings?.blocks ?? []);
     } catch (err) {

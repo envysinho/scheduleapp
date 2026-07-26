@@ -41,8 +41,6 @@ const EMPTY_FORM = {
   name: "",
   spaceType: "AULA",
   availability: "DISPONIBLE",
-  managerName: "",
-  managerPhone: "",
   practiceHeadId: null,
   assignments: [{ ...EMPTY_ASSIGNMENT }],
 };
@@ -57,8 +55,6 @@ function spaceToForm(space) {
     spaceType: space.spaceType ?? "AULA",
     availability:
       space.availability === "EN_MANTENIMIENTO" ? "EN_MANTENIMIENTO" : "DISPONIBLE",
-    managerName: space.managerName ?? "",
-    managerPhone: space.managerPhone ?? "",
     practiceHeadId: space.practiceHeadId ?? null,
     assignments:
       space.assignments?.length > 0
@@ -160,8 +156,8 @@ function SpaceForm({ space, practiceHeads = [], onSubmit, onCancel, isSubmitting
       name: form.name.trim(),
       spaceType: form.spaceType,
       availability: form.availability,
-      managerName: form.spaceType === "LABORATORIO" ? null : form.managerName.trim() || null,
-      managerPhone: form.spaceType === "LABORATORIO" ? null : form.managerPhone.trim() || null,
+      managerName: null,
+      managerPhone: null,
       practiceHeadId: form.spaceType === "LABORATORIO" ? form.practiceHeadId : null,
       assignments: form.assignments
         .filter((assignment) => findCourseByName(courses, assignment.courseName))
@@ -294,10 +290,10 @@ function SpaceForm({ space, practiceHeads = [], onSubmit, onCancel, isSubmitting
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="space-manager-name">Encargado</Label>
-            {requiresPracticeHead ? (
+        {requiresPracticeHead && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="space-manager-name">Jefe de práctica</Label>
               <div ref={practiceHeadAnchor} className="w-full">
                 <Combobox
                   items={practiceHeads.map((practiceHead) => practiceHead.fullName)}
@@ -329,21 +325,9 @@ function SpaceForm({ space, practiceHeads = [], onSubmit, onCancel, isSubmitting
                   </ComboboxContent>
                 </Combobox>
               </div>
-            ) : (
-              <Input
-                id="space-manager-name"
-                value={form.managerName}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, managerName: event.target.value }))
-                }
-                disabled={isSubmitting}
-                placeholder="Nombre del encargado"
-              />
-            )}
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="space-manager-phone">Teléfono del encargado</Label>
-            {requiresPracticeHead ? (
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="space-manager-phone">Teléfono del jefe de práctica</Label>
               <Input
                 id="space-manager-phone"
                 value={selectedPracticeHead?.phone ?? ""}
@@ -351,19 +335,9 @@ function SpaceForm({ space, practiceHeads = [], onSubmit, onCancel, isSubmitting
                 disabled={isSubmitting}
                 placeholder="Sin teléfono"
               />
-            ) : (
-              <Input
-                id="space-manager-phone"
-                value={form.managerPhone}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, managerPhone: event.target.value }))
-                }
-                disabled={isSubmitting}
-                placeholder="Sin teléfono"
-              />
-            )}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
@@ -516,48 +490,51 @@ function AssignmentRow({ assignment, index, canRemove, disabled, courses, onChan
         </div>
       </div>
 
-      <div className="mt-3 flex flex-col gap-2">
-        <Label>Turno</Label>
-        <div className="flex flex-wrap gap-1">
-          {TEACHER_SHIFTS.filter((item) => {
-            const allowed = allowedShiftsForCycle(assignment.cycle);
-            return allowed.includes(item.value);
-          }).map((item) => (
-            <Button
-              key={item.value}
-              type="button"
-              variant={assignment.shift === item.value ? "default" : "outline"}
-              onClick={() => handleShiftChange(item.value)}
-              disabled={disabled}
-            >
-              {getTeacherShiftLabel(item.value)}
-            </Button>
-          ))}
-        </div>
-      </div>
-
-      {showSubShifts && (
-        <div className="mt-3 flex flex-col gap-2">
-          <Label>Sub-turno</Label>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-2">
+          <Label>Turno</Label>
           <div className="flex flex-wrap gap-1">
-            {allowedSubShifts.map((value) => (
+            {TEACHER_SHIFTS.filter((item) => {
+              const allowed = allowedShiftsForCycle(assignment.cycle);
+              return allowed.includes(item.value);
+            }).map((item) => (
               <Button
-                key={value}
+                key={item.value}
                 type="button"
-                variant={assignment.subShift === value ? "default" : "outline"}
-                onClick={() => onChange(index, "subShift", value)}
+                variant={assignment.shift === item.value ? "default" : "outline"}
+                onClick={() => handleShiftChange(item.value)}
                 disabled={disabled}
               >
-                {getSubShiftLabel(value)}
+                {getTeacherShiftLabel(item.value)}
               </Button>
             ))}
           </div>
-          {subShiftMissing && (
-            <p className="text-sm text-destructive" role="alert">
-              Selecciona un sub-turno para este curso de laboratorio.
-            </p>
-          )}
         </div>
+
+        {showSubShifts && (
+          <div className="flex flex-col gap-2">
+            <Label>Sub-turno</Label>
+            <div className="flex flex-wrap gap-1">
+              {allowedSubShifts.map((value) => (
+                <Button
+                  key={value}
+                  type="button"
+                  variant={assignment.subShift === value ? "default" : "outline"}
+                  onClick={() => onChange(index, "subShift", value)}
+                  disabled={disabled}
+                >
+                  {getSubShiftLabel(value)}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {showSubShifts && subShiftMissing && (
+        <p className="mt-3 text-sm text-destructive" role="alert">
+          Selecciona un sub-turno para este curso de laboratorio.
+        </p>
       )}
     </div>
   );

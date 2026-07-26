@@ -44,10 +44,45 @@ function SpaceTypeIcon({ spaceType }) {
 
 function SpaceBadges({ space }) {
   return (
-    <div className="mt-1 flex flex-wrap gap-1">
+    <div className="flex flex-wrap gap-1">
       <Badge className={getAvailabilityClassName(space.availability)}>
         {getAvailabilityLabel(space.availability)}
       </Badge>
+    </div>
+  );
+}
+
+function SpaceAssignmentBadges({ assignments }) {
+  if (!assignments?.length) {
+    return null;
+  }
+
+  const uniqueAssignments = Array.from(
+    new Map(
+      assignments
+        .filter((assignment) => assignment.courseCode || assignment.courseName)
+        .map((assignment) => [
+          assignment.courseCode ?? assignment.courseName,
+          assignment,
+        ])
+    ).values()
+  );
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-1">
+      {uniqueAssignments.map((assignment) => {
+        const label = assignment.courseCode ?? assignment.courseName;
+
+        return (
+          <Badge
+            key={label}
+            variant="outline"
+            className="max-w-full truncate"
+          >
+            {label}
+          </Badge>
+        );
+      })}
     </div>
   );
 }
@@ -77,33 +112,6 @@ function SpaceActions({ space, onEdit, onDelete }) {
   );
 }
 
-function SpaceManager({ space, compact = false }) {
-  if (space.spaceType === "LABORATORIO") {
-    return null;
-  }
-
-  if (!space.managerName && !space.managerPhone) {
-    return null;
-  }
-
-  return (
-    <div className={compact ? "flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1" : "shrink-0 space-y-1"}>
-      {space.managerName && (
-        <p className="flex min-w-0 items-center gap-2 text-muted-foreground">
-          <User className="size-3.5 shrink-0" />
-          <span className="truncate">{space.managerName}</span>
-        </p>
-      )}
-      {space.managerPhone && (
-        <p className="flex items-center gap-2 text-muted-foreground">
-          <Phone className="size-3.5 shrink-0" />
-          <span className={compact ? "truncate" : undefined}>{space.managerPhone}</span>
-        </p>
-      )}
-    </div>
-  );
-}
-
 function SpacePracticeHead({ space, compact = false }) {
   if (!space.practiceHeadName && !space.practiceHeadPhone) {
     return null;
@@ -114,7 +122,7 @@ function SpacePracticeHead({ space, compact = false }) {
       {space.practiceHeadName && (
         <p className="flex min-w-0 items-center gap-2 text-muted-foreground">
           <User className="size-3.5 shrink-0" />
-          <span className="truncate">Jefe de practica: {space.practiceHeadName}</span>
+          <span className="truncate">Jefe de práctica: {space.practiceHeadName}</span>
         </p>
       )}
       {space.practiceHeadPhone && (
@@ -170,7 +178,6 @@ function SpaceCardGrid({ space, isAdmin, onEdit, onDelete }) {
       </CardHeader>
 
       <CardContent className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden text-sm">
-        <SpaceManager space={space} />
         <SpacePracticeHead space={space} />
         <SpaceAssignments assignments={space.assignments} />
       </CardContent>
@@ -186,24 +193,28 @@ function SpaceCardGrid({ space, isAdmin, onEdit, onDelete }) {
 
 function SpaceCardList({ space, isAdmin, onEdit, onDelete }) {
   return (
-    <Card className="flex h-24 items-center overflow-hidden py-0">
-      <div className="grid h-full w-full grid-cols-[minmax(0,220px)_minmax(0,1fr)_auto] items-center gap-4 px-4 py-3">
-        <div className="flex min-w-0 items-center gap-3">
+    <Card className="overflow-hidden py-0">
+      <div className="grid w-full gap-4 px-4 py-3 md:grid-cols-[minmax(0,1fr)_minmax(0,24rem)_auto] md:items-center">
+        <div className="flex min-w-0 items-start gap-3">
           <SpaceTypeIcon spaceType={space.spaceType} />
-          <div className="min-w-0">
-            <p className="truncate font-medium">{space.name}</p>
-            <SpaceBadges space={space} />
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <p className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {space.name}
+              </p>
+              <SpaceBadges space={space} />
+            </div>
+            <p className="truncate font-medium">Nombre por asignar</p>
+            <SpaceAssignmentBadges assignments={space.assignments} />
           </div>
         </div>
 
         <div className="min-w-0 space-y-1 text-sm">
-          <SpaceManager space={space} compact />
           <SpacePracticeHead space={space} compact />
-          <SpaceAssignments assignments={space.assignments} compact />
         </div>
 
         {isAdmin && (
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2 md:self-center">
             <SpaceActions space={space} onEdit={onEdit} onDelete={onDelete} />
           </div>
         )}
