@@ -61,6 +61,8 @@ function AppHeader({ isDark, onToggleTheme, onSearchSelect }) {
   const [clearedNotificationId, setClearedNotificationId] = useState(() =>
     readClearedNotificationId(user)
   );
+  const notificationButtonRef = useRef(null);
+  const notificationContainerRef = useRef(null);
   const notificationPanelRef = useRef(null);
   const semesterAnchor = useComboboxAnchor();
 
@@ -98,14 +100,45 @@ function AppHeader({ isDark, onToggleTheme, onSearchSelect }) {
     if (!isNotificationsOpen) return undefined;
 
     const handlePointerDown = (event) => {
-      if (notificationPanelRef.current?.contains(event.target)) {
+      if (notificationContainerRef.current?.contains(event.target)) {
         return;
       }
       setIsNotificationsOpen(false);
+      notificationButtonRef.current?.focus();
     };
 
     document.addEventListener("pointerdown", handlePointerDown);
     return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [isNotificationsOpen]);
+
+  useEffect(() => {
+    if (!isNotificationsOpen) {
+      return undefined;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      notificationPanelRef.current?.focus();
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [isNotificationsOpen]);
+
+  useEffect(() => {
+    if (!isNotificationsOpen) {
+      return undefined;
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key !== "Escape") {
+        return;
+      }
+      event.preventDefault();
+      setIsNotificationsOpen(false);
+      notificationButtonRef.current?.focus();
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isNotificationsOpen]);
 
   const visibleNotifications = useMemo(
@@ -185,14 +218,16 @@ function AppHeader({ isDark, onToggleTheme, onSearchSelect }) {
             </ComboboxContent>
           </Combobox>
         </div>
-        <div ref={notificationPanelRef} className="relative">
+        <div ref={notificationContainerRef} className="relative">
           <Button
+            ref={notificationButtonRef}
             variant="ghost"
             size="icon"
             className="relative"
             onClick={toggleNotifications}
             aria-expanded={isNotificationsOpen}
             aria-haspopup="dialog"
+            aria-controls="notifications-panel"
           >
             <Bell />
             {unreadCount > 0 && (
@@ -207,8 +242,12 @@ function AppHeader({ isDark, onToggleTheme, onSearchSelect }) {
           </Button>
           {isNotificationsOpen && (
             <div
+              id="notifications-panel"
+              ref={notificationPanelRef}
               role="dialog"
               aria-label="Notificaciones"
+              aria-modal="false"
+              tabIndex={-1}
               className="absolute right-0 top-10 z-50 w-[min(22rem,calc(100vw-1rem))] overflow-hidden rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 sm:w-[22rem]"
             >
               <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
