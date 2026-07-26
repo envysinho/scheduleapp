@@ -147,14 +147,20 @@ function CourseTeachers({ course, compact = false }) {
 
   if (compact) {
     return (
-      <p className="truncate text-xs text-muted-foreground">
-        {entries.map(({ name, shiftsText }) => `${name} · ${shiftsText}`).join(" · ")}
-      </p>
+      <div className="min-w-0 space-y-1 text-right">
+        {entries.map(({ id, name, shiftsText }) => (
+          <p key={id} className="truncate text-xs text-muted-foreground">
+            {name}
+            {" · "}
+            {shiftsText}
+          </p>
+        ))}
+      </div>
     );
   }
 
   return (
-    <div className="shrink-0 space-y-1">
+    <div className="grid shrink-0 gap-1 sm:grid-cols-2">
       {entries.map(({ id, name, shiftsText }) => (
         <p key={id} className="flex min-w-0 items-center gap-2 text-muted-foreground">
           <User className="size-3.5 shrink-0" />
@@ -183,17 +189,22 @@ function CourseSpaces({ spaceAssignments, compact = false }) {
   }
 
   return (
-    <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto">
-      {spaceAssignments.map((assignment) => (
-        <li
-          key={assignment.id ?? assignment.spaceId}
-          className="flex items-center gap-2 rounded-md bg-muted/50 px-2 py-1 text-xs"
-        >
-          <Building2 className="size-3 shrink-0 text-muted-foreground" />
-          <span className="font-medium">{assignment.spaceName}</span>
-        </li>
-      ))}
-    </ul>
+    <div className="min-h-0 flex-1 space-y-2">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        Ambientes
+      </p>
+      <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto">
+        {spaceAssignments.map((assignment) => (
+          <li
+            key={assignment.id ?? assignment.spaceId}
+            className="flex items-center gap-2 rounded-md bg-muted/50 px-2 py-1 text-xs"
+          >
+            <Building2 className="size-3 shrink-0 text-muted-foreground" />
+            <span className="font-medium">{assignment.spaceName}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -229,30 +240,30 @@ function CourseCardGrid({ course, isAdmin, onEdit, onDelete }) {
 
 function CourseCardList({ course, isAdmin, onEdit, onDelete }) {
   return (
-    <Card className="flex h-24 items-center overflow-hidden py-0">
-      <div className="grid h-full w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 px-4 py-3">
-        <div className="flex items-center gap-3">
+    <Card className="overflow-hidden py-0">
+      <div className="grid w-full gap-4 px-4 py-3 md:grid-cols-[minmax(0,1fr)_minmax(0,24rem)_auto] md:items-center">
+        <div className="flex min-w-0 items-start gap-3">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted">
             <BookOpen className="size-5 text-muted-foreground" />
           </div>
-          <div>
-            <p className="max-w-[14rem] truncate font-medium">
-              <span className="mr-2 text-sm font-normal text-muted-foreground">
-                {course.code}
-              </span>
-              {course.name}
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {course.code}
             </p>
+            <p className="truncate font-medium">{course.name}</p>
             <CourseBadges course={course} compact />
+            <div className="mt-1">
+              <CourseSpaces spaceAssignments={course.spaceAssignments} compact />
+            </div>
           </div>
         </div>
 
-        <div className="min-w-0 space-y-1 text-sm">
+        <div className="min-w-0 text-sm">
           <CourseTeachers course={course} compact />
-          <CourseSpaces spaceAssignments={course.spaceAssignments} compact />
         </div>
 
         {isAdmin && (
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2 md:self-center">
             <CourseActions course={course} onEdit={onEdit} onDelete={onDelete} />
           </div>
         )}

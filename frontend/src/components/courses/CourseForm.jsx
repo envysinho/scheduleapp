@@ -259,6 +259,9 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
               />
               <Label htmlFor="course-lectivo">Curso lectivo</Label>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Marca esta opción si el curso debe considerarse lectivo dentro de la planificación.
+            </p>
           </div>
 
           <div className="flex flex-col gap-2">
@@ -294,7 +297,10 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="course-required-space-type">Ambiente requerido</Label>
+            <Label htmlFor="course-required-space-type">Tipo de ambiente que necesita el curso</Label>
+            <p className="text-xs text-muted-foreground">
+              Define el tipo de ambiente adecuado para poder asignarlo correctamente.
+            </p>
             <div ref={requiredSpaceTypeAnchor} className="w-full">
               <Combobox
                 items={SPACE_TYPES.map((item) => item.label)}
@@ -365,7 +371,12 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
 
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <Label>Ambientes asignados</Label>
+            <div className="space-y-1">
+              <Label>Ambientes actualmente vinculados</Label>
+              <p className="text-xs text-muted-foreground">
+                Estas asignaciones deben coincidir con el tipo de ambiente requerido.
+              </p>
+            </div>
             <Button
               type="button"
               variant="outline"
@@ -404,7 +415,7 @@ function CourseForm({ course, onSubmit, onCancel, isSubmitting, error, onUnautho
         )}
         {hasSpaceMismatch && (
           <p className="text-sm text-destructive" role="alert">
-            Corrige los ambientes que no coincen con el tipo requerido antes de
+            Corrige los ambientes que no coinciden con el tipo requerido antes de
             guardar.
           </p>
         )}

@@ -211,8 +211,8 @@ function Courses({ searchFilter, onClearSearchFilter }) {
     : "Cursos";
 
   const pageDescription = isFormView
-    ? "Complete los datos del curso, docentes por turno y ambientes asignados."
-    : "Gestión y consulta de cursos por tipo, disponibilidad, turno y ciclo.";
+    ? "Complete los datos del curso y revise sus ambientes vinculados."
+    : "Consulta y gestión de cursos por tipo, ciclo, turno y disponibilidad.";
 
   return (
     <PageCard title={pageTitle} description={pageDescription}>
@@ -372,7 +372,7 @@ function Courses({ searchFilter, onClearSearchFilter }) {
             <p className="text-sm text-muted-foreground">
               {isSearchActive
                 ? "No se encontró el curso seleccionado."
-                : "No hay cursos que coincidan con los filtros seleccionados."}
+                : "No hay cursos con esos filtros. Prueba cambiando ciclo, turno o tipo."}
             </p>
           ) : (
             <div
