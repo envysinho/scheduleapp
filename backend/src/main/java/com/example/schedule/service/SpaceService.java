@@ -3,6 +3,8 @@ package com.example.schedule.service;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -18,6 +20,8 @@ import com.example.schedule.dto.CreateSpaceRequest;
 import com.example.schedule.dto.SpaceAssignmentRequest;
 import com.example.schedule.dto.SpaceResponse;
 import com.example.schedule.dto.UpdateSpaceRequest;
+import com.example.schedule.entity.Course;
+import com.example.schedule.entity.CourseTeacherAssignment;
 import com.example.schedule.entity.Space;
 import com.example.schedule.entity.SpaceAssignment;
 import com.example.schedule.model.CourseCycleRules;
@@ -217,6 +221,67 @@ public class SpaceService {
                             new SpaceAssignmentRequest("Programación I", ((i - 1) % 10) + 1, null, null),
                             new SpaceAssignmentRequest("Química Orgánica", ((i + 1) % 10) + 1, null, null))));
         }
+    }
+
+    @Transactional
+    public void seedAssignmentsForSemesterIfEmpty(String semester) {
+        String normalizedSemester = Semester.normalize(semester);
+        if (spaceRepository.count() == 0) {
+            seedDemoIfEmpty();
+        }
+
+        boolean hasAssignments = spaceRepository.findAll().stream()
+                .flatMap(space -> space.getAssignments().stream())
+                .anyMatch(assignment -> normalizedSemester.equals(assignment.getSemester()));
+        if (hasAssignments) {
+            return;
+        }
+
+        List<Course> courses = courseRepository.findByFilters(normalizedSemester, null, null, null);
+        if (courses.isEmpty()) {
+            return;
+        }
+
+        List<Space> aulas = new ArrayList<>();
+        List<Space> labs = new ArrayList<>();
+        for (Space space : spaceRepository.findAll().stream()
+                .sorted(Comparator.comparing(Space::getName))
+                .toList()) {
+            if (space.getSpaceType() == SpaceType.LABORATORIO) {
+                labs.add(space);
+            } else {
+                aulas.add(space);
+            }
+        }
+
+        int aulaIndex = 0;
+        int labIndex = 0;
+        for (Course course : courses.stream()
+                .sorted(Comparator.comparing(Course::getCycle).thenComparing(Course::getCode))
+                .toList()) {
+            List<Space> candidates = course.getRequiredSpaceType() == SpaceType.LABORATORIO ? labs : aulas;
+            if (candidates.isEmpty()) {
+                candidates = course.getRequiredSpaceType() == SpaceType.LABORATORIO ? aulas : labs;
+            }
+            if (candidates.isEmpty()) {
+                continue;
+            }
+
+            for (CourseTeacherAssignment teacherAssignment : course.getTeacherAssignments()) {
+                int selectedIndex = course.getRequiredSpaceType() == SpaceType.LABORATORIO ? labIndex++ : aulaIndex++;
+                Space targetSpace = candidates.get(selectedIndex % candidates.size());
+
+                SpaceAssignment assignment = new SpaceAssignment();
+                assignment.setCourseName(course.getName());
+                assignment.setSemester(normalizedSemester);
+                assignment.setCycle(course.getCycle());
+                assignment.setShift(teacherAssignment.getShift());
+                assignment.setSubShift(teacherAssignment.getSubShift());
+                assignment.setSpace(targetSpace);
+                targetSpace.getAssignments().add(assignment);
+            }
+        }
+
     }
 
     @Transactional

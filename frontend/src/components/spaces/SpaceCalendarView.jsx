@@ -17,21 +17,28 @@ import {
 } from "@/components/ui/combobox";
 import { Label } from "@/components/ui/label";
 import {
-  BLOCK_STYLES,
-  DEFAULT_BLOCK_STYLE,
   buildHourMarks,
-  getBlockPosition,
+  formatMinutesToTime,
   getDayBounds,
   parseTimeToMinutes,
 } from "@/lib/scheduleTime";
 import {
   WEEKDAYS,
   getCycleLabel,
+  getSpaceTypeLabel,
   getSubShiftLabel,
   getTeacherShiftLabel,
   getWeekdayLabel,
 } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+
+const JS_DAY_TO_WEEKDAY = {
+  1: "MONDAY",
+  2: "TUESDAY",
+  3: "WEDNESDAY",
+  4: "THURSDAY",
+  5: "FRIDAY",
+};
 
 function normalizeTime(value) {
   if (!value) {
@@ -58,7 +65,53 @@ function buildAssignmentKey(assignment) {
   ].join("|");
 }
 
-function buildCalendarData(space, scheduleSlots) {
+function formatAssignmentMeta(assignment) {
+  return [
+    assignment.cycle != null ? getCycleLabel(assignment.cycle) : null,
+    assignment.shift ? getTeacherShiftLabel(assignment.shift) : null,
+    assignment.subShift ? getSubShiftLabel(assignment.subShift) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function getAllSpacesLabel(spaceType) {
+  if (spaceType === "AULA") {
+    return "Todas las aulas";
+  }
+  if (spaceType === "LABORATORIO") {
+    return "Todos los laboratorios";
+  }
+  return "Todos";
+}
+
+function formatDuration(totalMinutes) {
+  if (totalMinutes <= 0) {
+    return "0 min";
+  }
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours > 0 && minutes > 0) {
+    return `${hours} h ${minutes} min`;
+  }
+  if (hours > 0) {
+    return `${hours} h`;
+  }
+  return `${minutes} min`;
+}
+
+function getCurrentWeekdayValue(date) {
+  return JS_DAY_TO_WEEKDAY[date.getDay()] ?? null;
+}
+
+function getInitialSelectedDay() {
+  const today = getCurrentWeekdayValue(new Date());
+  return today ?? WEEKDAYS[0].value;
+}
+
+function buildCalendarData(selectedSpaces, scheduleSlots) {
+  const spaces = selectedSpaces ?? [];
+  const selectedSpaceIds = new Set(spaces.map((space) => space.id));
   const slotsByDay = Object.fromEntries(WEEKDAYS.map((day) => [day.value, []]));
   const warnings = [];
   const normalizedSlots = (scheduleSlots ?? [])
@@ -69,7 +122,7 @@ function buildCalendarData(space, scheduleSlots) {
     }))
     .filter((slot) => slot.weekday && slot.startTime && slot.endTime);
 
-  const spaceSlots = normalizedSlots.filter((slot) => slot.spaceId === space?.id);
+  const spaceSlots = normalizedSlots.filter((slot) => selectedSpaceIds.has(slot.spaceId));
 
   for (const slot of spaceSlots) {
     slotsByDay[slot.weekday]?.push(slot);
@@ -114,446 +167,678 @@ function buildCalendarData(space, scheduleSlots) {
   }
 
   const unscheduledAssignments = [];
-  for (const assignment of space?.assignments ?? []) {
-    const key = buildAssignmentKey(assignment);
-    const currentCount = slotCounts.get(key) ?? 0;
+  for (const space of spaces) {
+    for (const assignment of space?.assignments ?? []) {
+      const key = buildAssignmentKey(assignment);
+      const currentCount = slotCounts.get(key) ?? 0;
 
-    if (currentCount > 0) {
-      slotCounts.set(key, currentCount - 1);
+      if (currentCount > 0) {
+        slotCounts.set(key, currentCount - 1);
+        continue;
+      }
+
+      const matchingSlots = slotsByKey.get(key) ?? [];
+      const otherSpaces = matchingSlots
+        .filter((slot) => slot.spaceId !== space?.id)
+        .map((slot) => slot.spaceName)
+        .filter(Boolean);
+      const uniqueOtherSpaces = [...new Set(otherSpaces)];
+
+      unscheduledAssignments.push({
+        ...assignment,
+        sourceSpaceName: space.name,
+        diagnostic:
+          uniqueOtherSpaces.length > 0
+            ? `Tiene bloque en Horarios, pero quedó asignado a ${uniqueOtherSpaces.join(", ")}.`
+            : "No tiene bloque generado en Horarios para esta combinación.",
+      });
+    }
+  }
+
+  return { slotsByDay, spaceSlots, unscheduledAssignments, warnings };
+}
+
+function buildMergedSegments(slots) {
+  const ordered = [...slots]
+    .map((slot) => ({
+      ...slot,
+      startMinutes: parseTimeToMinutes(slot.startTime),
+      endMinutes: parseTimeToMinutes(slot.endTime),
+    }))
+    .filter((slot) => slot.startMinutes != null && slot.endMinutes != null)
+    .sort((left, right) => left.startMinutes - right.startMinutes);
+
+  const segments = [];
+  for (const slot of ordered) {
+    const last = segments[segments.length - 1];
+    if (!last || slot.startMinutes > last.endMinutes) {
+      segments.push({
+        startMinutes: slot.startMinutes,
+        endMinutes: slot.endMinutes,
+        slots: [slot],
+      });
       continue;
     }
 
-    const matchingSlots = slotsByKey.get(key) ?? [];
-    const otherSpaces = matchingSlots
-      .filter((slot) => slot.spaceId !== space?.id)
-      .map((slot) => slot.spaceName)
-      .filter(Boolean);
-    const uniqueOtherSpaces = [...new Set(otherSpaces)];
-
-    unscheduledAssignments.push({
-      ...assignment,
-      diagnostic:
-        uniqueOtherSpaces.length > 0
-          ? `Tiene bloque en Horarios, pero quedó asignado a ${uniqueOtherSpaces.join(", ")}.`
-          : "No tiene bloque generado en Horarios para esta combinación.",
-    });
+    last.endMinutes = Math.max(last.endMinutes, slot.endMinutes);
+    last.slots.push(slot);
   }
 
-  return { slotsByDay, unscheduledAssignments, warnings };
+  return segments;
 }
 
-function getSlotColorClass(slot) {
-  if (slot.shift === "MANANA") {
-    return "border-sky-600 bg-sky-600 text-white";
+function getStatusTone(status) {
+  if (status === "MANTENIMIENTO") {
+    return "border-red-300 bg-red-50 text-red-800";
   }
-  if (slot.shift === "TARDE") {
-    return "border-indigo-600 bg-indigo-600 text-white";
+  if (status === "OCUPADO") {
+    return "border-amber-300 bg-amber-50 text-amber-800";
   }
-  if (slot.shift === "NOCHE") {
-    return "border-violet-600 bg-violet-600 text-white";
-  }
-  return "border-emerald-600 bg-emerald-600 text-white";
+  return "border-emerald-300 bg-emerald-50 text-emerald-800";
 }
 
-function formatAssignmentMeta(assignment) {
-  return [
-    assignment.cycle != null ? getCycleLabel(assignment.cycle) : null,
-    assignment.shift ? getTeacherShiftLabel(assignment.shift) : null,
-    assignment.subShift ? getSubShiftLabel(assignment.subShift) : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+function getTimelineSegmentClass(status) {
+  if (status === "MANTENIMIENTO") {
+    return "border-red-400 bg-red-500/80 text-white";
+  }
+  if (status === "OCUPADO") {
+    return "border-amber-400 bg-amber-500/90 text-white";
+  }
+  return "border-emerald-300 bg-emerald-100 text-emerald-900";
 }
 
-function positionForTime(time, bounds) {
-  const minutes = parseTimeToMinutes(time);
-  if (minutes == null) {
-    return 0;
+function getSpaceCurrentState(space, slots, nowWeekday, nowMinutes) {
+  if (space.availability === "EN_MANTENIMIENTO") {
+    return {
+      status: "MANTENIMIENTO",
+      label: "Mantenimiento",
+      detail: "No disponible",
+      activeSlot: null,
+    };
   }
+
+  if (nowWeekday == null || nowMinutes == null) {
+    return {
+      status: "LIBRE",
+      label: "Libre ahora",
+      detail: "Sin monitoreo horario hoy",
+      activeSlot: null,
+    };
+  }
+
+  const activeSlot = slots.find((slot) => {
+    if (slot.weekday !== nowWeekday) {
+      return false;
+    }
+    const start = parseTimeToMinutes(slot.startTime);
+    const end = parseTimeToMinutes(slot.endTime);
+    return start != null && end != null && nowMinutes >= start && nowMinutes < end;
+  }) ?? null;
+
+  if (activeSlot) {
+    return {
+      status: "OCUPADO",
+      label: "Ocupado ahora",
+      detail: `${activeSlot.startTime} - ${activeSlot.endTime}`,
+      activeSlot,
+    };
+  }
+
+  return {
+    status: "LIBRE",
+    label: "Libre ahora",
+    detail: "Disponible",
+    activeSlot: null,
+  };
+}
+
+function getNextChangeLabel(space, slots, nowWeekday, nowMinutes) {
+  if (space.availability === "EN_MANTENIMIENTO") {
+    return "En mantenimiento";
+  }
+
+  if (nowWeekday == null || nowMinutes == null) {
+    return "Sin cambios programados hoy";
+  }
+
+  const daySlots = slots
+    .filter((slot) => slot.weekday === nowWeekday)
+    .sort((left, right) => parseTimeToMinutes(left.startTime) - parseTimeToMinutes(right.startTime));
+
+  const activeSlot = daySlots.find((slot) => {
+    const start = parseTimeToMinutes(slot.startTime);
+    const end = parseTimeToMinutes(slot.endTime);
+    return start != null && end != null && nowMinutes >= start && nowMinutes < end;
+  });
+
+  if (activeSlot) {
+    return `Se libera a las ${activeSlot.endTime}`;
+  }
+
+  const upcomingSlot = daySlots.find((slot) => {
+    const start = parseTimeToMinutes(slot.startTime);
+    return start != null && start > nowMinutes;
+  });
+
+  if (upcomingSlot) {
+    return `Se ocupa a las ${upcomingSlot.startTime}`;
+  }
+
+  return "Sin más cambios hoy";
+}
+
+function getTimelinePosition(minutes, bounds) {
   const span = Math.max(bounds.end - bounds.start, 1);
   return ((minutes - bounds.start) / span) * 100;
 }
 
-function layoutOverlappingSlots(slots) {
-  const sorted = [...slots].sort((left, right) => {
-    const startDiff =
-      parseTimeToMinutes(left.startTime) - parseTimeToMinutes(right.startTime);
-    if (startDiff !== 0) {
-      return startDiff;
+function buildTimelineSegments(space, daySlots, bounds) {
+  if (space.availability === "EN_MANTENIMIENTO") {
+    return [
+      {
+        status: "MANTENIMIENTO",
+        label: "Mantenimiento",
+        left: 0,
+        width: 100,
+        slots: [],
+      },
+    ];
+  }
+
+  const occupiedSegments = buildMergedSegments(daySlots);
+  const segments = [];
+  let cursor = bounds.start;
+
+  for (const segment of occupiedSegments) {
+    const start = Math.max(segment.startMinutes, bounds.start);
+    const end = Math.min(segment.endMinutes, bounds.end);
+
+    if (start > cursor) {
+      segments.push({
+        status: "LIBRE",
+        label: "Libre",
+        left: getTimelinePosition(cursor, bounds),
+        width: getTimelinePosition(start, bounds) - getTimelinePosition(cursor, bounds),
+        slots: [],
+      });
     }
-    return parseTimeToMinutes(left.endTime) - parseTimeToMinutes(right.endTime);
+
+    segments.push({
+      status: "OCUPADO",
+      label: "Ocupado",
+      left: getTimelinePosition(start, bounds),
+      width: getTimelinePosition(end, bounds) - getTimelinePosition(start, bounds),
+      slots: segment.slots,
+    });
+
+    cursor = Math.max(cursor, end);
+  }
+
+  if (cursor < bounds.end) {
+    segments.push({
+      status: "LIBRE",
+      label: "Libre",
+      left: getTimelinePosition(cursor, bounds),
+      width: getTimelinePosition(bounds.end, bounds) - getTimelinePosition(cursor, bounds),
+      slots: [],
+    });
+  }
+
+  return segments.filter((segment) => segment.width > 0);
+}
+
+function buildSpaceRows(spaces, spaceSlots, selectedDay, bounds, nowWeekday, nowMinutes) {
+  return spaces.map((space) => {
+    const slots = spaceSlots.filter((slot) => slot.spaceId === space.id);
+    const daySlots = slots.filter((slot) => slot.weekday === selectedDay);
+    const occupiedMinutes = buildMergedSegments(daySlots).reduce(
+      (total, segment) => total + (segment.endMinutes - segment.startMinutes),
+      0
+    );
+    const timelineSegments = buildTimelineSegments(space, daySlots, bounds);
+    const currentState = getSpaceCurrentState(space, slots, nowWeekday, nowMinutes);
+
+    return {
+      space,
+      slots,
+      daySlots,
+      occupiedMinutes,
+      timelineSegments,
+      currentState,
+      nextChangeLabel: getNextChangeLabel(space, slots, nowWeekday, nowMinutes),
+    };
   });
-
-  const active = [];
-  const layout = [];
-  let clusterMaxColumns = 1;
-  let clusterIndices = [];
-
-  const finalizeCluster = () => {
-    for (const index of clusterIndices) {
-      layout[index].columns = clusterMaxColumns;
-    }
-    clusterIndices = [];
-    clusterMaxColumns = 1;
-  };
-
-  for (const slot of sorted) {
-    const start = parseTimeToMinutes(slot.startTime);
-    const end = parseTimeToMinutes(slot.endTime);
-
-    for (let index = active.length - 1; index >= 0; index -= 1) {
-      if (active[index].end <= start) {
-        active.splice(index, 1);
-      }
-    }
-
-    if (active.length === 0 && clusterIndices.length > 0) {
-      finalizeCluster();
-    }
-
-    let column = 0;
-    while (active.some((item) => item.column === column)) {
-      column += 1;
-    }
-
-    active.push({ end, column });
-    clusterMaxColumns = Math.max(clusterMaxColumns, active.length);
-    clusterIndices.push(layout.length);
-    layout.push({ slot, column, columns: 1 });
-  }
-
-  if (clusterIndices.length > 0) {
-    finalizeCluster();
-  }
-
-  return layout;
 }
 
 function SpaceCalendarView({ spaces, scheduleSlots, blocks, isLoading }) {
+  const spaceTypeAnchor = useComboboxAnchor();
   const spaceAnchor = useComboboxAnchor();
+  const [selectedSpaceType, setSelectedSpaceType] = useState(null);
   const [selectedSpaceId, setSelectedSpaceId] = useState(null);
+  const [selectedDay, setSelectedDay] = useState(getInitialSelectedDay);
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setNow(new Date());
+    }, 60_000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  const availableSpaceTypes = useMemo(
+    () => [...new Set(spaces.map((space) => space.spaceType).filter(Boolean))],
+    [spaces]
+  );
+
+  const spacesBySelectedType = useMemo(
+    () => spaces.filter((space) => space.spaceType === selectedSpaceType),
+    [spaces, selectedSpaceType]
+  );
 
   useEffect(() => {
     if (!spaces.length) {
+      setSelectedSpaceType(null);
       setSelectedSpaceId(null);
       return;
     }
 
-    if (!spaces.some((space) => space.id === selectedSpaceId)) {
-      setSelectedSpaceId(spaces[0].id);
+    if (!availableSpaceTypes.includes(selectedSpaceType)) {
+      setSelectedSpaceType(availableSpaceTypes[0] ?? null);
     }
-  }, [spaces, selectedSpaceId]);
+  }, [availableSpaceTypes, selectedSpaceType, spaces]);
+
+  useEffect(() => {
+    if (!spacesBySelectedType.length) {
+      setSelectedSpaceId(null);
+      return;
+    }
+
+    if (
+      selectedSpaceId != null
+      && !spacesBySelectedType.some((space) => space.id === selectedSpaceId)
+    ) {
+      setSelectedSpaceId(null);
+    }
+  }, [selectedSpaceId, spacesBySelectedType]);
 
   const selectedSpace =
-    spaces.find((space) => space.id === selectedSpaceId) ?? spaces[0] ?? null;
+    spacesBySelectedType.find((space) => space.id === selectedSpaceId) ?? null;
+  const selectedSpaces = selectedSpace != null ? [selectedSpace] : spacesBySelectedType;
 
-  const { slotsByDay, unscheduledAssignments, warnings } = useMemo(
-    () => buildCalendarData(selectedSpace, scheduleSlots),
-    [selectedSpace, scheduleSlots]
+  const { spaceSlots, unscheduledAssignments, warnings } = useMemo(
+    () => buildCalendarData(selectedSpaces, scheduleSlots),
+    [scheduleSlots, selectedSpaces]
   );
 
   const bounds = useMemo(() => getDayBounds(blocks), [blocks]);
-  const hourMarks = useMemo(() => buildHourMarks(bounds.start, bounds.end), [bounds]);
-  const scheduledCount = useMemo(
-    () => Object.values(slotsByDay).reduce((total, items) => total + items.length, 0),
-    [slotsByDay]
+  const hourMarks = useMemo(() => buildHourMarks(bounds.start, bounds.end, 60), [bounds]);
+  const selectedSpaceTypeLabel = selectedSpaceType ? getSpaceTypeLabel(selectedSpaceType) : null;
+  const allSpacesLabel = getAllSpacesLabel(selectedSpaceType);
+  const nowMinutes = useMemo(
+    () => parseTimeToMinutes(`${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`),
+    [now]
   );
+  const nowWeekday = useMemo(() => getCurrentWeekdayValue(now), [now]);
+  const nowLabel = useMemo(
+    () => formatMinutesToTime(now.getHours() * 60 + now.getMinutes()),
+    [now]
+  );
+  const nowLineTop = nowMinutes == null ? null : getTimelinePosition(nowMinutes, bounds);
+
+  const spaceRows = useMemo(
+    () => buildSpaceRows(selectedSpaces, spaceSlots, selectedDay, bounds, nowWeekday, nowMinutes),
+    [selectedSpaces, spaceSlots, selectedDay, bounds, nowWeekday, nowMinutes]
+  );
+
+  const occupiedNowCount = spaceRows.filter((row) => row.currentState.status === "OCUPADO").length;
+  const maintenanceCount = spaceRows.filter(
+    (row) => row.currentState.status === "MANTENIMIENTO"
+  ).length;
+  const freeNowCount = spaceRows.filter((row) => row.currentState.status === "LIBRE").length;
+  const selectedDayLabel = getWeekdayLabel(selectedDay, true);
+  const selectedRow = selectedSpace
+    ? spaceRows.find((row) => row.space.id === selectedSpace.id) ?? null
+    : null;
 
   if (!spaces.length && !isLoading) {
     return (
       <p className="text-sm text-muted-foreground">
-        No hay ambientes para mostrar en la vista calendario.
+        No hay ambientes para mostrar en la vista de disponibilidad.
       </p>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-2xl border bg-muted/20 p-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="min-w-[220px] flex-1">
-          <Label htmlFor="space-calendar-select">Ambiente</Label>
-          <div ref={spaceAnchor} className="mt-2 w-full max-w-md">
-            <Combobox
-              items={spaces.map((space) => space.name)}
-              value={selectedSpace?.name ?? ""}
-              onValueChange={(label) => {
-                const nextSpace = spaces.find((space) => space.name === label);
-                setSelectedSpaceId(nextSpace?.id ?? null);
-              }}
-              disabled={isLoading || spaces.length === 0}
-            >
-              <ComboboxInput
-                id="space-calendar-select"
-                placeholder="Seleccionar ambiente"
-                readOnly
-              />
-              <ComboboxContent anchor={spaceAnchor}>
-                <ComboboxEmpty>Sin ambientes.</ComboboxEmpty>
-                <ComboboxList>
-                  {(label) => (
-                    <ComboboxItem key={label} value={label}>
-                      {label}
-                    </ComboboxItem>
+      <div className="flex flex-col gap-3 rounded-2xl border bg-muted/20 p-4">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,16rem)_minmax(0,18rem)_1fr]">
+          <div className="min-w-[220px]">
+            <Label htmlFor="space-calendar-type-select">Tipo</Label>
+            <div ref={spaceTypeAnchor} className="mt-2 w-full">
+              <Combobox
+                items={availableSpaceTypes.map((type) => getSpaceTypeLabel(type))}
+                value={selectedSpaceTypeLabel ?? ""}
+                onValueChange={(label) => {
+                  const nextType = availableSpaceTypes.find(
+                    (type) => getSpaceTypeLabel(type) === label
+                  );
+                  setSelectedSpaceType(nextType ?? null);
+                  setSelectedSpaceId(null);
+                }}
+                disabled={isLoading || availableSpaceTypes.length === 0}
+              >
+                <ComboboxInput
+                  id="space-calendar-type-select"
+                  placeholder="Seleccionar tipo"
+                  readOnly
+                />
+                <ComboboxContent anchor={spaceTypeAnchor}>
+                  <ComboboxEmpty>Sin tipos.</ComboboxEmpty>
+                  <ComboboxList>
+                    {(label) => (
+                      <ComboboxItem key={label} value={label}>
+                        {label}
+                      </ComboboxItem>
+                    )}
+                  </ComboboxList>
+                </ComboboxContent>
+              </Combobox>
+            </div>
+          </div>
+
+          <div className="min-w-[220px]">
+            <Label htmlFor="space-calendar-select">Ambiente</Label>
+            <div ref={spaceAnchor} className="mt-2 w-full">
+              <Combobox
+                items={[allSpacesLabel, ...spacesBySelectedType.map((space) => space.name)]}
+                value={selectedSpace?.name ?? allSpacesLabel}
+                onValueChange={(label) => {
+                  const nextSpace = spacesBySelectedType.find((space) => space.name === label);
+                  setSelectedSpaceId(nextSpace?.id ?? null);
+                }}
+                disabled={isLoading || spacesBySelectedType.length === 0}
+              >
+                <ComboboxInput
+                  id="space-calendar-select"
+                  placeholder="Todos"
+                  readOnly
+                />
+                <ComboboxContent anchor={spaceAnchor}>
+                  <ComboboxEmpty>Sin ambientes.</ComboboxEmpty>
+                  <ComboboxList>
+                    {(label) => (
+                      <ComboboxItem key={label} value={label}>
+                        {label}
+                      </ComboboxItem>
+                    )}
+                  </ComboboxList>
+                </ComboboxContent>
+              </Combobox>
+            </div>
+          </div>
+
+          <div>
+            <Label>Día</Label>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {WEEKDAYS.map((day) => (
+                <button
+                  key={day.value}
+                  type="button"
+                  className={cn(
+                    "rounded-full border px-3 py-1.5 text-sm transition-colors",
+                    selectedDay === day.value
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-border bg-background text-foreground hover:bg-muted"
                   )}
-                </ComboboxList>
-              </ComboboxContent>
-            </Combobox>
+                  onClick={() => setSelectedDay(day.value)}
+                >
+                  {day.longLabel}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         <div className="flex flex-wrap gap-2 text-xs">
           <Badge variant="outline" className="gap-1">
-            <CalendarClock className="size-3.5" />
-            {scheduledCount} bloques sincronizados
+            <Clock3 className="size-3.5" />
+            Ahora: {nowLabel}
           </Badge>
           <Badge variant="outline" className="gap-1">
-            <Clock3 className="size-3.5" />
-            {unscheduledAssignments.length} sin horario
+            <MapPin className="size-3.5" />
+            {freeNowCount} libres
+          </Badge>
+          <Badge variant="outline" className="gap-1">
+            <CalendarClock className="size-3.5" />
+            {occupiedNowCount} ocupados
+          </Badge>
+          <Badge variant="outline" className="gap-1">
+            <TriangleAlert className="size-3.5" />
+            {maintenanceCount} en mantenimiento
           </Badge>
           {warnings.length > 0 && (
             <Badge variant="outline" className="gap-1 border-amber-400 text-amber-700">
-              <TriangleAlert className="size-3.5" />
-              {warnings.length} cruces
+              {warnings.length} cruces detectados
             </Badge>
           )}
         </div>
       </div>
 
-      {selectedSpace && (
-        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1">
-            <MapPin className="size-3.5" />
-            {selectedSpace.name}
-          </span>
-          <span>{selectedSpace.spaceType}</span>
-        </div>
-      )}
-
-      {selectedSpace && unscheduledAssignments.length > 0 && (
-        <section className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-          <h3 className="font-semibold">
-            {unscheduledAssignments.length === 1
-              ? "Hay 1 asignación del ambiente que no entró al calendario"
-              : `Hay ${unscheduledAssignments.length} asignaciones del ambiente que no entraron al calendario`}
-          </h3>
-          <div className="mt-2 space-y-2">
-            {unscheduledAssignments.slice(0, 3).map((assignment) => (
-              <div
-                key={assignment.id ?? `${assignment.courseName}-${assignment.shift ?? "sin-turno"}`}
-                className="rounded-xl bg-white/60 px-3 py-2"
-              >
-                <p className="font-medium">{assignment.courseName}</p>
-                <p className="text-xs">
-                  {formatAssignmentMeta(assignment) || "Sin turno definido"}
-                </p>
-                <p className="mt-1 text-xs">{assignment.diagnostic}</p>
+      {selectedRow && (
+        <section className="grid gap-3 lg:grid-cols-[minmax(0,18rem)_1fr]">
+          <article className="rounded-2xl border bg-background p-4">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+              Estado actual
+            </p>
+            <h3 className="mt-1 text-lg font-semibold">{selectedRow.space.name}</h3>
+            <Badge className={cn("mt-3 border", getStatusTone(selectedRow.currentState.status))}>
+              {selectedRow.currentState.label}
+            </Badge>
+            <p className="mt-3 text-sm text-muted-foreground">{selectedRow.nextChangeLabel}</p>
+            <div className="mt-4 grid gap-2 text-sm">
+              <div className="rounded-xl bg-muted/40 p-3">
+                <p className="text-xs text-muted-foreground">Tiempo ocupado en {selectedDayLabel}</p>
+                <p className="font-semibold">{formatDuration(selectedRow.occupiedMinutes)}</p>
               </div>
-            ))}
-            {unscheduledAssignments.length > 3 && (
-              <p className="text-xs">
-                Revisa la sección "Asignaciones sin horario en Horarios" para ver el resto.
+              <div className="rounded-xl bg-muted/40 p-3">
+                <p className="text-xs text-muted-foreground">Estado en este momento</p>
+                <p className="font-semibold">{selectedRow.currentState.detail}</p>
+              </div>
+            </div>
+          </article>
+
+          {selectedRow.currentState.activeSlot && (
+            <article className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+              <p className="text-xs font-medium uppercase tracking-[0.12em]">Detalle del bloqueo actual</p>
+              <p className="mt-2 text-base font-semibold">
+                {selectedRow.currentState.activeSlot.courseName}
               </p>
-            )}
-          </div>
+              <p className="mt-1">
+                {selectedRow.currentState.activeSlot.startTime}
+                {" - "}
+                {selectedRow.currentState.activeSlot.endTime}
+              </p>
+              <p className="mt-1 text-xs">
+                {formatAssignmentMeta(selectedRow.currentState.activeSlot) || "Sin turno definido"}
+              </p>
+              {selectedRow.currentState.activeSlot.teacherName && (
+                <p className="mt-1 text-xs">{selectedRow.currentState.activeSlot.teacherName}</p>
+              )}
+            </article>
+          )}
         </section>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[3.5rem_repeat(5,minmax(0,1fr))]">
-        <div className="hidden xl:flex xl:w-14 xl:flex-col xl:gap-3">
-          <div className="text-center text-xs font-medium text-muted-foreground opacity-0 select-none">
-            Hora
+      {selectedSpaces.length > 0 && (
+        <section className="rounded-2xl border bg-background p-4">
+          <div className="flex flex-col gap-1 pb-4">
+            <h3 className="text-sm font-semibold">Disponibilidad de {selectedDayLabel}</h3>
+            <p className="text-xs text-muted-foreground">
+              Verde = libre, ámbar = ocupado, rojo = mantenimiento.
+            </p>
           </div>
-          <div className="relative min-h-[560px] py-3">
-            {hourMarks.map((mark) => (
-              <span
-                key={`${mark.label}-${mark.top}`}
-                className="absolute right-0 w-full -translate-y-1/2 pr-2 text-right font-mono text-[10px] tabular-nums leading-none text-muted-foreground/80"
-                style={{ top: `${mark.top}%` }}
-              >
-                {mark.label}
-              </span>
-            ))}
-          </div>
-        </div>
 
-        {WEEKDAYS.map((day) => (
-          <section key={day.value} className="flex min-w-0 flex-col gap-2 rounded-2xl">
-            <div className="px-1 text-center text-xs font-semibold tracking-[0.08em] text-muted-foreground uppercase">
-              {day.label}
-            </div>
-            <div className="relative min-h-[440px] rounded-2xl border border-border/70 bg-gradient-to-b from-background to-muted/20 py-3 pl-10 shadow-sm xl:min-h-[560px] xl:pl-0">
-              {hourMarks.map((mark) => (
-                <div key={`${day.value}-${mark.label}-${mark.top}`}>
+          <div className="hidden border-b pb-3 md:block">
+            <div className="grid grid-cols-[minmax(0,14rem)_1fr] gap-4">
+              <div />
+              <div className="relative h-6">
+                {hourMarks.map((mark) => (
                   <span
-                    className="absolute left-1 w-8 -translate-y-1/2 text-left font-mono text-[9px] tabular-nums leading-none text-muted-foreground/80 xl:hidden"
-                    style={{ top: `${mark.top}%` }}
+                    key={mark.label}
+                    className="absolute -translate-x-1/2 text-[10px] text-muted-foreground"
+                    style={{ left: `${mark.top}%` }}
                   >
                     {mark.label}
                   </span>
-                  <div
-                    className="absolute left-9 right-2 border-t border-border/40 xl:left-2"
-                    style={{ top: `${mark.top}%` }}
-                  />
-                </div>
-              ))}
-
-              <div className="absolute inset-y-3 left-9 right-2 xl:left-2">
-                {blocks.map((block) => {
-                  const position = getBlockPosition(block, bounds.start, bounds.end);
-                  return (
-                    <div
-                      key={`${day.value}-${block.id}`}
-                      className={cn(
-                        "absolute inset-x-0 rounded-xl border px-1.5 text-center text-[10px] font-medium leading-tight opacity-35",
-                        BLOCK_STYLES[block.id] ?? DEFAULT_BLOCK_STYLE
-                      )}
-                      style={{
-                        top: `${position.top}%`,
-                        height: `${Math.max(position.height, 4)}%`,
-                      }}
-                    >
-                      {block.label}
-                    </div>
-                  );
-                })}
-
-                {layoutOverlappingSlots(slotsByDay[day.value] ?? []).map(
-                  ({ slot, column, columns }, index) => {
-                    const top = positionForTime(slot.startTime, bounds);
-                    const bottom = positionForTime(slot.endTime, bounds);
-                    const totalGapPx = Math.max(columns - 1, 0) * 8;
-                    const columnWidth = `calc((100% - ${totalGapPx}px) / ${columns})`;
-                    const columnLeft = `calc(${column} * (${columnWidth} + 8px))`;
-
-                    return (
-                      <article
-                        key={slot.id ?? `${slot.weekday}-${slot.startTime}-${slot.courseName}-${index}`}
-                        className={cn(
-                          "absolute z-10 overflow-hidden rounded-xl border px-2.5 py-2 text-[11px] leading-tight shadow-md",
-                          getSlotColorClass(slot)
-                        )}
-                        style={{
-                          top: `${top}%`,
-                          height: `${Math.max(bottom - top, 5)}%`,
-                          left: columnLeft,
-                          width: columnWidth,
-                        }}
-                      >
-                        <div className="font-semibold">
-                          {slot.startTime} - {slot.endTime}
-                        </div>
-                        <div className="truncate font-medium opacity-95">
-                          {slot.courseName}
-                        </div>
-                        <div className="mt-0.5 truncate text-[10px] opacity-90">
-                          {formatAssignmentMeta(slot)}
-                        </div>
-                        {slot.teacherName && (
-                          <div className="truncate text-[10px] opacity-80">
-                            {slot.teacherName}
-                          </div>
-                        )}
-                      </article>
-                    );
-                  }
-                )}
+                ))}
               </div>
             </div>
-          </section>
-        ))}
-      </div>
-
-      {unscheduledAssignments.length > 0 && (
-        <section className="rounded-2xl border p-4">
-          <div className="mb-3">
-            <h3 className="text-sm font-semibold">Asignaciones sin horario en Horarios</h3>
-            <p className="text-xs text-muted-foreground">
-              Estos cursos siguen ligados al ambiente, pero todavía no aparecen ubicados en la vista de horarios.
-            </p>
           </div>
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-            {unscheduledAssignments.map((assignment) => (
+
+          <div className="space-y-3 pt-4">
+            {spaceRows.map((row) => (
               <article
-                key={assignment.id ?? `${assignment.courseName}-${assignment.shift ?? "sin-turno"}`}
-                className="rounded-xl bg-muted/40 p-3 text-sm"
+                key={row.space.id}
+                className="grid gap-3 rounded-2xl border bg-muted/10 p-3 md:grid-cols-[minmax(0,14rem)_1fr]"
               >
-                <p className="font-medium">{assignment.courseName}</p>
-                <p className="text-xs text-muted-foreground">
-                  {formatAssignmentMeta(assignment) || "Sin turno definido"}
-                </p>
-                <p className="mt-1 text-xs text-amber-700">
-                  {assignment.diagnostic}
-                </p>
+                <div className="min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">{row.space.name}</p>
+                      <p className="text-xs text-muted-foreground">{row.nextChangeLabel}</p>
+                    </div>
+                    <Badge className={cn("shrink-0 border", getStatusTone(row.currentState.status))}>
+                      {row.currentState.status === "LIBRE"
+                        ? "Libre"
+                        : row.currentState.status === "OCUPADO"
+                          ? "Ocupado"
+                          : "Mantenimiento"}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="relative h-16 overflow-hidden rounded-2xl border bg-emerald-50">
+                    {hourMarks.map((mark) => (
+                      <div
+                        key={`${row.space.id}-${mark.label}`}
+                        className="absolute inset-y-0 border-l border-foreground/8"
+                        style={{ left: `${mark.top}%` }}
+                      />
+                    ))}
+
+                    {row.timelineSegments.map((segment, index) => (
+                      <div
+                        key={`${row.space.id}-${segment.status}-${index}`}
+                        className={cn(
+                          "absolute inset-y-0 flex items-center justify-center overflow-hidden border text-[11px] font-medium",
+                          getTimelineSegmentClass(segment.status)
+                        )}
+                        style={{
+                          left: `${segment.left}%`,
+                          width: `${segment.width}%`,
+                        }}
+                        title={
+                          segment.status === "OCUPADO" && segment.slots[0]
+                            ? `${segment.slots[0].startTime} - ${segment.slots[segment.slots.length - 1].endTime}`
+                            : segment.label
+                        }
+                      >
+                        {segment.width >= 12 && (
+                          <span className="truncate px-2">{segment.label}</span>
+                        )}
+                      </div>
+                    ))}
+
+                    {selectedDay === nowWeekday
+                      && nowLineTop != null
+                      && nowLineTop >= 0
+                      && nowLineTop <= 100 && (
+                        <>
+                          <div
+                            className="absolute inset-y-0 z-20 w-0.5 bg-foreground"
+                            style={{ left: `${nowLineTop}%` }}
+                          />
+                          <div
+                            className="absolute top-1 z-20 -translate-x-1/2 rounded-full bg-foreground px-1.5 py-0.5 text-[10px] text-background"
+                            style={{ left: `${nowLineTop}%` }}
+                          >
+                            Ahora
+                          </div>
+                        </>
+                      )}
+                  </div>
+
+                  {row.currentState.activeSlot ? (
+                    <p className="text-xs text-muted-foreground">
+                      Ocupado por {row.currentState.activeSlot.courseName}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Libre en este momento
+                    </p>
+                  )}
+                </div>
               </article>
             ))}
           </div>
         </section>
       )}
 
-      {selectedSpace && (
+      {unscheduledAssignments.length > 0 && (
+        <section className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <h3 className="font-semibold">Asignaciones sin horario</h3>
+          <p className="mt-1 text-xs">
+            Estas asignaciones no afectan la vista de disponibilidad porque todavía no tienen bloque real en Horarios.
+          </p>
+          <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {unscheduledAssignments.map((assignment) => (
+              <article
+                key={assignment.id ?? `${assignment.courseName}-${assignment.shift ?? "sin-turno"}`}
+                className="rounded-xl bg-white/60 p-3"
+              >
+                <p className="font-medium">{assignment.courseName}</p>
+                <p className="text-xs">{formatAssignmentMeta(assignment) || "Sin turno definido"}</p>
+                {assignment.sourceSpaceName && (
+                  <p className="mt-1 text-xs font-medium">{assignment.sourceSpaceName}</p>
+                )}
+                <p className="mt-1 text-xs">{assignment.diagnostic}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {selectedRow && (
         <Collapsible className="rounded-2xl border">
           <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold">
-            <span>Diagnóstico de sincronización</span>
+            <span>Detalle del ambiente</span>
             <ChevronDown className="size-4 transition-transform data-[popup-open]:rotate-180" />
           </CollapsibleTrigger>
           <CollapsibleContent>
             <div className="space-y-3 border-t px-4 py-3 text-sm">
               <div>
-                <p className="font-medium">Ambiente seleccionado</p>
-                <p className="text-muted-foreground">{selectedSpace.name}</p>
+                <p className="font-medium">Ambiente</p>
+                <p className="text-muted-foreground">{selectedRow.space.name}</p>
               </div>
               <div>
-                <p className="font-medium">Asignaciones del ambiente</p>
-                {selectedSpace.assignments?.length ? (
+                <p className="font-medium">Bloques ocupados en {selectedDayLabel}</p>
+                {selectedRow.daySlots.length > 0 ? (
                   <div className="mt-2 space-y-1">
-                    {selectedSpace.assignments.map((assignment) => (
-                      <p key={assignment.id ?? `${assignment.courseName}-${assignment.shift ?? ""}`}>
-                        {assignment.courseName} · {formatAssignmentMeta(assignment) || "Sin turno"}
+                    {selectedRow.daySlots.map((slot) => (
+                      <p key={slot.id ?? `${slot.courseName}-${slot.startTime}`}>
+                        {slot.startTime}-{slot.endTime} · {slot.courseName}
                       </p>
                     ))}
                   </div>
                 ) : (
-                  <p className="mt-1 text-muted-foreground">Sin asignaciones.</p>
-                )}
-              </div>
-              <div>
-                <p className="font-medium">Bloques detectados en Horarios para este ambiente</p>
-                {scheduledCount > 0 ? (
-                  <div className="mt-2 space-y-1">
-                    {Object.values(slotsByDay)
-                      .flat()
-                      .sort((left, right) => {
-                        const dayDiff = WEEKDAYS.findIndex((day) => day.value === left.weekday)
-                          - WEEKDAYS.findIndex((day) => day.value === right.weekday);
-                        if (dayDiff !== 0) {
-                          return dayDiff;
-                        }
-                        return parseTimeToMinutes(left.startTime) - parseTimeToMinutes(right.startTime);
-                      })
-                      .map((slot) => (
-                        <p key={slot.id ?? `${slot.courseName}-${slot.weekday}-${slot.startTime}`}>
-                          {getWeekdayLabel(slot.weekday, true)} {slot.startTime}-{slot.endTime} · {slot.courseName} · {formatAssignmentMeta(slot)}
-                        </p>
-                      ))}
-                  </div>
-                ) : (
-                  <p className="mt-1 text-muted-foreground">No hay bloques sincronizados.</p>
+                  <p className="mt-1 text-muted-foreground">No tiene bloques ocupados.</p>
                 )}
               </div>
             </div>
           </CollapsibleContent>
         </Collapsible>
-      )}
-
-      {warnings.length > 0 && (
-        <section className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-          <h3 className="font-semibold">Cruces detectados</h3>
-          <div className="mt-2 space-y-1">
-            {warnings.map((warning) => (
-              <p key={warning}>{warning}</p>
-            ))}
-          </div>
-        </section>
       )}
     </div>
   );

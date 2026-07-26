@@ -122,6 +122,35 @@ public class ScheduleService {
     }
 
     @Transactional
+    public void generateSchedulesForSemesterIfEmpty(String semester) {
+        String normalizedSemester = Semester.normalize(semester);
+        if (!scheduleSlotRepository.findBySemester(normalizedSemester).isEmpty()) {
+            return;
+        }
+
+        refreshSchedulesForSemester(normalizedSemester);
+    }
+
+    @Transactional
+    public void refreshSchedulesForSemester(String semester) {
+        String normalizedSemester = Semester.normalize(semester);
+
+        List<Integer> cycles = courseRepository.findByFilters(normalizedSemester, null, null, null).stream()
+                .map(Course::getCycle)
+                .distinct()
+                .sorted()
+                .toList();
+
+        for (Integer cycle : cycles) {
+            try {
+                generate(normalizedSemester, cycle);
+            } catch (RuntimeException ignored) {
+                // Algunos ciclos pueden quedar sin horario inicial si les faltan asignaciones válidas.
+            }
+        }
+    }
+
+    @Transactional
     public CourseTeacherAssignment updateAssignmentSchedule(
             Long assignmentId,
             ScheduleWeekday weekday,
@@ -316,7 +345,7 @@ public class ScheduleService {
             Integer cycle,
             List<Space> spaces,
             List<String> warnings) {
-        List<Course> courses = courseRepository.findByFilters(semester, null, cycle);
+        List<Course> courses = courseRepository.findByFilters(semester, null, null, cycle);
         List<AssignmentTask> tasks = new ArrayList<>();
         for (Course course : courses) {
             int academicHours = academicHours(course);

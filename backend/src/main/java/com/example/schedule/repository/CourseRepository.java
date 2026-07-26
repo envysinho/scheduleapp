@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 import com.example.schedule.entity.Course;
 import com.example.schedule.model.CourseType;
+import com.example.schedule.model.SpaceType;
 
 public interface CourseRepository extends JpaRepository<Course, Long> {
 
@@ -21,12 +22,14 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             LEFT JOIN FETCH sa.space
             WHERE c.semester = :semester
               AND (:type IS NULL OR c.type = :type)
+              AND (:requiredSpaceType IS NULL OR c.requiredSpaceType = :requiredSpaceType)
               AND (:cycle IS NULL OR c.cycle = :cycle)
             ORDER BY c.cycle ASC, c.name ASC
             """)
     List<Course> findByFilters(
             @Param("semester") String semester,
             @Param("type") CourseType type,
+            @Param("requiredSpaceType") SpaceType requiredSpaceType,
             @Param("cycle") Integer cycle);
 
     @Query("""
@@ -39,9 +42,13 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
 
     Optional<Course> findByCode(String code);
 
+    Optional<Course> findByCodeAndSemester(String code, String semester);
+
     Optional<Course> findByName(String name);
 
     Optional<Course> findByNameAndSemester(String name, String semester);
+
+    long countBySemester(String semester);
 
     boolean existsByCode(String code);
 

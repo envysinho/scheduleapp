@@ -27,4 +27,6 @@ public interface TeacherRepository extends JpaRepository<Teacher, Long> {
             @Param("cycle") Integer cycle);
 
     Optional<Teacher> findByEmail(String email);
+
+    long countBySemester(String semester);
 }

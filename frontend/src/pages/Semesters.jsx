@@ -17,6 +17,10 @@ const SEMESTER_META = {
     status: "Actual",
     description: "Semestre activo con cursos, docentes, reglas y jefes asignados.",
   },
+  "26-X": {
+    status: "Pruebas",
+    description: "Sandbox con datos simulados para validar ambientes, docentes, cursos y horarios.",
+  },
   "27-I": {
     status: "Próximo",
     description: "Preparado para una nueva carga académica independiente.",

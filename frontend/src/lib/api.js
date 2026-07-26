@@ -244,6 +244,9 @@ function buildCoursesQuery(filters = {}) {
   if (filters.type) {
     params.set("type", filters.type);
   }
+  if (filters.requiredSpaceType) {
+    params.set("requiredSpaceType", filters.requiredSpaceType);
+  }
   if (filters.availability) {
     params.set("availability", filters.availability);
   }

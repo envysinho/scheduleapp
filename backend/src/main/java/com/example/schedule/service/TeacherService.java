@@ -215,33 +215,83 @@ public class TeacherService {
 
     @Transactional
     public void seedNombradosIfNeeded() {
-        if (hasNombradosSeedFlag()) {
+        seedNombradosIfNeeded(Semester.CURRENT);
+    }
+
+    @Transactional
+    public void seedNombradosIfNeeded(String semester) {
+        String normalizedSemester = Semester.normalize(semester);
+        if (hasNombradosSeedFlag(normalizedSemester)) {
             return;
         }
 
         ensureSeedFlagsTable();
-        clearCourseTeacherReferences();
-        assignmentRepository.deleteAll();
-        teacherRepository.deleteAll();
 
         for (TeacherSeed seed : NombradosSeedData.TEACHERS) {
-            List<CourseTeacherAssignmentRequest> assignments = toSeedAssignmentRequests(seed);
+            List<CourseTeacherAssignmentRequest> assignments = toSeedAssignmentRequests(seed, normalizedSemester);
 
             create(new CreateTeacherRequest(
                     seed.firstName(),
                     seed.lastName(),
-                    Semester.CURRENT,
+                    normalizedSemester,
                     seed.email(),
                     null,
                     EmploymentType.NOMBRADO,
                     assignments));
         }
+
+        markNombradosSeedFlag(normalizedSemester);
     }
 
-    private List<CourseTeacherAssignmentRequest> toSeedAssignmentRequests(TeacherSeed seed) {
+    @Transactional
+    public void seedNombradosIfEmpty() {
+        seedNombradosIfEmpty(Semester.CURRENT);
+    }
+
+    @Transactional
+    public void seedNombradosIfEmpty(String semester) {
+        String normalizedSemester = Semester.normalize(semester);
+        if (teacherRepository.countBySemester(normalizedSemester) > 0) {
+            return;
+        }
+        seedNombradosIfNeeded(normalizedSemester);
+    }
+
+    @Transactional
+    public void seedRemainingTeachersForSemester(String semester) {
+        String normalizedSemester = Semester.normalize(semester);
+        int generatedIndex = 1;
+
+        for (Course course : courseRepository.findByFilters(normalizedSemester, null, null, null).stream()
+                .sorted((left, right) -> left.getCode().compareTo(right.getCode()))
+                .toList()) {
+            EmploymentType employmentType = course.getType() == CourseType.ESTUDIOS_GENERALES
+                    ? EmploymentType.ESTUDIOS_GENERALES
+                    : EmploymentType.CONTRATADO;
+
+            for (CourseTeacherAssignmentRequest assignment : missingSeedAssignments(course)) {
+                SyntheticTeacher teacher = buildSyntheticTeacher(
+                        course,
+                        employmentType,
+                        assignment.shift(),
+                        assignment.subShift(),
+                        generatedIndex++);
+                create(new CreateTeacherRequest(
+                        teacher.firstName(),
+                        teacher.lastName(),
+                        normalizedSemester,
+                        teacher.email(),
+                        null,
+                        employmentType,
+                        List.of(assignment)));
+            }
+        }
+    }
+
+    private List<CourseTeacherAssignmentRequest> toSeedAssignmentRequests(TeacherSeed seed, String semester) {
         List<CourseTeacherAssignmentRequest> requests = new ArrayList<>();
         for (NombradosSeedData.TeacherCourseChoice course : NombradosSeedData.preferenceCourses(seed)) {
-            Long courseId = resolveCourseIdByCode(course.courseCode());
+            Long courseId = resolveCourseIdByCode(course.courseCode(), semester);
             Course resolved = courseRepository.findById(courseId).orElse(null);
             for (TeacherShift shift : shiftsFor(course.modality())) {
                 requests.add(new CourseTeacherAssignmentRequest(
@@ -254,6 +304,60 @@ public class TeacherService {
             }
         }
         return requests;
+    }
+
+    private List<CourseTeacherAssignmentRequest> missingSeedAssignments(Course course) {
+        List<CourseTeacherAssignmentRequest> missing = new ArrayList<>();
+        for (TeacherShift shift : CourseCycleRules.allowedShiftsForCycle(course.getCycle())) {
+            List<SubShift> allowedSubShifts = CourseCycleRules.allowedSubShiftsForCycle(
+                    course.getCycle(),
+                    shift,
+                    course.getRequiredSpaceType());
+            if (allowedSubShifts.isEmpty()) {
+                if (course.getTeacherAssignments().stream().noneMatch(assignment ->
+                        assignment.getShift() == shift && assignment.getSubShift() == null)) {
+                    missing.add(new CourseTeacherAssignmentRequest(
+                            course.getId(),
+                            shift,
+                            null,
+                            null,
+                            null,
+                            null));
+                }
+                continue;
+            }
+
+            for (SubShift subShift : allowedSubShifts) {
+                if (course.getTeacherAssignments().stream().noneMatch(assignment ->
+                        assignment.getShift() == shift && assignment.getSubShift() == subShift)) {
+                    missing.add(new CourseTeacherAssignmentRequest(
+                            course.getId(),
+                            shift,
+                            subShift,
+                            null,
+                            null,
+                            null));
+                }
+            }
+        }
+        return missing;
+    }
+
+    private SyntheticTeacher buildSyntheticTeacher(
+            Course course,
+            EmploymentType employmentType,
+            TeacherShift shift,
+            SubShift subShift,
+            int index) {
+        String firstName = employmentType == EmploymentType.ESTUDIOS_GENERALES ? "General" : "Contratado";
+        String lastName = "Sandbox " + index;
+        String emailPrefix = employmentType == EmploymentType.ESTUDIOS_GENERALES ? "eg" : "ct";
+        String slot = subShift == null ? shift.name().toLowerCase() : subShift.name().toLowerCase();
+        String email = "%s-%s-%s@demo.schedule.local".formatted(
+                emailPrefix,
+                course.getCode().toLowerCase(),
+                slot);
+        return new SyntheticTeacher(firstName, lastName, email);
     }
 
     private SubShift seedSubShift(Course course, TeacherShift shift) {
@@ -274,11 +378,11 @@ public class TeacherService {
         };
     }
 
-    private Long resolveCourseIdByCode(String courseCode) {
-        return courseRepository.findByCode(courseCode)
+    private Long resolveCourseIdByCode(String courseCode, String semester) {
+        return courseRepository.findByCodeAndSemester(courseCode, semester)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.INTERNAL_SERVER_ERROR,
-                        "Curso de seed no encontrado: " + courseCode))
+                        "Curso de seed no encontrado: " + courseCode + " en " + semester))
                 .getId();
     }
 
@@ -306,24 +410,28 @@ public class TeacherService {
         }
     }
 
-    boolean hasNombradosSeedFlag() {
+    boolean hasNombradosSeedFlag(String semester) {
         ensureSeedFlagsTable();
         try {
             Integer count = jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM app_seed_flags WHERE flag_key = ?",
                     Integer.class,
-                    NombradosSeedData.SEED_FLAG);
+                    buildNombradosSeedFlag(semester));
             return count != null && count > 0;
         } catch (Exception ignored) {
             return false;
         }
     }
 
-    void markNombradosSeedFlag() {
+    void markNombradosSeedFlag(String semester) {
         ensureSeedFlagsTable();
         jdbcTemplate.update(
                 "INSERT INTO app_seed_flags (flag_key) VALUES (?) ON CONFLICT (flag_key) DO NOTHING",
-                NombradosSeedData.SEED_FLAG);
+                buildNombradosSeedFlag(semester));
+    }
+
+    private String buildNombradosSeedFlag(String semester) {
+        return NombradosSeedData.SEED_FLAG + ":" + Semester.normalize(semester);
     }
 
     @Transactional
@@ -705,5 +813,8 @@ public class TeacherService {
     private Teacher getTeacherOrThrow(Long id) {
         return teacherRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Docente no encontrado"));
+    }
+
+    private record SyntheticTeacher(String firstName, String lastName, String email) {
     }
 }

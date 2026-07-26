@@ -69,6 +69,7 @@ public class CourseService {
     public List<CourseResponse> findAll(
             String semester,
             CourseType type,
+            SpaceType requiredSpaceType,
             CourseAvailability availability,
             TeacherShift shift,
             Integer cycle) {
@@ -76,7 +77,12 @@ public class CourseService {
         if (effectiveCycle == null) {
             effectiveCycle = cycle;
         }
-        return courseRepository.findByFilters(Semester.normalize(semester), type, effectiveCycle).stream()
+        return courseRepository.findByFilters(
+                        Semester.normalize(semester),
+                        type,
+                        requiredSpaceType,
+                        effectiveCycle)
+                .stream()
                 .filter(course -> matchesShift(course, shift))
                 .filter(course -> matchesAvailability(course, availability))
                 .map(CourseResponse::from)
@@ -187,7 +193,13 @@ public class CourseService {
 
     @Transactional
     public void seedFromPlanIfEmpty() {
-        if (courseRepository.count() > 0) {
+        seedFromPlanIfMissing(Semester.CURRENT);
+    }
+
+    @Transactional
+    public void seedFromPlanIfMissing(String semester) {
+        String normalizedSemester = Semester.normalize(semester);
+        if (courseRepository.countBySemester(normalizedSemester) > 0) {
             return;
         }
 
@@ -195,7 +207,7 @@ public class CourseService {
             create(new CreateCourseRequest(
                     seed.name(),
                     seed.code(),
-                    Semester.CURRENT,
+                    normalizedSemester,
                     seed.type(),
                     seed.lectivo(),
                     seed.cycle(),

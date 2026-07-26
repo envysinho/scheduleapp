@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 
 import com.example.schedule.service.CourseService;
 import com.example.schedule.service.PracticeHeadService;
+import com.example.schedule.service.ScheduleService;
 import com.example.schedule.service.ScheduleSettingsService;
 import com.example.schedule.service.SpaceService;
 import com.example.schedule.service.TeacherService;
@@ -19,6 +20,7 @@ public class DataInitializer implements ApplicationRunner {
     private final SpaceService spaceService;
     private final CourseService courseService;
     private final PracticeHeadService practiceHeadService;
+    private final ScheduleService scheduleService;
     private final ScheduleSettingsService scheduleSettingsService;
 
     public DataInitializer(
@@ -27,12 +29,14 @@ public class DataInitializer implements ApplicationRunner {
             SpaceService spaceService,
             CourseService courseService,
             PracticeHeadService practiceHeadService,
+            ScheduleService scheduleService,
             ScheduleSettingsService scheduleSettingsService) {
         this.userService = userService;
         this.teacherService = teacherService;
         this.spaceService = spaceService;
         this.courseService = courseService;
         this.practiceHeadService = practiceHeadService;
+        this.scheduleService = scheduleService;
         this.scheduleSettingsService = scheduleSettingsService;
     }
 
@@ -52,5 +56,12 @@ public class DataInitializer implements ApplicationRunner {
         courseService.migrateCourseCodesIfNeeded();
         courseService.migrateRequiredSpaceTypeIfNeeded();
         courseService.seedFromPlanIfEmpty();
+        teacherService.seedNombradosIfEmpty();
+        scheduleSettingsService.seedDefaultsIfEmpty("26-X");
+        courseService.seedFromPlanIfMissing("26-X");
+        teacherService.seedNombradosIfEmpty("26-X");
+        teacherService.seedRemainingTeachersForSemester("26-X");
+        spaceService.seedAssignmentsForSemesterIfEmpty("26-X");
+        scheduleService.refreshSchedulesForSemester("26-X");
     }
 }

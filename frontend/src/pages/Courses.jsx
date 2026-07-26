@@ -21,6 +21,7 @@ import {
   COURSE_AVAILABILITY_FILTERS,
   COURSE_TYPE_FILTERS,
   CYCLE_FILTERS,
+  SPACE_TYPE_FILTERS,
   TEACHER_SHIFT_FILTERS,
 } from "@/lib/constants";
 import {
@@ -42,6 +43,7 @@ function Courses({ searchFilter, onClearSearchFilter }) {
   const [courses, setCourses] = useState([]);
   const [viewMode, setViewMode] = useState("grid");
   const [type, setType] = useState(null);
+  const [requiredSpaceType, setRequiredSpaceType] = useState(null);
   const [availability, setAvailability] = useState(null);
   const [shift, setShift] = useState(null);
   const [cycle, setCycle] = useState(null);
@@ -54,6 +56,7 @@ function Courses({ searchFilter, onClearSearchFilter }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const typeAnchor = useComboboxAnchor();
+  const spaceTypeAnchor = useComboboxAnchor();
   const cycleAnchor = useComboboxAnchor();
 
   const handleUnauthorized = useCallback(() => {
@@ -74,7 +77,14 @@ function Courses({ searchFilter, onClearSearchFilter }) {
       }
 
       const data = await listCourses(
-        { semester, type, availability, shift, cycle: forcedCycle ?? cycle },
+        {
+          semester,
+          type,
+          requiredSpaceType,
+          availability,
+          shift,
+          cycle: forcedCycle ?? cycle,
+        },
         handleUnauthorized
       );
       setCourses(data);
@@ -88,6 +98,7 @@ function Courses({ searchFilter, onClearSearchFilter }) {
     }
   }, [
     type,
+    requiredSpaceType,
     availability,
     shift,
     cycle,
@@ -129,6 +140,7 @@ function Courses({ searchFilter, onClearSearchFilter }) {
     setEditingCourse(null);
     setFormError(null);
     setType(null);
+    setRequiredSpaceType(null);
     setAvailability(null);
     setShift(null);
     setCycle(forcedCycle);
@@ -200,6 +212,10 @@ function Courses({ searchFilter, onClearSearchFilter }) {
   const selectedType =
     COURSE_TYPE_FILTERS.find((item) => item.value === type) ?? COURSE_TYPE_FILTERS[0];
 
+  const selectedSpaceType =
+    SPACE_TYPE_FILTERS.find((item) => item.value === requiredSpaceType) ??
+    SPACE_TYPE_FILTERS[0];
+
   const selectedCycle =
     CYCLE_FILTERS.find((item) => item.value === cycle) ?? CYCLE_FILTERS[0];
 
@@ -242,6 +258,33 @@ function Courses({ searchFilter, onClearSearchFilter }) {
                 >
                   <ComboboxInput id="filter-course-type" placeholder="Todos" readOnly />
                   <ComboboxContent anchor={typeAnchor}>
+                    <ComboboxEmpty>Sin opciones.</ComboboxEmpty>
+                    <ComboboxList>
+                      {(label) => (
+                        <ComboboxItem key={label} value={label}>
+                          {label}
+                        </ComboboxItem>
+                      )}
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
+              </div>
+            </div>
+
+            <div className="flex min-w-[180px] flex-col gap-2">
+              <Label htmlFor="filter-space-type">Ambiente requerido</Label>
+              <div ref={spaceTypeAnchor} className="w-full">
+                <Combobox
+                  items={SPACE_TYPE_FILTERS.map((item) => item.label)}
+                  value={selectedSpaceType.label}
+                  onValueChange={(label) => {
+                    const item = SPACE_TYPE_FILTERS.find((option) => option.label === label);
+                    setRequiredSpaceType(item?.value ?? null);
+                    resetFormOnFilterChange();
+                  }}
+                >
+                  <ComboboxInput id="filter-space-type" placeholder="Todos" readOnly />
+                  <ComboboxContent anchor={spaceTypeAnchor}>
                     <ComboboxEmpty>Sin opciones.</ComboboxEmpty>
                     <ComboboxList>
                       {(label) => (
