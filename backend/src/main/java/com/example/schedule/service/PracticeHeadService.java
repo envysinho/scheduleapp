@@ -56,7 +56,7 @@ public class PracticeHeadService {
 
     @Transactional
     public PracticeHeadResponse create(CreatePracticeHeadRequest request) {
-        validateAssignments(request.labAssignments());
+        validateAssignments(request.labAssignments(), null);
         PracticeHead practiceHead = new PracticeHead();
         applyPracticeHeadFields(practiceHead, request.firstName(), request.lastName(),
                 request.semester(), request.email(), request.phone());
@@ -69,7 +69,7 @@ public class PracticeHeadService {
 
     @Transactional
     public PracticeHeadResponse update(Long id, UpdatePracticeHeadRequest request) {
-        validateAssignments(request.labAssignments());
+        validateAssignments(request.labAssignments(), id);
         PracticeHead practiceHead = getPracticeHeadOrThrow(id);
         Set<AssignmentLog> previousAssignments = assignmentLogs(practiceHead);
         applyPracticeHeadFields(practiceHead, request.firstName(), request.lastName(),
@@ -139,7 +139,7 @@ public class PracticeHeadService {
         }
     }
 
-    private void validateAssignments(List<PracticeHeadLabAssignmentRequest> requests) {
+    private void validateAssignments(List<PracticeHeadLabAssignmentRequest> requests, Long practiceHeadId) {
         if (requests == null) {
             return;
         }
@@ -157,6 +157,14 @@ public class PracticeHeadService {
                         "Un jefe de práctica no puede tener el mismo laboratorio asignado más de una vez");
             }
             getLabOrThrow(request.spaceId());
+            boolean alreadyAssigned = practiceHeadId == null
+                    ? practiceHeadRepository.existsByLabAssignmentsSpaceId(request.spaceId())
+                    : practiceHeadRepository.existsByLabAssignmentsSpaceIdAndIdNot(request.spaceId(), practiceHeadId);
+            if (alreadyAssigned) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "El laboratorio ya está asignado a otro jefe de práctica");
+            }
         }
     }
 

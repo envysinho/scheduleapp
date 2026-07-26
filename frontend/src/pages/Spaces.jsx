@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { Building2, LayoutGrid, List } from "lucide-react";
+import { Building2, CalendarDays, LayoutGrid, List } from "lucide-react";
 import PageCard from "@/components/PageCard";
 import SearchFilterBanner from "@/components/SearchFilterBanner";
 import SpaceCard from "@/components/spaces/SpaceCard";
+import SpaceCalendarView from "@/components/spaces/SpaceCalendarView";
 import SpaceForm from "@/components/spaces/SpaceForm";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -18,6 +19,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useSemester } from "@/contexts/SemesterContext";
 import {
+  CYCLES,
   AVAILABILITY_FILTERS,
   CYCLE_FILTERS,
   SPACE_TYPE_FILTERS,
@@ -25,9 +27,12 @@ import {
 import {
   createSpace,
   deleteSpace,
+  getSchedule,
+  getScheduleSettings,
   getSpace,
   listPracticeHeads,
   listSpaces,
+  updatePracticeHead,
   updateSpace,
 } from "@/lib/api";
 import { canManageAcademic, canViewPracticeHeads, isStudent } from "@/lib/permissions";
@@ -55,8 +60,9 @@ function withAssignedPracticeHeads(spaces, practiceHeads) {
 
     return {
       ...space,
-      managerName: practiceHead?.fullName ?? null,
-      managerPhone: practiceHead?.phone ?? null,
+      practiceHeadId: practiceHead?.id ?? null,
+      practiceHeadName: practiceHead?.fullName ?? null,
+      practiceHeadPhone: practiceHead?.phone ?? null,
     };
   });
 }
@@ -69,7 +75,10 @@ function Spaces({ searchFilter, onClearSearchFilter }) {
   const forcedCycle = isStudent(user) ? user?.assignedCycle ?? null : null;
 
   const [spaces, setSpaces] = useState([]);
-  const [viewMode, setViewMode] = useState("grid");
+  const [practiceHeads, setPracticeHeads] = useState([]);
+  const [scheduleSlots, setScheduleSlots] = useState([]);
+  const [scheduleBlocks, setScheduleBlocks] = useState([]);
+  const [viewMode, setViewMode] = useState("list");
   const [spaceType, setSpaceType] = useState(null);
   const [availability, setAvailability] = useState(null);
   const [cycle, setCycle] = useState(null);
@@ -90,22 +99,54 @@ function Spaces({ searchFilter, onClearSearchFilter }) {
   const isSearchActive =
     searchFilter?.type === "space" && searchFilter.id != null;
 
+  const loadScheduleSlots = useCallback(async () => {
+    if (viewMode !== "calendar") {
+      return [];
+    }
+
+    const cyclesToLoad = forcedCycle != null
+      ? [forcedCycle]
+      : cycle != null
+        ? [cycle]
+        : CYCLES.map((item) => item.id);
+
+    const schedules = await Promise.all(
+      cyclesToLoad.map((cycleId) =>
+        getSchedule({ semester, cycle: cycleId }, handleUnauthorized).catch((error) => {
+          if (error instanceof Error && error.message.includes("Ciclo inválido")) {
+            return { slots: [] };
+          }
+          throw error;
+        })
+      )
+    );
+
+    return schedules.flatMap((schedule) => schedule?.slots ?? []);
+  }, [cycle, forcedCycle, handleUnauthorized, semester, viewMode]);
+
   const loadSpaces = useCallback(async () => {
     setError(null);
     setIsLoading(true);
     try {
       if (isSearchActive) {
-        const [data, practiceHeads] = await Promise.all([
+        const [data, practiceHeads, slots, settings] = await Promise.all([
           getSpace(searchFilter.id, { semester }, handleUnauthorized),
           canLoadPracticeHeads
             ? listPracticeHeads({ semester }, handleUnauthorized)
             : Promise.resolve([]),
+          loadScheduleSlots(),
+          viewMode === "calendar"
+            ? getScheduleSettings({ semester }, handleUnauthorized)
+            : Promise.resolve({ blocks: [] }),
         ]);
+        setPracticeHeads(practiceHeads);
         setSpaces(withAssignedPracticeHeads([data], practiceHeads));
+        setScheduleSlots(slots);
+        setScheduleBlocks(settings?.blocks ?? []);
         return;
       }
 
-      const [data, practiceHeads] = await Promise.all([
+      const [data, practiceHeads, slots, settings] = await Promise.all([
         listSpaces(
           { semester, spaceType, availability, cycle: forcedCycle ?? cycle },
           handleUnauthorized
@@ -113,10 +154,20 @@ function Spaces({ searchFilter, onClearSearchFilter }) {
         canLoadPracticeHeads
           ? listPracticeHeads({ semester }, handleUnauthorized)
           : Promise.resolve([]),
+        loadScheduleSlots(),
+        viewMode === "calendar"
+          ? getScheduleSettings({ semester }, handleUnauthorized)
+          : Promise.resolve({ blocks: [] }),
       ]);
+      setPracticeHeads(practiceHeads);
       setSpaces(withAssignedPracticeHeads(data, practiceHeads));
+      setScheduleSlots(slots);
+      setScheduleBlocks(settings?.blocks ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar ambientes");
+      setPracticeHeads([]);
+      setScheduleSlots([]);
+      setScheduleBlocks([]);
       if (isSearchActive) {
         setSpaces([]);
       }
@@ -133,10 +184,12 @@ function Spaces({ searchFilter, onClearSearchFilter }) {
     isSearchActive,
     searchFilter?.id,
     handleUnauthorized,
+    loadScheduleSlots,
+    viewMode,
   ]);
 
   useEffect(() => {
-    if (pageView === "list") {
+    if (pageView !== "form") {
       loadSpaces();
     }
   }, [loadSpaces, pageView]);
@@ -182,17 +235,76 @@ function Spaces({ searchFilter, onClearSearchFilter }) {
     setFormError(null);
     setIsSubmitting(true);
     try {
-      if (editingSpace?.id) {
-        await updateSpace(editingSpace.id, { ...payload, semester }, handleUnauthorized);
-      } else {
-        await createSpace({ ...payload, semester }, handleUnauthorized);
-      }
+      const spacePayload = {
+        ...payload,
+        semester,
+      };
+      const savedSpace = editingSpace?.id
+        ? await updateSpace(editingSpace.id, spacePayload, handleUnauthorized)
+        : await createSpace(spacePayload, handleUnauthorized);
+      await syncPracticeHeadAssignment(savedSpace, payload.practiceHeadId);
       closeForm();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Error al guardar ambiente");
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const syncPracticeHeadAssignment = async (space, nextPracticeHeadId) => {
+    if (!canLoadPracticeHeads || !space?.id) {
+      return;
+    }
+
+    const currentPracticeHead = practiceHeads.find((practiceHead) =>
+      practiceHead.labAssignments?.some((assignment) => assignment.spaceId === space.id)
+    );
+    const shouldManagePracticeHead = space.spaceType === "LABORATORIO";
+    const targetPracticeHeadId = shouldManagePracticeHead ? nextPracticeHeadId : null;
+
+    if (currentPracticeHead && currentPracticeHead.id !== targetPracticeHeadId) {
+      await updatePracticeHead(
+        currentPracticeHead.id,
+        {
+          firstName: currentPracticeHead.firstName,
+          lastName: currentPracticeHead.lastName,
+          semester: currentPracticeHead.semester ?? semester,
+          email: currentPracticeHead.email,
+          phone: currentPracticeHead.phone,
+          labAssignments: (currentPracticeHead.labAssignments ?? [])
+            .filter((assignment) => assignment.spaceId !== space.id)
+            .map((assignment) => ({ spaceId: assignment.spaceId })),
+        },
+        handleUnauthorized
+      );
+    }
+
+    if (!targetPracticeHeadId || currentPracticeHead?.id === targetPracticeHeadId) {
+      return;
+    }
+
+    const targetPracticeHead = practiceHeads.find((practiceHead) => practiceHead.id === targetPracticeHeadId);
+    if (!targetPracticeHead) {
+      throw new Error("Jefe de práctica no encontrado");
+    }
+
+    await updatePracticeHead(
+      targetPracticeHead.id,
+      {
+        firstName: targetPracticeHead.firstName,
+        lastName: targetPracticeHead.lastName,
+        semester: targetPracticeHead.semester ?? semester,
+        email: targetPracticeHead.email,
+        phone: targetPracticeHead.phone,
+        labAssignments: [
+          ...(targetPracticeHead.labAssignments ?? [])
+            .filter((assignment) => assignment.spaceId !== space.id)
+            .map((assignment) => ({ spaceId: assignment.spaceId })),
+          { spaceId: space.id },
+        ],
+      },
+      handleUnauthorized
+    );
   };
 
   const handleDelete = async (space) => {
@@ -248,6 +360,7 @@ function Spaces({ searchFilter, onClearSearchFilter }) {
       {isFormView ? (
         <SpaceForm
           space={editingSpace}
+          practiceHeads={practiceHeads}
           onSubmit={handleFormSubmit}
           onCancel={closeForm}
           isSubmitting={isSubmitting}
@@ -322,16 +435,6 @@ function Spaces({ searchFilter, onClearSearchFilter }) {
               <div className="flex items-center gap-1">
                 <Button
                   type="button"
-                  variant={viewMode === "grid" ? "default" : "outline"}
-                  size="icon"
-                  onClick={() => setViewMode("grid")}
-                  aria-label="Vista en cuadrícula"
-                  title="Vista en cuadrícula"
-                >
-                  <LayoutGrid className="size-4" />
-                </Button>
-                <Button
-                  type="button"
                   variant={viewMode === "list" ? "default" : "outline"}
                   size="icon"
                   onClick={() => setViewMode("list")}
@@ -339,6 +442,26 @@ function Spaces({ searchFilter, onClearSearchFilter }) {
                   title="Vista en lista"
                 >
                   <List className="size-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant={viewMode === "calendar" ? "default" : "outline"}
+                  size="icon"
+                  onClick={() => setViewMode("calendar")}
+                  aria-label="Vista calendario"
+                  title="Vista calendario"
+                >
+                  <CalendarDays className="size-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant={viewMode === "grid" ? "default" : "outline"}
+                  size="icon"
+                  onClick={() => setViewMode("grid")}
+                  aria-label="Vista en cuadrícula"
+                  title="Vista en cuadrícula"
+                >
+                  <LayoutGrid className="size-4" />
                 </Button>
               </div>
 
@@ -372,6 +495,13 @@ function Spaces({ searchFilter, onClearSearchFilter }) {
                 ? "No se encontró el ambiente seleccionado."
                 : "No hay ambientes que coincidan con los filtros seleccionados."}
             </p>
+          ) : viewMode === "calendar" ? (
+            <SpaceCalendarView
+              spaces={spaces}
+              scheduleSlots={scheduleSlots}
+              blocks={scheduleBlocks}
+              isLoading={isLoading}
+            />
           ) : (
             <div
               className={cn(

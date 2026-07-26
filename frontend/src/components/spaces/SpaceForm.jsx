@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/combobox";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSemester } from "@/contexts/SemesterContext";
-import { listCourses, listPracticeHeads } from "@/lib/api";
+import { listCourses } from "@/lib/api";
 import { normalizeSearchText } from "@/lib/search";
 import {
   allowedShiftsForCycle,
@@ -37,14 +37,13 @@ const EMPTY_ASSIGNMENT = {
   subShift: null,
 };
 
-const UNASSIGNED_MANAGER_LABEL = "Sin encargado";
-
 const EMPTY_FORM = {
   name: "",
   spaceType: "AULA",
   availability: "DISPONIBLE",
   managerName: "",
   managerPhone: "",
+  practiceHeadId: null,
   assignments: [{ ...EMPTY_ASSIGNMENT }],
 };
 
@@ -60,6 +59,7 @@ function spaceToForm(space) {
       space.availability === "EN_MANTENIMIENTO" ? "EN_MANTENIMIENTO" : "DISPONIBLE",
     managerName: space.managerName ?? "",
     managerPhone: space.managerPhone ?? "",
+    practiceHeadId: space.practiceHeadId ?? null,
     assignments:
       space.assignments?.length > 0
         ? space.assignments.map((assignment) => ({
@@ -80,17 +80,15 @@ function findCourseByName(courses, courseName) {
   return courses.find((course) => normalizeSearchText(course.name) === normalized) ?? null;
 }
 
-function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
+function SpaceForm({ space, practiceHeads = [], onSubmit, onCancel, isSubmitting, error }) {
   const { logout } = useAuth();
   const { semester } = useSemester();
   const [form, setForm] = useState(EMPTY_FORM);
   const [courses, setCourses] = useState([]);
-  const [practiceHeads, setPracticeHeads] = useState([]);
   const [isLoadingCourses, setIsLoadingCourses] = useState(false);
-  const [isLoadingPracticeHeads, setIsLoadingPracticeHeads] = useState(true);
   const spaceTypeAnchor = useComboboxAnchor();
   const availabilityAnchor = useComboboxAnchor();
-  const managerAnchor = useComboboxAnchor();
+  const practiceHeadAnchor = useComboboxAnchor();
 
   useEffect(() => {
     let cancelled = false;
@@ -119,46 +117,6 @@ function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
   useEffect(() => {
     setForm(spaceToForm(space));
   }, [space]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setIsLoadingPracticeHeads(true);
-    listPracticeHeads({ semester }, logout)
-      .then((data) => {
-        if (!cancelled) {
-          setPracticeHeads(data ?? []);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setPracticeHeads([]);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsLoadingPracticeHeads(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [semester, logout]);
-
-  useEffect(() => {
-    if (!form.managerName || isLoadingPracticeHeads) {
-      return;
-    }
-    const selectedExists = practiceHeads.some(
-      (practiceHead) => practiceHead.fullName === form.managerName
-    );
-    if (!selectedExists) {
-      setForm((current) => ({
-        ...current,
-        managerName: "",
-        managerPhone: "",
-      }));
-    }
-  }, [form.managerName, isLoadingPracticeHeads, practiceHeads]);
 
   const hasInvalidCourses = form.assignments.some((assignment) => {
     const normalized = normalizeSearchText(assignment.courseName);
@@ -202,8 +160,9 @@ function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
       name: form.name.trim(),
       spaceType: form.spaceType,
       availability: form.availability,
-      managerName: form.managerName.trim() || null,
-      managerPhone: form.managerPhone.trim() || null,
+      managerName: form.spaceType === "LABORATORIO" ? null : form.managerName.trim() || null,
+      managerPhone: form.spaceType === "LABORATORIO" ? null : form.managerPhone.trim() || null,
+      practiceHeadId: form.spaceType === "LABORATORIO" ? form.practiceHeadId : null,
       assignments: form.assignments
         .filter((assignment) => findCourseByName(courses, assignment.courseName))
         .map((assignment) => {
@@ -225,11 +184,9 @@ function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
 
   const isEditing = Boolean(space?.id);
   const selectedPracticeHead =
-    practiceHeads.find((practiceHead) => practiceHead.fullName === form.managerName) ?? null;
-  const managerOptions = [
-    UNASSIGNED_MANAGER_LABEL,
-    ...practiceHeads.map((practiceHead) => practiceHead.fullName),
-  ];
+    practiceHeads.find((practiceHead) => practiceHead.id === form.practiceHeadId) ?? null;
+  const requiresPracticeHead = form.spaceType === "LABORATORIO";
+  const hasMissingPracticeHead = requiresPracticeHead && !form.practiceHeadId;
 
   return (
     <form className="flex flex-col gap-6 pb-6" onSubmit={handleSubmit}>
@@ -340,55 +297,71 @@ function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-2">
             <Label htmlFor="space-manager-name">Encargado</Label>
-            <div ref={managerAnchor} className="w-full">
-              <Combobox
-                items={managerOptions}
-                value={selectedPracticeHead?.fullName ?? UNASSIGNED_MANAGER_LABEL}
-                onValueChange={(label) => {
-                  if (label === UNASSIGNED_MANAGER_LABEL) {
+            {requiresPracticeHead ? (
+              <div ref={practiceHeadAnchor} className="w-full">
+                <Combobox
+                  items={practiceHeads.map((practiceHead) => practiceHead.fullName)}
+                  value={selectedPracticeHead?.fullName ?? ""}
+                  onValueChange={(label) => {
+                    const practiceHead =
+                      practiceHeads.find((item) => item.fullName === label) ?? null;
                     setForm((current) => ({
                       ...current,
-                      managerName: "",
-                      managerPhone: "",
+                      practiceHeadId: practiceHead?.id ?? null,
                     }));
-                    return;
-                  }
-                  const practiceHead = practiceHeads.find((item) => item.fullName === label);
-                  setForm((current) => ({
-                    ...current,
-                    managerName: practiceHead?.fullName ?? "",
-                    managerPhone: practiceHead?.phone ?? "",
-                  }));
-                }}
-                disabled={isSubmitting || isLoadingPracticeHeads}
-              >
-                <ComboboxInput
-                  id="space-manager-name"
-                  placeholder="Seleccionar encargado"
-                  readOnly
-                />
-                <ComboboxContent anchor={managerAnchor}>
-                  <ComboboxEmpty>Sin jefes de práctica.</ComboboxEmpty>
-                  <ComboboxList>
-                    {(label) => (
-                      <ComboboxItem key={label} value={label}>
-                        {label}
-                      </ComboboxItem>
-                    )}
-                  </ComboboxList>
-                </ComboboxContent>
-              </Combobox>
-            </div>
+                  }}
+                  disabled={isSubmitting}
+                >
+                  <ComboboxInput
+                    id="space-manager-name"
+                    placeholder="Seleccionar jefe de práctica"
+                    readOnly
+                  />
+                  <ComboboxContent anchor={practiceHeadAnchor}>
+                    <ComboboxEmpty>Sin jefes de práctica.</ComboboxEmpty>
+                    <ComboboxList>
+                      {(label) => (
+                        <ComboboxItem key={label} value={label}>
+                          {label}
+                        </ComboboxItem>
+                      )}
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
+              </div>
+            ) : (
+              <Input
+                id="space-manager-name"
+                value={form.managerName}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, managerName: event.target.value }))
+                }
+                disabled={isSubmitting}
+                placeholder="Nombre del encargado"
+              />
+            )}
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="space-manager-phone">Teléfono del encargado</Label>
-            <Input
-              id="space-manager-phone"
-              value={form.managerPhone}
-              readOnly
-              disabled={isSubmitting}
-              placeholder="Sin teléfono"
-            />
+            {requiresPracticeHead ? (
+              <Input
+                id="space-manager-phone"
+                value={selectedPracticeHead?.phone ?? ""}
+                readOnly
+                disabled={isSubmitting}
+                placeholder="Sin teléfono"
+              />
+            ) : (
+              <Input
+                id="space-manager-phone"
+                value={form.managerPhone}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, managerPhone: event.target.value }))
+                }
+                disabled={isSubmitting}
+                placeholder="Sin teléfono"
+              />
+            )}
           </div>
         </div>
 
@@ -436,7 +409,15 @@ function SpaceForm({ space, onSubmit, onCancel, isSubmitting, error }) {
         <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
           Cancelar
         </Button>
-        <Button type="submit" disabled={isSubmitting || hasInvalidCourses || hasMissingSubShift}>
+        <Button
+          type="submit"
+          disabled={
+            isSubmitting
+            || hasInvalidCourses
+            || hasMissingSubShift
+            || hasMissingPracticeHead
+          }
+        >
           {isSubmitting ? "Guardando..." : isEditing ? "Actualizar" : "Crear"}
         </Button>
       </div>

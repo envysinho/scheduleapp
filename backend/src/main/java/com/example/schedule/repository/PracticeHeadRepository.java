@@ -11,4 +11,8 @@ public interface PracticeHeadRepository extends JpaRepository<PracticeHead, Long
     List<PracticeHead> findAllByOrderByLastNameAscFirstNameAsc();
 
     List<PracticeHead> findBySemesterOrderByLastNameAscFirstNameAsc(String semester);
+
+    boolean existsByLabAssignmentsSpaceId(Long spaceId);
+
+    boolean existsByLabAssignmentsSpaceIdAndIdNot(Long spaceId, Long id);
 }

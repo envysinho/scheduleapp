@@ -142,16 +142,19 @@ public class CourseService {
         Course course = getCourseOrThrow(id);
         Set<TeacherAssignmentLog> previousTeachers = teacherAssignmentLogs(course);
         Set<SpaceAssignmentLog> previousSpaces = spaceAssignmentLogs(course);
-        List<Long> teacherAssignmentIds = course.getTeacherAssignments().stream()
-                .map(CourseTeacherAssignment::getId)
-                .filter(java.util.Objects::nonNull)
-                .toList();
-        course.getTeacherAssignments().clear();
-        courseRepository.save(course);
-        courseRepository.flush();
-        if (!teacherAssignmentIds.isEmpty()) {
-            assignmentRepository.deleteAllByIdInBatch(teacherAssignmentIds);
-            assignmentRepository.flush();
+        boolean shouldPreserveTeacherAssignments = shouldPreserveTeacherAssignments(request);
+        if (!shouldPreserveTeacherAssignments) {
+            List<Long> teacherAssignmentIds = course.getTeacherAssignments().stream()
+                    .map(CourseTeacherAssignment::getId)
+                    .filter(java.util.Objects::nonNull)
+                    .toList();
+            course.getTeacherAssignments().clear();
+            courseRepository.save(course);
+            courseRepository.flush();
+            if (!teacherAssignmentIds.isEmpty()) {
+                assignmentRepository.deleteAllByIdInBatch(teacherAssignmentIds);
+                assignmentRepository.flush();
+            }
         }
         applyCourseFields(
                 course,
@@ -164,7 +167,8 @@ public class CourseService {
                 request.requiredSpaceType(),
                 request.morningTeacherId(),
                 request.afternoonTeacherId(),
-                request.nightTeacherId());
+                request.nightTeacherId(),
+                shouldPreserveTeacherAssignments);
         course.replaceSpaceAssignments(toSpaceAssignments(course, request.spaceAssignments()));
         Course saved = courseRepository.save(course);
         notificationService.record("actualizó el curso " + saved.getName());
@@ -334,6 +338,34 @@ public class CourseService {
             Long morningTeacherId,
             Long afternoonTeacherId,
             Long nightTeacherId) {
+        applyCourseFields(
+                course,
+                name,
+                code,
+                semester,
+                type,
+                lectivo,
+                cycle,
+                requiredSpaceType,
+                morningTeacherId,
+                afternoonTeacherId,
+                nightTeacherId,
+                false);
+    }
+
+    private void applyCourseFields(
+            Course course,
+            String name,
+            String code,
+            String semester,
+            CourseType type,
+            boolean lectivo,
+            Integer cycle,
+            SpaceType requiredSpaceType,
+            Long morningTeacherId,
+            Long afternoonTeacherId,
+            Long nightTeacherId,
+            boolean preserveTeacherAssignments) {
         course.setName(name.trim());
         course.setCode(normalizeCode(code));
         course.setSemester(Semester.normalize(semester));
@@ -341,6 +373,11 @@ public class CourseService {
         course.setLectivo(lectivo);
         course.setCycle(cycle);
         course.setRequiredSpaceType(requiredSpaceType);
+
+        if (preserveTeacherAssignments) {
+            course.deriveShiftTeachers();
+            return;
+        }
 
         List<CourseTeacherAssignment> assignments = new ArrayList<>();
         if (CourseCycleRules.isNightOnlyCycle(cycle)) {
@@ -365,6 +402,12 @@ public class CourseService {
             course.getTeacherAssignments().add(a);
         }
         course.deriveShiftTeachers();
+    }
+
+    private boolean shouldPreserveTeacherAssignments(UpdateCourseRequest request) {
+        return request.morningTeacherId() == null
+                && request.afternoonTeacherId() == null
+                && request.nightTeacherId() == null;
     }
 
     private CourseTeacherAssignment buildAssignment(Course course, Long teacherId, TeacherShift shift) {

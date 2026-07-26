@@ -78,6 +78,10 @@ function SpaceActions({ space, onEdit, onDelete }) {
 }
 
 function SpaceManager({ space, compact = false }) {
+  if (space.spaceType === "LABORATORIO") {
+    return null;
+  }
+
   if (!space.managerName && !space.managerPhone) {
     return null;
   }
@@ -94,6 +98,29 @@ function SpaceManager({ space, compact = false }) {
         <p className="flex items-center gap-2 text-muted-foreground">
           <Phone className="size-3.5 shrink-0" />
           <span className={compact ? "truncate" : undefined}>{space.managerPhone}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+function SpacePracticeHead({ space, compact = false }) {
+  if (!space.practiceHeadName && !space.practiceHeadPhone) {
+    return null;
+  }
+
+  return (
+    <div className={compact ? "flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1" : "shrink-0 space-y-1"}>
+      {space.practiceHeadName && (
+        <p className="flex min-w-0 items-center gap-2 text-muted-foreground">
+          <User className="size-3.5 shrink-0" />
+          <span className="truncate">Jefe de practica: {space.practiceHeadName}</span>
+        </p>
+      )}
+      {space.practiceHeadPhone && (
+        <p className="flex items-center gap-2 text-muted-foreground">
+          <Phone className="size-3.5 shrink-0" />
+          <span className={compact ? "truncate" : undefined}>{space.practiceHeadPhone}</span>
         </p>
       )}
     </div>
@@ -144,6 +171,7 @@ function SpaceCardGrid({ space, isAdmin, onEdit, onDelete }) {
 
       <CardContent className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden text-sm">
         <SpaceManager space={space} />
+        <SpacePracticeHead space={space} />
         <SpaceAssignments assignments={space.assignments} />
       </CardContent>
 
@@ -170,6 +198,7 @@ function SpaceCardList({ space, isAdmin, onEdit, onDelete }) {
 
         <div className="min-w-0 space-y-1 text-sm">
           <SpaceManager space={space} compact />
+          <SpacePracticeHead space={space} compact />
           <SpaceAssignments assignments={space.assignments} compact />
         </div>
 
