@@ -160,7 +160,7 @@ function CourseTeachers({ course, compact = false }) {
   }
 
   return (
-    <div className="grid shrink-0 gap-1 sm:grid-cols-2">
+    <div className="shrink-0 space-y-1">
       {entries.map(({ id, name, shiftsText }) => (
         <p key={id} className="flex min-w-0 items-center gap-2 text-muted-foreground">
           <User className="size-3.5 shrink-0" />
@@ -220,7 +220,12 @@ function CourseTitle({ course, compact = false }) {
           ) : null}
         </p>
       ) : (
-        <CardTitle className="truncate">{course.name}</CardTitle>
+        <>
+          <CardTitle className="truncate">{course.name}</CardTitle>
+          {primarySpace ? (
+            <p className="mt-0.5 truncate text-sm text-muted-foreground">{primarySpace}</p>
+          ) : null}
+        </>
       )}
     </div>
   );
