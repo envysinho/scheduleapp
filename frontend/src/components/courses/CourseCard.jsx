@@ -189,10 +189,7 @@ function CourseSpaces({ spaceAssignments, compact = false }) {
   }
 
   return (
-    <div className="min-h-0 flex-1 space-y-2">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        Ambientes
-      </p>
+    <div className="min-h-0 flex-1">
       <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto">
         {spaceAssignments.map((assignment) => (
           <li
@@ -223,12 +220,7 @@ function CourseTitle({ course, compact = false }) {
           ) : null}
         </p>
       ) : (
-        <>
-          <CardTitle className="truncate">{course.name}</CardTitle>
-          {primarySpace ? (
-            <p className="mt-0.5 truncate text-sm text-muted-foreground">{primarySpace}</p>
-          ) : null}
-        </>
+        <CardTitle className="truncate">{course.name}</CardTitle>
       )}
     </div>
   );
