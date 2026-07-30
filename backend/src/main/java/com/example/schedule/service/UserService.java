@@ -205,15 +205,13 @@ public class UserService {
             jdbcTemplate.execute("""
                     UPDATE users
                     SET role = CASE
-                        WHEN role = 'ADMIN' THEN 'OWNER'
                         WHEN role = 'USER' OR role IS NULL OR BTRIM(role) = '' THEN 'DOCENTE'
-                        WHEN role IN ('OWNER', 'DOCENTE', 'ESTUDIANTE') THEN role
+                        WHEN role IN ('OWNER', 'ADMIN', 'DOCENTE', 'ESTUDIANTE') THEN role
                         ELSE 'DOCENTE'
                     END
                     WHERE role IS DISTINCT FROM CASE
-                        WHEN role = 'ADMIN' THEN 'OWNER'
                         WHEN role = 'USER' OR role IS NULL OR BTRIM(role) = '' THEN 'DOCENTE'
-                        WHEN role IN ('OWNER', 'DOCENTE', 'ESTUDIANTE') THEN role
+                        WHEN role IN ('OWNER', 'ADMIN', 'DOCENTE', 'ESTUDIANTE') THEN role
                         ELSE 'DOCENTE'
                     END
                     """);
