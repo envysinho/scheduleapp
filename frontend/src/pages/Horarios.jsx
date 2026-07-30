@@ -7,15 +7,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import {
-  Combobox,
-  ComboboxContent,
-  ComboboxEmpty,
-  ComboboxInput,
-  ComboboxItem,
-  ComboboxList,
-  useComboboxAnchor,
-} from "@/components/ui/combobox";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSemester } from "@/contexts/SemesterContext";
 import {
@@ -122,7 +113,9 @@ function Horarios({ cycle = 1 }) {
   const slotsByDay = useMemo(() => {
     const groups = Object.fromEntries(WEEKDAYS.map((day) => [day.value, []]));
     for (const slot of schedule?.slots ?? []) {
-      groups[slot.weekday]?.push(slot);
+      if (!slot.automaticWeekday) {
+        groups[slot.weekday]?.push(slot);
+      }
     }
     return groups;
   }, [schedule]);
@@ -152,6 +145,16 @@ function Horarios({ cycle = 1 }) {
   const allWarnings = useMemo(
     () => [...(schedule?.warnings ?? []), ...dayConflicts],
     [schedule?.warnings, dayConflicts]
+  );
+  const unassignedAssignments = useMemo(
+    () =>
+      assignments
+        .filter((assignment) => !assignment.weekday)
+        .map((assignment) => ({
+          ...assignment,
+          suggestedSlot: findSlotByAssignmentId(schedule, assignment.id),
+        })),
+    [assignments, schedule]
   );
 
   const handleAssignmentScheduleChange = async (assignmentId, nextSchedule) => {
@@ -221,15 +224,6 @@ function Horarios({ cycle = 1 }) {
     }
   };
 
-  const handleWeekdayChange = async (assignmentId, weekday) => {
-    const currentSlot = findSlotByAssignmentId(schedule, assignmentId);
-    await handleAssignmentScheduleChange(assignmentId, {
-      weekday,
-      startTime: weekday ? currentSlot?.startTime ?? null : null,
-      endTime: weekday ? currentSlot?.endTime ?? null : null,
-    });
-  };
-
   return (
     <PageCard
       title={`Horarios — ${cycleLabel}`}
@@ -261,59 +255,15 @@ function Horarios({ cycle = 1 }) {
           <ColorScheduleView
             blocks={blocks}
             slotsByDay={slotsByDay}
+            unassignedAssignments={unassignedAssignments}
             savingAssignmentId={savingAssignmentId}
             onUpdateSlot={handleAssignmentScheduleChange}
           />
         )}
 
-        <AssignmentDayPlanner
-          assignments={assignments}
-          savingAssignmentId={savingAssignmentId}
-          onWeekdayChange={handleWeekdayChange}
-        />
-
         <WarningsPanel warnings={allWarnings} />
       </div>
     </PageCard>
-  );
-}
-
-function AssignmentDayPlanner({ assignments, savingAssignmentId, onWeekdayChange }) {
-  if (!assignments.length) {
-    return null;
-  }
-
-  return (
-    <section className="rounded-md border">
-      <div className="border-b px-3 py-2">
-        <h3 className="text-sm font-semibold">Días asignados</h3>
-        <p className="text-xs text-muted-foreground">
-          Sin día se ubica automáticamente y se muestra opaco en la vista Color.
-        </p>
-      </div>
-      <div className="grid gap-2 p-3 md:grid-cols-2">
-        {assignments.map((assignment) => (
-          <div
-            key={assignment.id}
-            className="grid gap-2 rounded-md bg-muted/40 p-2 text-sm sm:grid-cols-[minmax(0,1fr)_9rem]"
-          >
-            <span className="min-w-0">
-              <span className="block truncate font-medium">
-                {assignment.courseCode} · {assignment.courseName}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {assignment.teacherName} · {slotSubtitle(assignment)}
-              </span>
-            </span>
-            <WeekdayCombobox
-              value={assignment.weekday}
-              disabled={savingAssignmentId === assignment.id}
-              onChange={(weekday) => onWeekdayChange(assignment.id, weekday)}
-            />
-          </div>
-        ))}
-      </div>
-    </section>
   );
 }
 
@@ -336,38 +286,6 @@ function WarningsPanel({ warnings }) {
         </div>
       </CollapsibleContent>
     </Collapsible>
-  );
-}
-
-function WeekdayCombobox({ value, disabled, onChange }) {
-  const anchor = useComboboxAnchor();
-  const selectedLabel = value ? getWeekdayLabel(value, true) : "Sin día";
-  const options = ["Sin día", ...WEEKDAYS.map((day) => day.longLabel)];
-
-  return (
-    <div ref={anchor} className="w-full">
-      <Combobox
-        items={options}
-        value={selectedLabel}
-        onValueChange={(label) => {
-          const weekday = WEEKDAYS.find((day) => day.longLabel === label);
-          onChange(weekday?.value ?? null);
-        }}
-        disabled={disabled}
-      >
-        <ComboboxInput placeholder="Día" readOnly />
-        <ComboboxContent anchor={anchor}>
-          <ComboboxEmpty>Sin opciones.</ComboboxEmpty>
-          <ComboboxList>
-            {(label) => (
-              <ComboboxItem key={label} value={label}>
-                {label}
-              </ComboboxItem>
-            )}
-          </ComboboxList>
-        </ComboboxContent>
-      </Combobox>
-    </div>
   );
 }
 
@@ -411,7 +329,13 @@ function findManualDayConflicts(assignments) {
   return conflicts;
 }
 
-function ColorScheduleView({ blocks, slotsByDay, savingAssignmentId, onUpdateSlot }) {
+function ColorScheduleView({
+  blocks,
+  slotsByDay,
+  unassignedAssignments,
+  savingAssignmentId,
+  onUpdateSlot,
+}) {
   const bounds = getDayBounds(blocks);
   const hourMarks = buildHourMarks(bounds.start, bounds.end);
   const dayRefs = useRef(new Map());
@@ -440,7 +364,18 @@ function ColorScheduleView({ blocks, slotsByDay, savingAssignmentId, onUpdateSlo
         const nextWeekday =
           current.type === "resize"
             ? current.previewWeekday
-            : pickWeekdayFromPointer(dayRefs.current, event.clientX, current.previewWeekday);
+            : current.origin === "unassigned"
+              ? pickDropWeekdayFromPointer(dayRefs.current, event.clientX, event.clientY)
+              : pickWeekdayFromPointer(dayRefs.current, event.clientX, current.previewWeekday);
+
+        if (current.origin === "unassigned" && !nextWeekday) {
+          return {
+            ...current,
+            x: event.clientX,
+            y: event.clientY,
+            previewWeekday: null,
+          };
+        }
 
         const shiftBounds = getShiftBounds(blocks, current.slot.shift, bounds);
         if (!shiftBounds) {
@@ -494,8 +429,12 @@ function ColorScheduleView({ blocks, slotsByDay, savingAssignmentId, onUpdateSlo
       if (!current || savingAssignmentId != null) {
         return;
       }
+      if (current.origin === "unassigned" && !current.previewWeekday) {
+        return;
+      }
 
       const changed =
+        current.origin === "unassigned" ||
         current.previewWeekday !== current.slot.weekday ||
         current.previewStartTime !== current.slot.startTime ||
         current.previewEndTime !== current.slot.endTime;
@@ -572,33 +511,73 @@ function ColorScheduleView({ blocks, slotsByDay, savingAssignmentId, onUpdateSlo
     });
   };
 
-  return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[3.5rem_repeat(5,minmax(0,1fr))]">
-      <div className="hidden xl:flex xl:w-14 xl:flex-col xl:gap-3">
-        <div className="text-center text-xs font-medium text-muted-foreground opacity-0 select-none">
-          Hora
-        </div>
-        <div className="relative min-h-[560px] py-3">
-          {hourMarks.map((mark) => (
-            <span
-              key={`${mark.label}-${mark.top}`}
-              className="absolute right-0 w-full -translate-y-1/2 pr-2 text-right font-mono text-[10px] tabular-nums leading-none text-muted-foreground/80"
-              style={{ top: `${mark.top}%` }}
-            >
-              {mark.label}
-            </span>
-          ))}
-        </div>
-      </div>
+  const startUnassignedInteraction = (event, assignment) => {
+    if (savingAssignmentId != null) {
+      return;
+    }
+    event.preventDefault();
 
-      {WEEKDAYS.map((day) => (
-        <section
-          key={day.value}
-          className={cn(
-            "flex min-w-0 flex-col gap-2 rounded-2xl transition-colors",
-            interaction?.previewWeekday === day.value && "bg-primary/5"
-          )}
-        >
+    const shiftBounds = getShiftBounds(blocks, assignment.shift, bounds) ?? bounds;
+    const suggestedSlot = assignment.suggestedSlot;
+    const startMinutes =
+      parseTimeToMinutes(suggestedSlot?.startTime) ?? shiftBounds.start;
+    const suggestedEndMinutes = parseTimeToMinutes(suggestedSlot?.endTime);
+    const endMinutes =
+      suggestedEndMinutes != null && suggestedEndMinutes > startMinutes
+        ? suggestedEndMinutes
+        : Math.min(startMinutes + 60, shiftBounds.end);
+    const slot = {
+      ...assignment,
+      ...(suggestedSlot ?? {}),
+      assignmentId: assignment.id,
+      automaticWeekday: false,
+      startTime: formatMinutesToTime(startMinutes),
+      endTime: formatMinutesToTime(endMinutes),
+    };
+
+    setInteraction({
+      type: "move",
+      origin: "unassigned",
+      assignmentId: assignment.id,
+      slot,
+      x: event.clientX,
+      y: event.clientY,
+      durationMinutes: endMinutes - startMinutes,
+      pointerOffsetMinutes: (endMinutes - startMinutes) / 2,
+      previewWeekday: null,
+      previewStartTime: slot.startTime,
+      previewEndTime: slot.endTime,
+    });
+  };
+
+  return (
+    <>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[3.5rem_repeat(5,minmax(0,1fr))]">
+        <div className="hidden xl:flex xl:w-14 xl:flex-col xl:gap-3">
+          <div className="text-center text-xs font-medium text-muted-foreground opacity-0 select-none">
+            Hora
+          </div>
+          <div className="relative min-h-[560px] py-3">
+            {hourMarks.map((mark) => (
+              <span
+                key={`${mark.label}-${mark.top}`}
+                className="absolute right-0 w-full -translate-y-1/2 pr-2 text-right font-mono text-[10px] tabular-nums leading-none text-muted-foreground/80"
+                style={{ top: `${mark.top}%` }}
+              >
+                {mark.label}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {WEEKDAYS.map((day) => (
+          <section
+            key={day.value}
+            className={cn(
+              "flex min-w-0 flex-col gap-2 rounded-2xl transition-colors",
+              interaction?.previewWeekday === day.value && "bg-primary/5"
+            )}
+          >
           <div className="px-1 text-center text-xs font-semibold tracking-[0.08em] text-muted-foreground uppercase">
             {day.label}
           </div>
@@ -707,8 +686,43 @@ function ColorScheduleView({ blocks, slotsByDay, savingAssignmentId, onUpdateSlo
               })}
             </div>
           </div>
+          </section>
+        ))}
+      </div>
+
+      {unassignedAssignments.length > 0 && (
+        <section className="mt-4 rounded-xl border">
+          <div className="border-b px-3 py-2">
+            <h3 className="text-sm font-semibold">Cursos sin asignar</h3>
+            <p className="text-xs text-muted-foreground">
+              Arrastra un curso hacia el día y la hora donde deseas colocarlo.
+            </p>
+          </div>
+          <div className="grid gap-2 p-3 md:grid-cols-2">
+            {unassignedAssignments.map((assignment) => (
+              <article
+                key={assignment.id}
+                className={cn(
+                  "touch-none rounded-xl border px-3 py-2 text-[11px] leading-tight shadow-sm transition-all",
+                  getCourseColorStyle(assignment),
+                  savingAssignmentId == null &&
+                    "cursor-grab hover:-translate-y-0.5 hover:shadow-md active:cursor-grabbing",
+                  interaction?.assignmentId === assignment.id && "opacity-40"
+                )}
+                onPointerDown={(event) => startUnassignedInteraction(event, assignment)}
+                title={`Arrastra ${assignment.courseCode} para asignarlo al horario`}
+              >
+                <div className="font-semibold">
+                  {assignment.courseCode} · {assignment.courseName}
+                </div>
+                <div className="mt-0.5 truncate opacity-80">
+                  {assignment.teacherName} · {slotSubtitle(assignment)}
+                </div>
+              </article>
+            ))}
+          </div>
         </section>
-      ))}
+      )}
 
       {interaction && (
         <div
@@ -738,7 +752,7 @@ function ColorScheduleView({ blocks, slotsByDay, savingAssignmentId, onUpdateSlo
           </article>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -788,6 +802,21 @@ function pickWeekdayFromPointer(dayRefs, clientX, fallbackWeekday) {
     }
   }
   return fallbackWeekday;
+}
+
+function pickDropWeekdayFromPointer(dayRefs, clientX, clientY) {
+  for (const [weekday, node] of dayRefs.entries()) {
+    const rect = node.getBoundingClientRect();
+    if (
+      clientX >= rect.left &&
+      clientX <= rect.right &&
+      clientY >= rect.top &&
+      clientY <= rect.bottom
+    ) {
+      return weekday;
+    }
+  }
+  return null;
 }
 
 function minutesFromPointer(dayRefs, weekday, clientY, bounds) {
