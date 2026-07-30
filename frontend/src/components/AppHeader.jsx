@@ -182,6 +182,15 @@ function AppHeader({ isDark, onToggleTheme, onSearchSelect }) {
     });
   };
 
+  const handleNotificationAuxClick = (event) => {
+    if (event.button !== 1) {
+      return;
+    }
+    event.preventDefault();
+    clearRecentNotifications();
+    setIsNotificationsOpen(false);
+  };
+
   return (
     <header className="flex flex-wrap items-center gap-2 border-b px-3 py-2 md:flex-nowrap md:px-4">
       <div className="flex min-w-0 shrink-0 items-center gap-2">
@@ -225,6 +234,8 @@ function AppHeader({ isDark, onToggleTheme, onSearchSelect }) {
             size="icon"
             className="relative"
             onClick={toggleNotifications}
+            onAuxClick={handleNotificationAuxClick}
+            title="Clic central para limpiar notificaciones"
             aria-expanded={isNotificationsOpen}
             aria-haspopup="dialog"
             aria-controls="notifications-panel"
